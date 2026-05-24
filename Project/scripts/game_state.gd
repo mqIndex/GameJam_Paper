@@ -482,11 +482,9 @@ func _start_turn() -> void:
 	skills_played_this_turn = 0
 	# 抽牌 (会发 hand_changed)
 	# 每天第 1 回合摸 6 张 (首日及每天开始时的"起始手牌"); 其它回合摸 2 张.
-	# 配合 leave_shop_to_next_day() / new_level() 的"手牌洗回"逻辑, 每天独立发起始手牌.
+	# 整局首回合: 先种 1 买 + 1 卖 + 1 技能, 再补到 6 张 (策划 7.2.8, 修复 "缺类型补 1 → 7 张" bug)
 	if turn_in_day == 1:
-		draw_cards(FIRST_TURN_DRAW)
 		if turn_global == 1:
-			_ensure_first_turn_floor()
 			_seed_first_turn()
 			var to_draw: int = max(0, FIRST_TURN_DRAW - hand.size())
 			if to_draw > 0:
@@ -537,7 +535,6 @@ func _settle_turn() -> void:
 		var min_p: float = max(1.0, day_open_price * (1.0 - dn_cap))
 		if price < min_p: price = min_p
 	_track_price()
-	_log("  自然波动 %+.2f%% (¥%.2f → ¥%.2f)" % [drift * 100.0, old_price, price])
 	# 1.5 自然波动作为分时 K 最后一根
 	intraday_candles.append({
 		"open":  old_price,
@@ -694,10 +691,13 @@ func _emotion_modifier_for_price(rate: float) -> float:
 	else:
 		# sell / 砸盘 direction; 看下跌情绪 (=100-bull)
 		var bear_v: int = EMOTION_TOTAL - bull
-		if bear_v <= 30: return 0.5
-		elif bear_v <= 50: return 0.8
-		elif bear_v <= 70: return 1.5
-		else: return 2.0
+		if bear_v <= 30: m = 0.5
+		elif bear_v <= 50: m = 0.8
+		elif bear_v <= 70: m = 1.5
+		else: m = 2.0
+	if event_modifiers.has("emotion_modifier_mul"):
+		m *= float(event_modifiers["emotion_modifier_mul"])
+	return m
 
 
 # ===========================================================
@@ -817,9 +817,9 @@ func shop_upgrade_card(deck_index: int) -> bool:
 # 商店: 删卡
 func shop_delete_card(deck_index: int) -> bool:
 	if phase != Phase.SHOP: return false
-	var price: int = current_delete_price()
-	if cash < price:
-		_log("现金不足, 无法删卡 (需要 ¥%d)" % price)
+	var del_price: int = current_delete_price()
+	if cash < del_price:
+		_log("现金不足, 无法删卡 (需要 ¥%d)" % del_price)
 		return false
 	if get_deck_size() <= 1:
 		_log("牌组至少保留 1 张")
@@ -827,10 +827,10 @@ func shop_delete_card(deck_index: int) -> bool:
 	var entry: Dictionary = _locate_in_deck(deck_index)
 	if entry.is_empty(): return false
 	var card: Card = entry["card"]
-	cash -= price
+	cash -= del_price
 	(entry["pile"] as Array).remove_at(entry["index"])
 	shop_delete_count += 1
-	_log("[商店] 删除「%s」, 花费 ¥%d, 下次删卡 ¥%d" % [card.name, price, current_delete_price()])
+	_log("[商店] 删除「%s」, 花费 ¥%d, 下次删卡 ¥%d" % [card.name, del_price, current_delete_price()])
 	emit_signal("hand_changed")
 	emit_signal("shop_changed")
 	emit_signal("state_changed")
