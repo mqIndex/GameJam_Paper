@@ -14,7 +14,7 @@ signal card_hovered(is_hovering: bool)
 @onready var lbl_price: Label = $LblPrice
 @onready var btn_action: Button = $BtnAction
 
-const HOVER_SCALE: float = 1.12
+const HOVER_SCALE: float = 1.08
 const TWEEN_DURATION: float = 0.15
 
 var _tween: Tween = null

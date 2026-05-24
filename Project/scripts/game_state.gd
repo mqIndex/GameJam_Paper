@@ -11,8 +11,13 @@ const Event = preload("res://scripts/event.gd")
 const EventDatabase = preload("res://scripts/event_database.gd")
 const Talent = preload("res://scripts/talent.gd")
 const TalentDatabase = preload("res://scripts/talent_database.gd")
+const OpponentState = preload("res://scripts/systems/opponent_state.gd")
+const OpponentBrain = preload("res://scripts/systems/opponent_brain.gd")
+const OpponentDatabase = preload("res://scripts/systems/opponent_database.gd")
 
 var _effect_system: CardEffectSystem = null
+var _opponent_state: OpponentState = null
+var _opponent_brain: OpponentBrain = null
 
 # ===== 关卡/天/回合 (新手关) =====
 var DAYS_PER_LEVEL: int = 5
@@ -53,6 +58,12 @@ var SHOP_UPGRADE_PRICE: int = 1000
 var SHOP_DELETE_BASE_PRICE: int = 1000
 var SHOP_DELETE_PRICE_INCREMENT: int = 1000   # 策划: 后续每次删卡价格+1000
 
+# ===== 对手参数 =====
+var LEVEL_OPPONENT_ID: Array = ["boss_six", "boss_blade", "boss_snake"]
+var OPPONENT_DEFEAT_EMOTION_BONUS: int = 15
+var TIGHT_CASH_MULTIPLIER: int = 50
+var current_level_index: int = 0              # 当前关卡索引 (0-based)
+
 var shop_offers: Array = []                     # 当前商店可购买的卡 (Card 实例数组)
 var shop_delete_count: int = 0                  # 累计删卡次数, 用来计算下次删卡价
 # 天赋 (商店第 1 天上架, 跨天/跨关全程保留)
@@ -88,6 +99,13 @@ signal discard_choice_requested(hand_cards: Array)        # 顺势而为: 选 1 
 signal topdeck_choice_requested(draw_pile_cards: Array)   # 计划得当: 选 1 张抽牌堆牌上顶
 signal shatter_choice_requested(buy_sell_cards: Array)    # 化整为零: 多选 BUY/SELL 牌
 signal event_triggered(event)                    # Event 实例 或 null (清空时)
+# 对手信号
+signal opponent_entered(opponent_id: String)
+signal opponent_acted(action_id: String, params: Dictionary)
+signal opponent_action_played(action_name: String, params: Dictionary)
+signal opponent_state_changed
+signal opponent_defeated(opponent_id: String, reward_card_id: String)
+signal opponent_bubble(text: String)
 
 # ===== 局内状态 =====
 var cash: float = 100000.0
@@ -121,7 +139,7 @@ var daily_play_count: Dictionary = {}                    # effect_id → 本日�
 var candles: Array = []                         # 已结算回合 K, 每根 {turn_global, day, turn_in_day, open, high, low, close}
 var intraday_ticks: Array[float] = []           # 当前回合分时 (每个价格变化点都 append)
 var intraday_candles: Array = []                # 当前回合分时 K 事件序列, 每根 {open, high, low, close, kind}
-												# kind: "play" (出牌) / "settle" (回合末自然波动)
+												# kind: "play" / "opponent" / "settle"
 var cur_open: float = 0.0
 var cur_high: float = 0.0
 var cur_low: float = 0.0
@@ -166,6 +184,12 @@ func _apply_balance_from_cfg() -> void:
 	if b.has("SHOP_UPGRADE_PRICE"): SHOP_UPGRADE_PRICE = int(b["SHOP_UPGRADE_PRICE"])
 	if b.has("SHOP_DELETE_BASE_PRICE"): SHOP_DELETE_BASE_PRICE = int(b["SHOP_DELETE_BASE_PRICE"])
 	if b.has("SHOP_DELETE_PRICE_INCREMENT"): SHOP_DELETE_PRICE_INCREMENT = int(b["SHOP_DELETE_PRICE_INCREMENT"])
+	if b.has("LEVEL_OPPONENT_ID"):
+		var arr: Variant = b["LEVEL_OPPONENT_ID"]
+		if typeof(arr) == TYPE_ARRAY:
+			LEVEL_OPPONENT_ID = arr
+	if b.has("OPPONENT_DEFEAT_EMOTION_BONUS"): OPPONENT_DEFEAT_EMOTION_BONUS = int(b["OPPONENT_DEFEAT_EMOTION_BONUS"])
+	if b.has("TIGHT_CASH_MULTIPLIER"): TIGHT_CASH_MULTIPLIER = int(b["TIGHT_CASH_MULTIPLIER"])
 
 
 func new_level() -> void:
@@ -201,6 +225,7 @@ func new_level() -> void:
 	triggered_event_ids_this_level.clear()
 	_clear_event_state()
 	emit_signal("event_triggered", null)
+	_init_opponent()
 	_log("新一关开始 - 资金 ¥%s, 目标 ¥%s, 5 天 × 10 回合" % [_fmt_money(START_CASH), _fmt_money(VICTORY_TARGET)])
 	emit_signal("state_changed")
 	_start_day()
@@ -288,7 +313,7 @@ func end_turn() -> void:
 		return
 	phase = Phase.SETTLE
 	emit_signal("phase_changed", phase)
-	_settle_turn()
+	await _settle_turn()
 
 
 # ===========================================================
@@ -353,6 +378,7 @@ func apply_price_change(rate: float, ignore_emotion_modifier: bool = false) -> v
 			price = min_p
 	_track_price()
 	_log("  股价 %+.1f%% (¥%.2f → ¥%.2f)" % [eff_rate * 100.0, old_price, price])
+	_check_opponent_liquidation()
 
 
 # 改变上涨情绪 (下跌情绪自动补足)
@@ -741,6 +767,7 @@ func _start_turn() -> void:
 	if event_modifiers.get("ap_chaos", false):
 		_apply_ap_chaos()
 	_log("--- 第 %d 天 第 %d 回合 [行动阶段] ---" % [day, turn_in_day])
+	_check_opponent_spawn()
 	emit_signal("turn_started", day, turn_in_day)
 	emit_signal("phase_changed", phase)
 	emit_signal("intraday_updated")
@@ -753,6 +780,8 @@ func _start_turn() -> void:
 
 
 func _settle_turn() -> void:
+	# 0. 对手行动 (在自然波动之前)
+	await _tick_opponent()
 	# 1. 自然波动
 	var drift: float = _roll_natural_drift()
 	var old_price: float = price
@@ -789,7 +818,7 @@ func _settle_turn() -> void:
 	# 2. 提交一根回合 K
 	var turn_cards: Array = []
 	for ic in intraday_candles:
-		if ic["kind"] == "play":
+		if ic["kind"] == "play" or ic["kind"] == "opponent":
 			turn_cards.append(String(ic["card_name"]))
 	candles.append({
 		"turn_global": turn_global,
@@ -1279,3 +1308,190 @@ func _apply_ap_chaos() -> void:
 	else:
 		action_points = max(action_points - 1, 0)
 		_log("  [混乱之日] 行动力 -1 → %d" % action_points)
+
+
+# ===========================================================
+# 对手系统
+# ===========================================================
+func _init_opponent() -> void:
+	_opponent_brain = OpponentBrain.new()
+	if current_level_index < LEVEL_OPPONENT_ID.size():
+		var boss_id: String = LEVEL_OPPONENT_ID[current_level_index]
+		_opponent_state = OpponentDatabase.make(boss_id)
+	else:
+		_opponent_state = null
+
+
+func _check_opponent_spawn() -> void:
+	if _opponent_state == null:
+		return
+	if _opponent_state.defeated_this_level or _opponent_state.present:
+		return
+	# 教学保护期: 第1关第1天不触发
+	if current_level_index == 0 and day == 1:
+		return
+	# 基础概率 (按天数递增)
+	var base_table: Dictionary = {1: 0.20, 2: 0.35, 3: 0.50, 4: 0.65, 5: 0.80}
+	var base: float = base_table.get(day, 0.80)
+	# 涨幅加成: 当涨幅 >= 12% 时, bonus = 涨幅本身; 否则 0
+	var bonus: float = 0.0
+	if day_open_price > 0.0:
+		var rise: float = (price - day_open_price) / day_open_price
+		if rise >= 0.12:
+			bonus = rise
+	var p: float = min(0.95, base + bonus)
+	if randf() < p:
+		_spawn_opponent()
+
+
+func _spawn_opponent() -> void:
+	_opponent_state.spawn(price)
+	_log("[庄家] %s 入场！做空 %d 股 @ ¥%.2f, 平仓线 ¥%.2f, 现金 ¥%s" % [
+		_opponent_state.display_name, _opponent_state.short_position,
+		_opponent_state.entry_avg_price, _opponent_state.liquidation_price,
+		_fmt_money(_opponent_state.cash)])
+	emit_signal("opponent_entered", _opponent_state.opponent_id)
+	if _opponent_state.dialog_enter != "":
+		emit_signal("opponent_bubble", _opponent_state.dialog_enter)
+	emit_signal("opponent_state_changed")
+	# 入场即加空一次 (戏剧性压力)
+	_apply_opponent_action({"action": "add_short", "params": {
+		"N": _opponent_state.action_n, "X": _opponent_state.action_x_pct}, "bubble": ""})
+
+
+func _tick_opponent() -> void:
+	if _opponent_state == null:
+		return
+	if not _opponent_state.present or _opponent_state.defeated_this_level:
+		return
+	var decision: Dictionary = _opponent_brain.tick(_opponent_state, self)
+	await _apply_opponent_action(decision)
+
+
+func _apply_opponent_action(decision: Dictionary) -> void:
+	var action_id: String = decision.get("action", "idle")
+	var params: Dictionary = decision.get("params", {})
+	var bubble: String = decision.get("bubble", "")
+
+	# 处理复合动作
+	var actions: Array = []
+	if "+" in action_id:
+		for s in action_id.split("+"):
+			actions.append(s)
+	else:
+		actions = [action_id]
+
+	var atomic_delay: float = _opponent_action_delay()
+
+	var price_before := price
+	var event_labels: Array[String] = []
+	var emotion_delta_total: int = 0
+	for act in actions:
+		act = act.strip_edges()
+		# 通知 UI 播放对应特效 (在效果应用之前发, 让特效与状态变化同步可见)
+		emit_signal("opponent_action_played", act, params)
+		match act:
+			"add_short":
+				var n: int = int(params.get("N", _opponent_state.action_n))
+				var x: float = float(params.get("X", _opponent_state.action_x_pct))
+				if _opponent_state.add_short(n, price):
+					apply_price_change(-x, true)
+					_log("[庄家] %s 加空 %d 股, 压股价 −%.1f%%" % [
+						_opponent_state.display_name, n, x * 100.0])
+					event_labels.append("加空")
+				else:
+					_log("[庄家] %s 现金不足, 无法继续加空" % _opponent_state.display_name)
+					if _opponent_state.cash <= 0.0:
+						_on_opponent_liquidated()
+						return
+			"bad_news":
+				var k: int = int(params.get("K", _opponent_state.action_k_emotion))
+				apply_emotion_delta_bull(-k)
+				emotion_delta_total -= k
+				event_labels.append("利空")
+				_log("[庄家] %s 散播利空, 上涨情绪 -%d" % [
+					_opponent_state.display_name, k])
+			"cover":
+				var m: int = int(params.get("M", _opponent_state.action_m_cover))
+				var old_liq := _opponent_state.liquidation_price
+				_opponent_state.cover(m)
+				event_labels.append("平仓")
+				_log("[庄家] %s 主动减仓 %d 股, 平仓线 ¥%.1f → ¥%.1f" % [
+					_opponent_state.display_name, m, old_liq, _opponent_state.liquidation_price])
+			"pump_trap":
+				var y: float = float(params.get("Y", _opponent_state.pump_trap_y_pct))
+				apply_price_change(y, true)
+				event_labels.append("拉抬")
+				_log("[庄家] %s 拉抬陷阱, 股价 +%.1f%%" % [
+					_opponent_state.display_name, y * 100.0])
+			"idle":
+				event_labels.append("静观")
+				_log("[庄家] %s 静观" % _opponent_state.display_name)
+		# 等下一步, 让特效播完
+		emit_signal("opponent_state_changed")
+		if atomic_delay > 0.0:
+			await get_tree().create_timer(atomic_delay).timeout
+
+	# 追加分时K
+	var price_after := price
+	var effect_label := "/".join(event_labels)
+	if effect_label == "":
+		effect_label = action_id
+	intraday_candles.append({
+		"open": price_before,
+		"close": price_after,
+		"high": max(price_before, price_after),
+		"low": min(price_before, price_after),
+		"kind": "opponent",
+		"card_name": "[庄家] %s" % effect_label,
+		"effect_label": effect_label,
+		"price_delta_pct": (price_after / price_before - 1.0) * 100.0 if price_before > 0.0 else 0.0,
+		"emotion_delta": emotion_delta_total,
+	})
+	emit_signal("intraday_updated")
+	emit_signal("opponent_acted", action_id, params)
+	emit_signal("opponent_state_changed")
+
+	if bubble != "":
+		emit_signal("opponent_bubble", bubble)
+
+
+func _check_opponent_liquidation() -> void:
+	if _opponent_state == null:
+		return
+	if not _opponent_state.present or _opponent_state.defeated_this_level:
+		return
+	# 尝试根据当前股价追加保证金, 返回 false 表示现金不够补 → 完全失败
+	var ok: bool = _opponent_state.try_top_up_margin(price)
+	if not ok:
+		_on_opponent_liquidated()
+	else:
+		emit_signal("opponent_state_changed")
+
+
+func _opponent_action_delay() -> float:
+	if DisplayServer.get_name() == "headless":
+		return 0.0
+	return 0.4
+
+
+func _on_opponent_liquidated() -> void:
+	var reward_id: String = _opponent_state.reward_card_id
+	_log("[强平] %s 被击败！获得《%s》、市场情绪 +%d" % [
+		_opponent_state.display_name, reward_id, OPPONENT_DEFEAT_EMOTION_BONUS])
+	if _opponent_state.dialog_defeat != "":
+		emit_signal("opponent_bubble", _opponent_state.dialog_defeat)
+	_opponent_state.liquidate()
+	# 奖励
+	apply_emotion_delta_bull(OPPONENT_DEFEAT_EMOTION_BONUS)
+	if reward_id != "":
+		var card = CardDatabase.make_by_effect(reward_id, "reward_%s" % reward_id)
+		if card != null:
+			draw_pile.append(card)
+	emit_signal("opponent_defeated", _opponent_state.opponent_id, reward_id)
+	emit_signal("opponent_state_changed")
+	emit_signal("state_changed")
+
+
+func get_opponent_state() -> OpponentState:
+	return _opponent_state

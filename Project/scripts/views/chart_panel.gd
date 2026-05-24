@@ -99,7 +99,15 @@ func _show_intraday_tooltip(local_pos: Vector2) -> void:
 		tooltip.hide_tooltip()
 		return
 	var candle: Dictionary = candles_arr[idx]
-	var source: String = "玩家出牌" if candle.get("kind", "") == "play" else "市场波动"
+	var kind := String(candle.get("kind", ""))
+	var source: String
+	match kind:
+		"play":
+			source = "玩家出牌"
+		"opponent":
+			source = "对手行动"
+		_:
+			source = "市场波动"
 	var data: Dictionary = candle.duplicate()
 	data["source"] = source
 	var area: Rect2 = _intraday_layout["area"]
@@ -263,7 +271,7 @@ func _draw_intraday(r: Rect2) -> void:
 	var draw_h: float = r.size.y - 30
 
 	var candles: Array = Game.intraday_candles
-	var slot_count: int = 10
+	var slot_count: int = max(10, candles.size())
 	var slot: float = draw_w / float(slot_count)
 	var body_w: float = max(slot * 0.55, 3.0)
 
@@ -356,6 +364,8 @@ func _draw_intraday(r: Rect2) -> void:
 			k_chart.draw_rect(
 				Rect2(slot_cx - body_w * 0.5 - 1, top_y - 1, body_w + 2, body_h + 2),
 				UF.COL_GOLD, false, 1.0)
+		elif c2.has("kind") and c2["kind"] == "opponent":
+			_draw_opponent_marker(c2, slot_cx, Rect2(slot_cx - body_w * 0.5 - 1, top_y - 1, body_w + 2, body_h + 2), r)
 
 	var last_price: float = float(candles[candles.size() - 1]["close"])
 	var last_y: float = draw_y + draw_h - (last_price - p_min) / (p_max - p_min) * draw_h
@@ -370,3 +380,31 @@ func _draw_intraday(r: Rect2) -> void:
 		k_chart.draw_string(
 			ThemeDB.fallback_font, Vector2(draw_x + draw_w + 4, y + 4),
 			"¥%.1f" % p, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UF.COL_TEXT_DIM)
+
+
+func _draw_opponent_marker(candle: Dictionary, slot_cx: float, candle_rect: Rect2, section: Rect2) -> void:
+	var pct: float = float(candle.get("price_delta_pct", 0.0))
+	var marker_color: Color
+	if pct > 0.0:
+		marker_color = UF.COL_UP
+	elif pct < 0.0:
+		marker_color = UF.COL_DOWN
+	else:
+		marker_color = UF.COL_GOLD
+	k_chart.draw_rect(candle_rect.grow(1.0), marker_color, false, 1.5)
+	k_chart.draw_dashed_line(
+		Vector2(slot_cx, section.position.y + 18.0),
+		Vector2(slot_cx, section.position.y + section.size.y - 4.0),
+		Color(marker_color.r, marker_color.g, marker_color.b, 0.45),
+		1.0, 3.0, true)
+	var tag_pos := Vector2(slot_cx - 8.0, section.position.y + 15.0)
+	k_chart.draw_circle(tag_pos + Vector2(7.0, -4.0), 7.0, Color(0.0, 0.0, 0.0, 0.72))
+	k_chart.draw_arc(tag_pos + Vector2(7.0, -4.0), 7.0, 0.0, TAU, 18, marker_color, 1.2)
+	k_chart.draw_string(
+		ThemeDB.fallback_font, tag_pos + Vector2(2.0, 0.0),
+		"庄", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, marker_color)
+	var label: String = String(candle.get("effect_label", ""))
+	if label != "":
+		k_chart.draw_string(
+			ThemeDB.fallback_font, tag_pos + Vector2(14.0, 0.0),
+			label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, marker_color)

@@ -8,14 +8,18 @@ const ShopCardScene = preload("res://scenes/ui/shop/shop_card.tscn")
 @onready var grid: GridContainer = $Margin/VBox/Grid
 @onready var lbl_empty: Label = $Margin/VBox/LblEmpty
 
+const CARD_SLOT_W: float = 100.0
+
 var _tooltip: PanelContainer
 var _tooltip_lbl: Label
 
 
 func _ready() -> void:
 	_build_tooltip()
+	resized.connect(_update_columns)
 	Game.shop_changed.connect(refresh)
 	refresh()
+	call_deferred("_update_columns")
 
 
 func _build_tooltip() -> void:
@@ -67,6 +71,7 @@ func refresh() -> void:
 				_tooltip.visible = false
 		)
 	lbl_empty.visible = not any_upgradable
+	_update_columns()
 
 
 func _show_tooltip(node: Control, text: String) -> void:
@@ -74,3 +79,9 @@ func _show_tooltip(node: Control, text: String) -> void:
 	var r := node.get_global_rect()
 	_tooltip.global_position = Vector2(r.position.x + r.size.x + 4, r.position.y)
 	_tooltip.visible = true
+
+
+func _update_columns() -> void:
+	if grid == null:
+		return
+	grid.columns = max(1, int(floor(size.x / CARD_SLOT_W)))

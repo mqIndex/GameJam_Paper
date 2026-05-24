@@ -1,8 +1,8 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene format=3 uid="uid://63mxpljw8fxt"]
 
-[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="Script" uid="uid://d1blbpqbkg6ok" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://scenes/ui/top_bar.tscn" id="2_top_bar"]
-[ext_resource type="PackedScene" path="res://scenes/ui/money_bar.tscn" id="3_money_bar"]
+[ext_resource type="PackedScene" path="res://scenes/ui/enemy_hp_bar.tscn" id="3_enemy_hp_bar"]
 [ext_resource type="PackedScene" path="res://scenes/ui/chart_panel.tscn" id="4_chart"]
 [ext_resource type="PackedScene" path="res://scenes/ui/data_panel.tscn" id="5_data"]
 [ext_resource type="PackedScene" path="res://scenes/ui/action_bar.tscn" id="6_action"]
@@ -14,7 +14,8 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/shop/shop_overlay.tscn" id="12_shop"]
 [ext_resource type="PackedScene" path="res://scenes/ui/deck_preview_popup.tscn" id="13_deck"]
 
-[node name="Main" type="Control"]
+[node name="Main" type="Control" unique_id=1846624010]
+layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -22,81 +23,94 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_main")
 
-[node name="BG" type="ColorRect" parent="."]
-anchors_preset = 15
+[node name="BG" type="ColorRect" parent="." unique_id=737905088]
+layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.051, 0.106, 0.165, 1)
 
-[node name="TopBar" parent="." instance=ExtResource("2_top_bar")]
+[node name="TopBar" parent="." unique_id=26865201 instance=ExtResource("2_top_bar")]
+layout_mode = 0
 offset_left = 8.0
 offset_top = 8.0
 offset_right = 1272.0
 offset_bottom = 44.0
 
-[node name="MoneyBar" parent="." instance=ExtResource("3_money_bar")]
+[node name="EnemyHpBar" parent="." unique_id=453626996 instance=ExtResource("3_enemy_hp_bar")]
+layout_mode = 0
 offset_left = 8.0
 offset_top = 52.0
 offset_right = 64.0
 offset_bottom = 512.0
 
-[node name="ChartPanel" parent="." instance=ExtResource("4_chart")]
+[node name="ChartPanel" parent="." unique_id=1687685113 instance=ExtResource("4_chart")]
+layout_mode = 0
 offset_left = 72.0
 offset_top = 52.0
 offset_right = 892.0
 offset_bottom = 464.0
 
-[node name="DataPanel" parent="." instance=ExtResource("5_data")]
+[node name="DataPanel" parent="." unique_id=1722963715 instance=ExtResource("5_data")]
+layout_mode = 0
 offset_left = 900.0
 offset_top = 52.0
 offset_right = 1272.0
 offset_bottom = 512.0
 
-[node name="ActionBar" parent="." instance=ExtResource("6_action")]
+[node name="ActionBar" parent="." unique_id=2049971350 instance=ExtResource("6_action")]
+layout_mode = 0
 offset_left = 72.0
 offset_top = 472.0
 offset_right = 892.0
 offset_bottom = 500.0
 
-[node name="EnemyPanel" parent="." instance=ExtResource("7_enemy")]
+[node name="EnemyPanel" parent="." unique_id=20696801 instance=ExtResource("7_enemy")]
+layout_mode = 0
 offset_left = 8.0
 offset_top = 508.0
 offset_right = 176.0
 offset_bottom = 712.0
 
-[node name="HandPanel" parent="." instance=ExtResource("8_hand")]
+[node name="HandPanel" parent="." unique_id=184571409 instance=ExtResource("8_hand")]
+layout_mode = 0
 offset_left = 184.0
 offset_top = 508.0
 offset_right = 936.0
 offset_bottom = 712.0
 
-[node name="TurnPanel" parent="." instance=ExtResource("9_turn")]
+[node name="TurnPanel" parent="." unique_id=1793292224 instance=ExtResource("9_turn")]
+layout_mode = 0
 offset_left = 944.0
 offset_top = 508.0
 offset_right = 1080.0
 offset_bottom = 712.0
 
-[node name="PlayerPanel" parent="." instance=ExtResource("10_player")]
+[node name="PlayerPanel" parent="." unique_id=1559497788 instance=ExtResource("10_player")]
+layout_mode = 0
 offset_left = 1088.0
 offset_top = 508.0
 offset_right = 1272.0
 offset_bottom = 712.0
 
-[node name="LogText" type="RichTextLabel" parent="."]
+[node name="LogText" type="RichTextLabel" parent="." unique_id=120930602]
 visible = false
-offset_right = 0.0
-offset_bottom = 0.0
+layout_mode = 0
 bbcode_enabled = true
 scroll_following = true
 
-[node name="EndDialog" parent="." instance=ExtResource("11_end")]
+[node name="EndDialog" parent="." unique_id=1937517655 instance=ExtResource("11_end")]
+layout_mode = 0
 offset_left = 384.0
 offset_top = 220.0
 offset_right = 896.0
 offset_bottom = 500.0
 
-[node name="ShopOverlay" parent="." instance=ExtResource("12_shop")]
+[node name="ShopOverlay" parent="." unique_id=1158079318 instance=ExtResource("12_shop")]
+anchors_preset = 0
 
-[node name="DeckPreviewPopup" parent="." instance=ExtResource("13_deck")]
+[node name="DeckPreviewPopup" parent="." unique_id=625219257 instance=ExtResource("13_deck")]
+anchors_preset = 0
+grow_horizontal = 2
+grow_vertical = 2

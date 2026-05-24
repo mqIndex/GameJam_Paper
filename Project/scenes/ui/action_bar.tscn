@@ -8,10 +8,15 @@ offset_bottom = 28.0
 script = ExtResource("1_script")
 
 [node name="HBox" type="HBoxContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 offset_left = 12.0
 offset_top = 4.0
-offset_right = 808.0
-offset_bottom = 24.0
+offset_right = -12.0
+offset_bottom = -4.0
 theme_override_constants/separation = 16
 
 [node name="LblActionPoints" type="Label" parent="HBox"]

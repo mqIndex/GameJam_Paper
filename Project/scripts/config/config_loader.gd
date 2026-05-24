@@ -10,26 +10,32 @@ extends Node
 const CARDS_CSV_PATH := "res://data/cards.csv"
 const BALANCE_JSON_PATH := "res://data/balance.json"
 const TALENTS_CSV_PATH := "res://data/talents.csv"
+const OPPONENTS_CSV_PATH := "res://data/opponents.csv"
 
 var cards: Dictionary = {}     # effect_id -> {name, kind, cost, description, image_path, upgrade_to, in_starter, starter_count, in_shop}
+var opponents: Dictionary = {} # opponent_id -> {display_name, personality, level, n0, m0, ...}
 var balance: Dictionary = {}   # key -> value (从 balance.json 直接读入)
 var talents: Dictionary = {}   # talent_id -> {name, description, price, in_first_day, effect_id}
 
 var _csv_load_ok: bool = false
 var _balance_load_ok: bool = false
 var _talents_load_ok: bool = false
+var _opponents_load_ok: bool = false
 
 
 func _ready() -> void:
 	_load_balance()
 	_load_cards()
 	_load_talents()
+	_load_opponents()
 	if not _csv_load_ok:
 		push_error("[Cfg] cards.csv 加载失败,卡牌系统将依赖代码回退")
 	if not _balance_load_ok:
 		push_error("[Cfg] balance.json 加载失败,数值将依赖 game_state.gd 内置默认")
 	if not _talents_load_ok:
 		push_warning("[Cfg] talents.csv 未加载, 天赋系统将无可用项")
+	if not _opponents_load_ok:
+		push_error("[Cfg] opponents.csv 加载失败,对手系统不可用")
 
 
 # ----- 卡牌 -----
@@ -75,6 +81,13 @@ func first_day_talent_ids() -> Array:
 		if t.get("in_first_day", false):
 			out.append(tid)
 	return out
+
+
+# ----- 对手 -----
+func get_opponent_template(opponent_id: String) -> Variant:
+	if opponents.has(opponent_id):
+		return opponents[opponent_id]
+	return null
 
 
 # ----- 内部:加载 -----
@@ -159,6 +172,7 @@ func _load_cards() -> void:
 			"discard_hand_redraw": _bool(_cell(row, col, "discard_hand_redraw")),
 			# 动态效果: 乌合之众 — ±X% (50/50, X = 卡组中 BUY+SELL 数)
 			"mob_swing":           _bool(_cell(row, col, "mob_swing")),
+			"draw_count":      int(_cell_or(row, col, "draw_count", "0")),
 		}
 		cards[eid] = entry
 	f.close()
@@ -225,3 +239,63 @@ func _float(s: String) -> float:
 	if v == "":
 		return 0.0
 	return float(v)
+
+
+func _load_opponents() -> void:
+	if not FileAccess.file_exists(OPPONENTS_CSV_PATH):
+		return
+	var f := FileAccess.open(OPPONENTS_CSV_PATH, FileAccess.READ)
+	if f == null:
+		return
+	var headers: PackedStringArray = f.get_csv_line()
+	if headers.size() == 0:
+		f.close()
+		return
+	var col: Dictionary = {}
+	for i in range(headers.size()):
+		col[headers[i].strip_edges()] = i
+	if not col.has("opponent_id"):
+		push_error("[Cfg] opponents.csv 缺列: opponent_id")
+		f.close()
+		return
+	while not f.eof_reached():
+		var row: PackedStringArray = f.get_csv_line()
+		if row.size() == 0:
+			continue
+		var oid: String = _cell(row, col, "opponent_id").strip_edges()
+		if oid == "":
+			continue
+		var entry: Dictionary = {
+			"opponent_id": oid,
+			"display_name": _cell(row, col, "display_name"),
+			"personality": _cell(row, col, "personality"),
+			"level": int(_cell_or(row, col, "level", "1")),
+			"n0": int(_cell_or(row, col, "n0", "500")),
+			"m0": _float(_cell(row, col, "m0")),
+			"initial_cash": float(_cell_or(row, col, "initial_cash", "100000")),
+			"action_n": int(_cell_or(row, col, "action_n", "100")),
+			"action_x_pct": _float(_cell(row, col, "action_x_pct")),
+			"action_k_emotion": int(_cell_or(row, col, "action_k_emotion", "3")),
+			"action_m_cover": int(_cell_or(row, col, "action_m_cover", "80")),
+			"pump_trap_y_pct": _float(_cell(row, col, "pump_trap_y_pct")),
+			"critical_threshold": _float(_cell(row, col, "critical_threshold")),
+			"reaction_threshold": _float(_cell(row, col, "reaction_threshold")),
+			"hard_hold_weight": _float(_cell(row, col, "hard_hold_weight")),
+			"w_add_short": _float(_cell(row, col, "w_add_short")),
+			"w_bad_news": _float(_cell(row, col, "w_bad_news")),
+			"w_cover": _float(_cell(row, col, "w_cover")),
+			"w_idle": _float(_cell(row, col, "w_idle")),
+			"w_pump_trap": _float(_cell(row, col, "w_pump_trap")),
+			"trigger_prob_per_turn": _float(_cell(row, col, "trigger_prob_per_turn")),
+			"trigger_rise_pct": _float(_cell(row, col, "trigger_rise_pct")),
+			"dialog_enter": _cell(row, col, "dialog_enter"),
+			"dialog_react": _cell(row, col, "dialog_react"),
+			"dialog_cover": _cell(row, col, "dialog_cover"),
+			"dialog_trap": _cell(row, col, "dialog_trap"),
+			"dialog_dying": _cell(row, col, "dialog_dying"),
+			"dialog_defeat": _cell(row, col, "dialog_defeat"),
+			"reward_card_id": _cell(row, col, "reward_card_id").strip_edges(),
+		}
+		opponents[oid] = entry
+	f.close()
+	_opponents_load_ok = true
