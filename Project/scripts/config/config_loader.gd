@@ -157,7 +157,7 @@ func _load_cards() -> void:
 			"daily_exile":  _bool(_cell(row, col, "daily_exile")),
 			# 自动效果: 弃光手牌再抽等量 (快速换手)
 			"discard_hand_redraw": _bool(_cell(row, col, "discard_hand_redraw")),
-			# 动态效果: 乌合之众 — ±X% (50/50, X = 卡组中 BUY+SELL 数)
+			# 动态效果: 孤注一掷 — ±X% (50/50, X = 卡组中 BUY+SELL 数)
 			"mob_swing":           _bool(_cell(row, col, "mob_swing")),
 		}
 		cards[eid] = entry

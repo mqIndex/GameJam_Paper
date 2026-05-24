@@ -461,7 +461,7 @@ func discard_hand_redraw() -> void:
 	emit_signal("state_changed")
 
 
-# 乌合之众: 股价 ±X% (50/50), X = 卡组里 BUY+SELL 牌总数 (含手牌/抽牌堆/弃牌堆/此卡之外)
+# 孤注一掷: 股价 ±X% (50/50), X = 卡组里 BUY+SELL 牌总数 (含手牌/抽牌堆/弃牌堆/此卡之外; 化整为零产出的 transient 小买/小卖也计入)
 # 走 apply_price_change, 会经过情绪倍率 / 突发事件 up_mul/down_mul 等正常通道
 func apply_mob_swing() -> void:
 	var x: int = 0
@@ -469,13 +469,13 @@ func apply_mob_swing() -> void:
 		if c.is_buy() or c.is_sell():
 			x += 1
 	if x <= 0:
-		_log("  [乌合之众] 卡组无买卖牌, 无效果")
+		_log("  [孤注一掷] 卡组无买卖牌, 无效果")
 		return
 	var up: bool = randi() % 2 == 0
 	var rate: float = float(x) / 100.0
 	if not up:
 		rate = -rate
-	_log("  [乌合之众] 卡组 BUY+SELL = %d, %s %d%%" % [x, "上涨" if up else "下跌", x])
+	_log("  [孤注一掷] 卡组 BUY+SELL = %d, %s %d%%" % [x, "上涨" if up else "下跌", x])
 	apply_price_change(rate)
 
 
