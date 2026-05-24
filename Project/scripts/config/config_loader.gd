@@ -9,21 +9,27 @@ extends Node
 
 const CARDS_CSV_PATH := "res://data/cards.csv"
 const BALANCE_JSON_PATH := "res://data/balance.json"
+const TALENTS_CSV_PATH := "res://data/talents.csv"
 
 var cards: Dictionary = {}     # effect_id -> {name, kind, cost, description, image_path, upgrade_to, in_starter, starter_count, in_shop}
 var balance: Dictionary = {}   # key -> value (从 balance.json 直接读入)
+var talents: Dictionary = {}   # talent_id -> {name, description, price, in_first_day, effect_id}
 
 var _csv_load_ok: bool = false
 var _balance_load_ok: bool = false
+var _talents_load_ok: bool = false
 
 
 func _ready() -> void:
 	_load_balance()
 	_load_cards()
+	_load_talents()
 	if not _csv_load_ok:
 		push_error("[Cfg] cards.csv 加载失败,卡牌系统将依赖代码回退")
 	if not _balance_load_ok:
 		push_error("[Cfg] balance.json 加载失败,数值将依赖 game_state.gd 内置默认")
+	if not _talents_load_ok:
+		push_warning("[Cfg] talents.csv 未加载, 天赋系统将无可用项")
 
 
 # ----- 卡牌 -----
@@ -51,6 +57,23 @@ func shop_pool_ids() -> Array:
 		var t: Dictionary = cards[eid]
 		if t.get("in_shop", false):
 			out.append(eid)
+	return out
+
+
+# ----- 天赋 -----
+func get_talent_template(talent_id: String) -> Variant:
+	if talents.has(talent_id):
+		return talents[talent_id]
+	return null
+
+
+# 返回第 1 天可购天赋 id 列表
+func first_day_talent_ids() -> Array:
+	var out: Array = []
+	for tid in talents.keys():
+		var t: Dictionary = talents[tid]
+		if t.get("in_first_day", false):
+			out.append(tid)
 	return out
 
 
@@ -132,10 +155,50 @@ func _load_cards() -> void:
 			"shop_price":   int(_cell_or(row, col, "shop_price", "0")),
 			"daily_limit":  int(_cell_or(row, col, "daily_limit", "0")),
 			"daily_exile":  _bool(_cell(row, col, "daily_exile")),
+			# 自动效果: 弃光手牌再抽等量 (快速换手)
+			"discard_hand_redraw": _bool(_cell(row, col, "discard_hand_redraw")),
+			# 动态效果: 乌合之众 — ±X% (50/50, X = 卡组中 BUY+SELL 数)
+			"mob_swing":           _bool(_cell(row, col, "mob_swing")),
 		}
 		cards[eid] = entry
 	f.close()
 	_csv_load_ok = true
+
+
+func _load_talents() -> void:
+	if not FileAccess.file_exists(TALENTS_CSV_PATH):
+		return
+	var f := FileAccess.open(TALENTS_CSV_PATH, FileAccess.READ)
+	if f == null:
+		return
+	var headers: PackedStringArray = f.get_csv_line()
+	if headers.size() == 0:
+		f.close()
+		return
+	var col: Dictionary = {}
+	for i in range(headers.size()):
+		col[headers[i].strip_edges()] = i
+	for required in ["id", "name"]:
+		if not col.has(required):
+			push_error("[Cfg] talents.csv 缺列: %s" % required)
+			f.close()
+			return
+	while not f.eof_reached():
+		var row: PackedStringArray = f.get_csv_line()
+		if row.size() == 0:
+			continue
+		var tid: String = _cell(row, col, "id").strip_edges()
+		if tid == "":
+			continue
+		talents[tid] = {
+			"name":          _cell(row, col, "name"),
+			"description":   _cell(row, col, "description"),
+			"price":         int(_cell_or(row, col, "price", "0")),
+			"in_first_day":  _bool(_cell(row, col, "in_first_day")),
+			"effect_id":     _cell_or(row, col, "effect_id", tid),
+		}
+	f.close()
+	_talents_load_ok = true
 
 
 func _cell(row: PackedStringArray, col: Dictionary, key: String) -> String:

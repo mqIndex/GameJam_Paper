@@ -95,3 +95,7 @@ func dispatch(effect_id: String) -> void:
 		_gs.try_apply_liquidity(liquidity_chance)
 	if shatter:
 		_gs.request_shatter()
+	if bool(tpl.get("discard_hand_redraw", false)):
+		_gs.discard_hand_redraw()
+	if bool(tpl.get("mob_swing", false)):
+		_gs.apply_mob_swing()

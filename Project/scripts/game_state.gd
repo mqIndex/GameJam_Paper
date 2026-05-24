@@ -9,6 +9,8 @@ const CardDatabase = preload("res://scripts/card_database.gd")
 const CardEffectSystem = preload("res://scripts/systems/card_effect_system.gd")
 const Event = preload("res://scripts/event.gd")
 const EventDatabase = preload("res://scripts/event_database.gd")
+const Talent = preload("res://scripts/talent.gd")
+const TalentDatabase = preload("res://scripts/talent_database.gd")
 
 var _effect_system: CardEffectSystem = null
 
@@ -53,6 +55,13 @@ var SHOP_DELETE_PRICE_INCREMENT: int = 1000   # 策划: 后续每次删卡价格
 
 var shop_offers: Array = []                     # 当前商店可购买的卡 (Card 实例数组)
 var shop_delete_count: int = 0                  # 累计删卡次数, 用来计算下次删卡价
+# 天赋 (商店第 1 天上架, 跨天/跨关全程保留)
+var talent_offers: Array = []                   # 当前商店可购买的天赋 (Talent 数组)
+var owned_talents: Array = []                   # 玩家已购天赋 (Talent 数组)
+# 连携效应运行时状态机 (per_turn 作用域, _start_turn 重置)
+var combo_buy_count: int = 0
+var combo_sell_count: int = 0
+var _in_cascade: bool = false                   # 重入保护: 连携重触发期间, play_card 不会被再调; 此标志用于判断 dispatch 内部是否处于 cascade
 # 当日摘要 (day_open_price 在 _start_day 时记录, 其余在 _end_day 计算)
 var day_open_price: float = 100.0
 var day_open_assets: float = 100000.0
@@ -67,6 +76,7 @@ signal day_started(day: int)
 signal day_ended(day: int)                       # 一天 10 回合打完, 进商店之前
 signal shop_entered(day: int)                    # 已进入商店阶段
 signal shop_changed                              # 商店内购买/升级/删卡后刷新
+signal talents_changed                           # 天赋购买/重置后刷新
 signal phase_changed(phase: int)
 signal candle_committed(turn_global: int)        # 回合 K 入库
 signal intraday_updated                          # 分时新点
@@ -239,29 +249,27 @@ func play_card(index: int) -> bool:
 	_dispatch_effect(c.effect_id)
 	if c.is_skill():
 		skills_played_this_turn += 1
-	# 出牌后这一段时间内 (effect 可能多次调用 apply_price_change), 价格区间 = (hi_before..cur_high, lo_before..cur_low)
-	# 计算这次出牌的 high/low: 取 dispatch 期间 cur_high/cur_low 的"增量"
-	# 简单做法: high = max(open, close, cur_high in this play), low = min(open, close, cur_low in this play)
-	# 由于 cur_high/cur_low 是本回合累计, 此次出牌的实际波动范围 = 出牌前后的 price 区间 + 出牌过程中 _track_price 经过的极值
-	# 为不引入新的状态, 这里取 open/close 极值作为该 K 的 high/low (足够分时可视化)
-	var price_after: float = price
-	var k_open: float = price_before
-	var k_close: float = price_after
-	var k_high: float = max(k_open, k_close)
-	var k_low:  float = min(k_open, k_close)
-	# 若出牌中途价格穿越过 open/close 之外 (apply_price_change 多次调用), 取累计极值
-	if cur_high > hi_before and cur_high > k_high: k_high = cur_high
-	if cur_low  < lo_before and cur_low  < k_low:  k_low  = cur_low
-	intraday_candles.append({
-		"open":  k_open,
-		"close": k_close,
-		"high":  k_high,
-		"low":   k_low,
-		"kind":  "play",
-		"card_name": c.name,
-		"price_delta_pct": (price_after / price_before - 1.0) * 100.0 if price_before > 0.0 else 0.0,
-		"emotion_delta": bull - bull_before,
-	})
+	# 主出牌的 K 线 (第 1 根)
+	_record_play_candle(price_before, hi_before, lo_before, bull_before, c.name)
+	# 天赋: 连携效应 (cascade_combo) — 连续 3 张 BUY 或 3 张 SELL, 最后一张额外触发一次
+	# 资源不足时该次失效, 始终不消耗行动力; 计数作用域 = 本回合
+	# K 线: 连携产生独立 K (第 2 根, 出现在 _try_cascade_dispatch 内部)
+	if has_talent("cascade_combo"):
+		if c.is_skill():
+			combo_buy_count = 0
+			combo_sell_count = 0
+		elif c.is_buy():
+			combo_buy_count += 1
+			combo_sell_count = 0
+			if combo_buy_count >= 3 and not _in_cascade:
+				_try_cascade_dispatch(c)
+				combo_buy_count = 0
+		elif c.is_sell():
+			combo_sell_count += 1
+			combo_buy_count = 0
+			if combo_sell_count >= 3 and not _in_cascade:
+				_try_cascade_dispatch(c)
+				combo_sell_count = 0
 	discard_pile.append(c)
 	if c.daily_exile:
 		c.daily_exiled = true
@@ -434,6 +442,41 @@ func discard_one_then_draw(idx: int) -> void:
 	emit_signal("hand_changed")
 	draw_cards(1)
 	emit_signal("state_changed")
+
+
+# 快速换手: 弃光当前手牌 (此时不含本卡, 本卡已在 play_card 中 remove_at), 再抽相同数量
+func discard_hand_redraw() -> void:
+	var n: int = hand.size()
+	if n == 0:
+		_log("  [快速换手] 手牌为空, 无效果")
+		return
+	var names: Array = []
+	for c in hand:
+		names.append(c.name)
+		discard_pile.append(c)
+	hand.clear()
+	_log("  [快速换手] 弃掉 %d 张 (%s)" % [n, ", ".join(names)])
+	emit_signal("hand_changed")
+	draw_cards(n)
+	emit_signal("state_changed")
+
+
+# 乌合之众: 股价 ±X% (50/50), X = 卡组里 BUY+SELL 牌总数 (含手牌/抽牌堆/弃牌堆/此卡之外)
+# 走 apply_price_change, 会经过情绪倍率 / 突发事件 up_mul/down_mul 等正常通道
+func apply_mob_swing() -> void:
+	var x: int = 0
+	for c in get_full_deck():
+		if c.is_buy() or c.is_sell():
+			x += 1
+	if x <= 0:
+		_log("  [乌合之众] 卡组无买卖牌, 无效果")
+		return
+	var up: bool = randi() % 2 == 0
+	var rate: float = float(x) / 100.0
+	if not up:
+		rate = -rate
+	_log("  [乌合之众] 卡组 BUY+SELL = %d, %s %d%%" % [x, "上涨" if up else "下跌", x])
+	apply_price_change(rate)
 
 
 # 计划得当: 让 UI 列出抽牌堆所有牌让玩家选 1 张
@@ -667,6 +710,8 @@ func _start_turn() -> void:
 	phase = Phase.PLAY
 	skills_played_this_turn = 0
 	turn_emotion_mul = 1.0
+	combo_buy_count = 0
+	combo_sell_count = 0
 	# 抽牌 (会发 hand_changed)
 	# 每天第 1 回合摸 6 张 (首日及每天开始时的"起始手牌"); 其它回合摸 2 张.
 	# 整局首回合: 先种 1 买 + 1 卖 + 1 技能, 再补到 6 张 (策划 7.2.8, 修复 "缺类型补 1 → 7 张" bug)
@@ -801,11 +846,17 @@ func _end_day() -> void:
 
 func _enter_shop() -> void:
 	phase = Phase.SHOP
-	shop_offers = CardDatabase.build_shop_offers(day, _owned_effect_ids())   # 用 day 作 seed; owned 用于过滤 shop_unique
+	shop_offers = CardDatabase.build_shop_offers(_owned_effect_ids())   # 随机洗牌取前 6 张; owned 用于过滤 shop_unique
+	# 天赋售卖: 仅第 1 天的盘后商店上架; 其它日清空 (UI 仍展示空列表 + 提示)
+	if day == 1:
+		talent_offers = TalentDatabase.build_first_day_offers(_owned_talent_ids())
+	else:
+		talent_offers = []
 	_log("---- 进入第 %d 天 盘后商店 ----" % day)
 	emit_signal("phase_changed", phase)
 	emit_signal("shop_entered", day)
 	emit_signal("shop_changed")
+	emit_signal("talents_changed")
 	emit_signal("state_changed")
 
 
@@ -815,6 +866,81 @@ func _owned_effect_ids() -> Array:
 	for c in get_full_deck():
 		seen[c.effect_id] = true
 	return seen.keys()
+
+
+# 玩家已拥有的天赋 id 列表 (供 build_first_day_offers 过滤)
+func _owned_talent_ids() -> Array:
+	var ids: Array = []
+	for t in owned_talents:
+		ids.append(t.id)
+	return ids
+
+
+# 天赋查询: 按 effect_id 判断玩家是否已拥有
+func has_talent(effect_id: String) -> bool:
+	for t in owned_talents:
+		if t.effect_id == effect_id:
+			return true
+	return false
+
+
+# 商店: 买天赋 (从 talent_offers 拿一个)
+func shop_buy_talent(offer_index: int) -> bool:
+	if phase != Phase.SHOP: return false
+	if offer_index < 0 or offer_index >= talent_offers.size(): return false
+	var t: Talent = talent_offers[offer_index]
+	if cash < float(t.price):
+		_log("现金不足, 无法购买天赋 (需要 ¥%d)" % t.price)
+		return false
+	cash -= float(t.price)
+	owned_talents.append(t)
+	talent_offers.remove_at(offer_index)
+	_log("[商店] 购入天赋「%s」, 花费 ¥%d" % [t.name, t.price])
+	emit_signal("talents_changed")
+	emit_signal("state_changed")
+	return true
+
+
+# 连携效应: 对 BUY/SELL 卡再触发一次 dispatch
+# - 资源不足: 静默失效, 日志提示, 不写 K 线
+# - 不消耗行动力 (不在此处扣 AP, 也不再次 remove hand)
+# - 不再次进弃牌堆
+# - 写独立 K 线 (在主出牌 K 之后), 名字带 "(连携)" 后缀
+# - 通过 _in_cascade 防止递归连携 (即便玩家持续多张, cascade 出来的那次不参与计数)
+func _try_cascade_dispatch(c: Card) -> void:
+	if not _has_resources_for(c):
+		_log("  [连携效应] 资源不足, 「%s」额外触发失效" % c.name)
+		return
+	var pb: float = price
+	var hib: float = cur_high
+	var lob: float = cur_low
+	var bb: int = bull
+	_in_cascade = true
+	_log("  [连携效应] 「%s」连击 ×3, 额外触发一次" % c.name)
+	_dispatch_effect(c.effect_id)
+	_in_cascade = false
+	_record_play_candle(pb, hib, lob, bb, "%s (连携)" % c.name)
+
+
+# 出牌 K 线: 取主出牌前后的 open/close, 用 cur_high/cur_low 推出 high/low (适配多次 apply_price_change)
+func _record_play_candle(price_before: float, hi_before: float, lo_before: float, bull_before: int, card_name: String) -> void:
+	var price_after: float = price
+	var k_open: float = price_before
+	var k_close: float = price_after
+	var k_high: float = max(k_open, k_close)
+	var k_low:  float = min(k_open, k_close)
+	if cur_high > hi_before and cur_high > k_high: k_high = cur_high
+	if cur_low  < lo_before and cur_low  < k_low:  k_low  = cur_low
+	intraday_candles.append({
+		"open":  k_open,
+		"close": k_close,
+		"high":  k_high,
+		"low":   k_low,
+		"kind":  "play",
+		"card_name": card_name,
+		"price_delta_pct": (price_after / price_before - 1.0) * 100.0 if price_before > 0.0 else 0.0,
+		"emotion_delta": bull - bull_before,
+	})
 
 
 # 玩家点 "离开商店" 进入下一天
