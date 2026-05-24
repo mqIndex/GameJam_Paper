@@ -1,0 +1,157 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/views/data_panel.gd" id="1_script"]
+
+[node name="DataPanel" type="Panel"]
+offset_right = 372.0
+offset_bottom = 460.0
+script = ExtResource("1_script")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+offset_left = 12.0
+offset_top = 8.0
+offset_right = 320.0
+offset_bottom = 452.0
+theme_override_constants/separation = 4
+
+[node name="LblStockTitle" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+text = "股价 · 飞港工业"
+
+[node name="LblStockPrice" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "¥100.00"
+
+[node name="LblStockChange" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+text = "+0.00% (开盘 ¥100)"
+
+[node name="Sep1" type="HSeparator" parent="VBox"]
+layout_mode = 2
+
+[node name="LblCashTitle" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+text = "现金"
+
+[node name="LblCash" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
+text = "¥100,000"
+
+[node name="Sep2" type="HSeparator" parent="VBox"]
+layout_mode = 2
+
+[node name="LblSharesTitle" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+text = "持仓"
+
+[node name="LblShares" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "0 股"
+
+[node name="LblHoldingValue" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+text = "市值 ¥0"
+
+[node name="Sep3" type="HSeparator" parent="VBox"]
+layout_mode = 2
+
+[node name="LblPnlTitle" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+text = "总盈亏"
+
+[node name="LblPnl" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "¥0"
+
+[node name="LblPnlPct" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+text = "0.0%"
+
+[node name="Sep4" type="HSeparator" parent="VBox"]
+layout_mode = 2
+
+[node name="LblTotalTitle" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+text = "总资产"
+
+[node name="LblTotalAssets" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "¥100,000"
+
+[node name="LblTarget" type="Label" parent="VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+text = "目标 ¥120K  ·  0%"
+
+[node name="LblTargetTitle" type="Label" parent="."]
+offset_left = 332.0
+offset_top = 8.0
+offset_right = 364.0
+offset_bottom = 22.0
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+horizontal_alignment = 1
+text = "目标"
+
+[node name="BarBorder" type="ColorRect" parent="."]
+offset_left = 335.0
+offset_top = 24.0
+offset_right = 361.0
+offset_bottom = 404.0
+color = Color(1, 0.82, 0.4, 1)
+
+[node name="BarBg" type="ColorRect" parent="."]
+offset_left = 336.0
+offset_top = 25.0
+offset_right = 360.0
+offset_bottom = 403.0
+color = Color(0, 0, 0, 1)
+
+[node name="BarFill" type="ColorRect" parent="."]
+offset_left = 336.0
+offset_top = 403.0
+offset_right = 360.0
+offset_bottom = 403.0
+color = Color(1, 0.82, 0.4, 1)
+
+[node name="LblBarValue" type="Label" parent="."]
+offset_left = 332.0
+offset_top = 408.0
+offset_right = 364.0
+offset_bottom = 422.0
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
+horizontal_alignment = 1
+text = "¥120K"
+
+[node name="LblBarProgress" type="Label" parent="."]
+offset_left = 332.0
+offset_top = 424.0
+offset_right = 364.0
+offset_bottom = 438.0
+theme_override_font_sizes/font_size = 12
+horizontal_alignment = 1
+text = "0%"

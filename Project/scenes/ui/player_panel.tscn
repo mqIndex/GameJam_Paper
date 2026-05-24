@@ -1,0 +1,33 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/views/player_panel.gd" id="1_script"]
+
+[node name="PlayerPanel" type="Panel"]
+offset_right = 184.0
+offset_bottom = 204.0
+script = ExtResource("1_script")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 174.0
+offset_bottom = 194.0
+theme_override_constants/separation = 4
+
+[node name="LblTitle" type="Label" parent="VBox"]
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+text = "玩家"
+
+[node name="Avatar" type="ColorRect" parent="VBox"]
+custom_minimum_size = Vector2(64, 64)
+color = Color(0.149, 0.224, 0.353, 1)
+
+[node name="LblCash" type="Label" parent="VBox"]
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
+text = "¥100,000"
+
+[node name="BtnDeck" type="Button" parent="VBox"]
+theme_override_font_sizes/font_size = 10
+text = "查看牌组"

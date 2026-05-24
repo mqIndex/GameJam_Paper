@@ -7,14 +7,9 @@ set "REPO=%~dp0"
 if "%REPO:~-1%"=="\" set "REPO=%REPO:~0,-1%"
 set "PROJ=%REPO%\Project"
 
-set "GODOT_DIR=F:\Aion\Godot_v4.6.2-stable_win64.exe"
-set "GODOT_CON=%GODOT_DIR%\Godot_v4.6.2-stable_win64_console.exe"
-set "GODOT_GUI=%GODOT_DIR%\Godot_v4.6.2-stable_win64.exe"
-set "GODOT="
-if exist "%GODOT_CON%" set "GODOT=%GODOT_CON%"
-if not defined GODOT if exist "%GODOT_GUI%" set "GODOT=%GODOT_GUI%"
-if not defined GODOT (
-    echo [run_project_shop_test] FATAL: Godot exe not found under %GODOT_DIR%
+set "GODOT=%REPO%\Godot_v4.6.2-stable_win64.exe"
+if not exist "%GODOT%" (
+    echo [run_project_shop_test] FATAL: Godot exe not found: %GODOT%
     exit /b 2
 )
 if not exist "%PROJ%\project.godot" (

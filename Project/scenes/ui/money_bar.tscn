@@ -1,0 +1,51 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/views/money_bar.gd" id="1_script"]
+
+[node name="MoneyBar" type="Panel"]
+offset_right = 56.0
+offset_bottom = 460.0
+script = ExtResource("1_script")
+
+[node name="LblTitle" type="Label" parent="."]
+offset_left = 8.0
+offset_top = 4.0
+offset_right = 48.0
+offset_bottom = 18.0
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+text = "现金"
+
+[node name="SegBlue" type="ColorRect" parent="."]
+offset_left = 14.0
+offset_top = 20.0
+offset_right = 42.0
+offset_bottom = 128.0
+color = Color(0.067, 0.541, 0.698, 1)
+
+[node name="SegGreen" type="ColorRect" parent="."]
+offset_left = 14.0
+offset_top = 128.0
+offset_right = 42.0
+offset_bottom = 236.0
+color = Color(0.024, 0.839, 0.627, 1)
+
+[node name="SegYellow" type="ColorRect" parent="."]
+offset_left = 14.0
+offset_top = 236.0
+offset_right = 42.0
+offset_bottom = 344.0
+color = Color(1, 0.82, 0.4, 1)
+
+[node name="SegRed" type="ColorRect" parent="."]
+offset_left = 14.0
+offset_top = 344.0
+offset_right = 42.0
+offset_bottom = 452.0
+color = Color(0.937, 0.278, 0.435, 1)
+
+[node name="Marker" type="ColorRect" parent="."]
+offset_left = 10.0
+offset_top = 20.0
+offset_right = 46.0
+offset_bottom = 22.0

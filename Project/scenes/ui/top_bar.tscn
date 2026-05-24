@@ -1,0 +1,92 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/views/top_bar.gd" id="1_script"]
+
+[node name="TopBar" type="Panel"]
+offset_right = 1264.0
+offset_bottom = 36.0
+script = ExtResource("1_script")
+
+[node name="HBox" type="HBoxContainer" parent="."]
+offset_left = 12.0
+offset_top = 6.0
+offset_right = 1252.0
+offset_bottom = 30.0
+theme_override_constants/separation = 14
+
+[node name="LblDay" type="Label" parent="HBox"]
+theme_override_font_sizes/font_size = 13
+text = "第 1 / 5 天 (周一)"
+
+[node name="Sep1" type="Label" parent="HBox"]
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+text = "|"
+
+[node name="LblTurn" type="Label" parent="HBox"]
+theme_override_font_sizes/font_size = 13
+text = "第 1 / 10 回合"
+
+[node name="Sep2" type="Label" parent="HBox"]
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+text = "|"
+
+[node name="LblPrice" type="Label" parent="HBox"]
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
+text = "¥100.00"
+
+[node name="Sep3" type="Label" parent="HBox"]
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+text = "|"
+
+[node name="LblBull" type="Label" parent="HBox"]
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.024, 0.839, 0.627, 1)
+text = "上涨 50"
+
+[node name="Slash" type="Label" parent="HBox"]
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+text = "/"
+
+[node name="LblBear" type="Label" parent="HBox"]
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.937, 0.278, 0.435, 1)
+text = "50 下跌"
+
+[node name="LblEmotionState" type="Label" parent="HBox"]
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
+text = "· 偏多"
+
+[node name="Spacer" type="Control" parent="HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BtnEmotion" type="Button" parent="HBox"]
+custom_minimum_size = Vector2(76, 24)
+theme_override_font_sizes/font_size = 11
+text = "情绪详情"
+
+[node name="BtnEvent" type="Button" parent="HBox"]
+custom_minimum_size = Vector2(76, 24)
+theme_override_font_sizes/font_size = 11
+text = "突发事件"
+
+[node name="BtnPause" type="Button" parent="HBox"]
+custom_minimum_size = Vector2(28, 24)
+theme_override_font_sizes/font_size = 11
+text = "⏸"
+
+[node name="BtnPlay" type="Button" parent="HBox"]
+custom_minimum_size = Vector2(28, 24)
+theme_override_font_sizes/font_size = 11
+text = "▶"
+
+[node name="BtnFF" type="Button" parent="HBox"]
+custom_minimum_size = Vector2(28, 24)
+theme_override_font_sizes/font_size = 11
+text = "⏩"

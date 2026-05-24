@@ -1,0 +1,29 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/views/action_bar.gd" id="1_script"]
+
+[node name="ActionBar" type="Panel"]
+offset_right = 820.0
+offset_bottom = 28.0
+script = ExtResource("1_script")
+
+[node name="HBox" type="HBoxContainer" parent="."]
+offset_left = 12.0
+offset_top = 4.0
+offset_right = 808.0
+offset_bottom = 24.0
+theme_override_constants/separation = 16
+
+[node name="LblActionPoints" type="Label" parent="HBox"]
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.361, 0.835, 1, 1)
+text = "行动力 3 / 3   ● ● ●"
+
+[node name="Spacer" type="Control" parent="HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LblCardCostHint" type="Label" parent="HBox"]
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+text = "选中卡牌查看费用"

@@ -1,0 +1,34 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/views/enemy_panel.gd" id="1_script"]
+
+[node name="EnemyPanel" type="Panel"]
+offset_right = 168.0
+offset_bottom = 204.0
+script = ExtResource("1_script")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 158.0
+offset_bottom = 194.0
+theme_override_constants/separation = 4
+
+[node name="LblTitle" type="Label" parent="VBox"]
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+text = "商战对手"
+
+[node name="Avatar" type="ColorRect" parent="VBox"]
+custom_minimum_size = Vector2(64, 64)
+color = Color(0.149, 0.224, 0.353, 1)
+
+[node name="LblStatus" type="Label" parent="VBox"]
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+text = "未出现"
+
+[node name="BtnEnemyDeck" type="Button" parent="VBox"]
+theme_override_font_sizes/font_size = 10
+disabled = true
+text = "对手牌组"

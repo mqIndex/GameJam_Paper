@@ -1,32 +1,37 @@
 # 《不要怕，是技术性调整！》核心规则数据层 (autoload: /root/Game)
 # 阶段2: 仅做规则与状态; UI 在阶段3 接入.
+# 重构: 原 const 块已改为 var, 在 _ready 中从 /root/Cfg.balance 加载, 缺失项回退到代码默认值.
 extends Node
 
 const Card = preload("res://scripts/card.gd")
 const CardDatabase = preload("res://scripts/card_database.gd")
+const CardEffectSystem = preload("res://scripts/systems/card_effect_system.gd")
+
+var _effect_system: CardEffectSystem = null
 
 # ===== 关卡/天/回合 (新手关) =====
-const DAYS_PER_LEVEL: int = 5
-const TURNS_PER_DAY: int = 10
+var DAYS_PER_LEVEL: int = 5
+var TURNS_PER_DAY: int = 10
 
 # ===== 经济参数 =====
-const START_CASH: float = 100000.0
-const VICTORY_TARGET: float = 120000.0          # 第一关
-const INITIAL_PRICE: float = 100.0
-const SETTLE_DISCOUNT: float = 0.5              # 周五未卖筹码强制折价
-const FIRST_TURN_DRAW: int = 6                  # 第一回合摸 6 张
-const TURN_DRAW: int = 2                        # 此后每回合摸 2 张
-const HAND_LIMIT: int = 10
-const ACTION_POINTS_PER_TURN: int = 3
+var START_CASH: float = 100000.0
+var VICTORY_TARGET: float = 120000.0          # 第一关
+var INITIAL_PRICE: float = 100.0
+var SETTLE_DISCOUNT: float = 0.5              # 周五未卖筹码强制折价
+var FIRST_TURN_DRAW: int = 6                  # 第一回合摸 6 张
+var TURN_DRAW: int = 2                        # 此后每回合摸 2 张
+var HAND_LIMIT: int = 10
+var ACTION_POINTS_INITIAL: int = 2
+var ACTION_POINTS_MAX: int = 6
 
 # ===== 情绪参数 =====
-const INITIAL_BULL: int = 50                    # 初始上涨情绪
-const EMOTION_TOTAL: int = 100                  # 上涨 + 下跌 = 100
+var INITIAL_BULL: int = 50                    # 初始上涨情绪
+var EMOTION_TOTAL: int = 100                  # 上涨 + 下跌 = 100
 
 # ===== 自然波动 (clamp 范围 / σ 可调) =====
-const NATURAL_DRIFT_CLAMP: float = 0.03         # ±3%
-const NATURAL_VOLATILITY_SIGMA_DEFAULT: float = 0.012   # σ 暂取 1.2%, 待数值组确认
-var natural_volatility_sigma: float = NATURAL_VOLATILITY_SIGMA_DEFAULT
+var NATURAL_DRIFT_CLAMP: float = 0.03         # ±3%
+var NATURAL_VOLATILITY_SIGMA_DEFAULT: float = 0.012   # σ 暂取 1.2%, 待数值组确认
+var natural_volatility_sigma: float = 0.012
 
 # ===== 阶段 =====
 enum Phase {
@@ -37,16 +42,16 @@ enum Phase {
 }
 
 # ===== 商店 =====
-const SHOP_BUY_PRICE: int = 1000
-const SHOP_UPGRADE_PRICE: int = 1000
-const SHOP_DELETE_BASE_PRICE: int = 1000
-const SHOP_DELETE_PRICE_INCREMENT: int = 1000   # 策划: 后续每次删卡价格+1000
+var SHOP_BUY_PRICE: int = 1000
+var SHOP_UPGRADE_PRICE: int = 1000
+var SHOP_DELETE_BASE_PRICE: int = 1000
+var SHOP_DELETE_PRICE_INCREMENT: int = 1000   # 策划: 后续每次删卡价格+1000
 
 var shop_offers: Array = []                     # 当前商店可购买的卡 (Card 实例数组)
 var shop_delete_count: int = 0                  # 累计删卡次数, 用来计算下次删卡价
 # 当日摘要 (day_open_price 在 _start_day 时记录, 其余在 _end_day 计算)
-var day_open_price: float = INITIAL_PRICE
-var day_open_assets: float = START_CASH
+var day_open_price: float = 100.0
+var day_open_assets: float = 100000.0
 var day_close_summary: Dictionary = {}          # {day, open_price, close_price, day_pnl, total_assets, shares, holding_value}
 
 # ===== 信号 =====
@@ -65,11 +70,11 @@ signal level_finished(victory: bool, final_assets: float)
 signal log_message(msg: String)
 
 # ===== 局内状态 =====
-var cash: float = START_CASH
+var cash: float = 100000.0
 var shares: int = 0
-var price: float = INITIAL_PRICE
-var bull: int = INITIAL_BULL                    # 上涨情绪
-var bear: int = EMOTION_TOTAL - INITIAL_BULL    # 下跌情绪 (= 100 - bull)
+var price: float = 100.0
+var bull: int = 50                              # 上涨情绪
+var bear: int = 50                              # 下跌情绪 (= EMOTION_TOTAL - bull)
 var day: int = 0                                # 1..5
 var turn_in_day: int = 0                        # 1..10
 var turn_global: int = 0                        # 累计回合, 用于 K 线
@@ -93,6 +98,43 @@ var cur_low: float = 0.0
 # ===========================================================
 # 公共 API
 # ===========================================================
+func _ready() -> void:
+	_apply_balance_from_cfg()
+	_effect_system = CardEffectSystem.new(self)
+
+
+# 从 /root/Cfg.balance 把数值刷到本节点的同名 var; 不存在的键保留代码默认.
+# 调用一次即可: Cfg 是 autoload, 启动顺序保证它先 _ready.
+func _apply_balance_from_cfg() -> void:
+	var cfg := get_node_or_null("/root/Cfg")
+	if cfg == null:
+		return
+	var b: Dictionary = cfg.balance
+	if b.is_empty():
+		return
+	if b.has("DAYS_PER_LEVEL"): DAYS_PER_LEVEL = int(b["DAYS_PER_LEVEL"])
+	if b.has("TURNS_PER_DAY"): TURNS_PER_DAY = int(b["TURNS_PER_DAY"])
+	if b.has("START_CASH"): START_CASH = float(b["START_CASH"])
+	if b.has("VICTORY_TARGET"): VICTORY_TARGET = float(b["VICTORY_TARGET"])
+	if b.has("INITIAL_PRICE"): INITIAL_PRICE = float(b["INITIAL_PRICE"])
+	if b.has("SETTLE_DISCOUNT"): SETTLE_DISCOUNT = float(b["SETTLE_DISCOUNT"])
+	if b.has("FIRST_TURN_DRAW"): FIRST_TURN_DRAW = int(b["FIRST_TURN_DRAW"])
+	if b.has("TURN_DRAW"): TURN_DRAW = int(b["TURN_DRAW"])
+	if b.has("HAND_LIMIT"): HAND_LIMIT = int(b["HAND_LIMIT"])
+	if b.has("ACTION_POINTS_INITIAL"): ACTION_POINTS_INITIAL = int(b["ACTION_POINTS_INITIAL"])
+	if b.has("ACTION_POINTS_MAX"): ACTION_POINTS_MAX = int(b["ACTION_POINTS_MAX"])
+	if b.has("INITIAL_BULL"): INITIAL_BULL = int(b["INITIAL_BULL"])
+	if b.has("EMOTION_TOTAL"): EMOTION_TOTAL = int(b["EMOTION_TOTAL"])
+	if b.has("NATURAL_DRIFT_CLAMP"): NATURAL_DRIFT_CLAMP = float(b["NATURAL_DRIFT_CLAMP"])
+	if b.has("NATURAL_VOLATILITY_SIGMA_DEFAULT"):
+		NATURAL_VOLATILITY_SIGMA_DEFAULT = float(b["NATURAL_VOLATILITY_SIGMA_DEFAULT"])
+		natural_volatility_sigma = NATURAL_VOLATILITY_SIGMA_DEFAULT
+	if b.has("SHOP_BUY_PRICE"): SHOP_BUY_PRICE = int(b["SHOP_BUY_PRICE"])
+	if b.has("SHOP_UPGRADE_PRICE"): SHOP_UPGRADE_PRICE = int(b["SHOP_UPGRADE_PRICE"])
+	if b.has("SHOP_DELETE_BASE_PRICE"): SHOP_DELETE_BASE_PRICE = int(b["SHOP_DELETE_BASE_PRICE"])
+	if b.has("SHOP_DELETE_PRICE_INCREMENT"): SHOP_DELETE_PRICE_INCREMENT = int(b["SHOP_DELETE_PRICE_INCREMENT"])
+
+
 func new_level() -> void:
 	cash = START_CASH
 	shares = 0
@@ -102,7 +144,7 @@ func new_level() -> void:
 	day = 0
 	turn_in_day = 0
 	turn_global = 0
-	action_points = 0
+	action_points = ACTION_POINTS_INITIAL
 	hand.clear()
 	discard_pile.clear()
 	draw_pile = CardDatabase.build_starter_deck()
@@ -143,6 +185,7 @@ func play_card(index: int) -> bool:
 	var price_before: float = price
 	var hi_before: float = cur_high
 	var lo_before: float = cur_low
+	var bull_before: int = bull
 	_dispatch_effect(c.effect_id)
 	# 出牌后这一段时间内 (effect 可能多次调用 apply_price_change), 价格区间 = (hi_before..cur_high, lo_before..cur_low)
 	# 计算这次出牌的 high/low: 取 dispatch 期间 cur_high/cur_low 的"增量"
@@ -163,6 +206,9 @@ func play_card(index: int) -> bool:
 		"high":  k_high,
 		"low":   k_low,
 		"kind":  "play",
+		"card_name": c.name,
+		"price_delta_pct": (price_after / price_before - 1.0) * 100.0 if price_before > 0.0 else 0.0,
+		"emotion_delta": bull - bull_before,
 	})
 	discard_pile.append(c)
 	_log("打出「%s」: %s" % [c.name, c.description])
@@ -183,43 +229,10 @@ func end_turn() -> void:
 
 
 # ===========================================================
-# 卡牌效果分发
+# 卡牌效果分发 -> 委托给 CardEffectSystem
 # ===========================================================
 func _dispatch_effect(effect_id: String) -> void:
-	match effect_id:
-		"buy_basic":
-			# 消耗总资金的 10% 买入筹码, 不影响股价
-			# "总资金" 在策划描述里没明确是 cash 还是 cash+持仓市值
-			# 根据策划"金钱也是生命值"语境, 这里取手头现金的 10%
-			var spend: float = cash * 0.10
-			_buy_with_cash(spend, false)
-		"sell_basic":
-			# 卖出当前持仓的 10%, 不影响股价
-			var n: int = int(floor(float(shares) * 0.10))
-			_sell_shares(n, false)
-		"insider_basic":
-			apply_price_change(0.03)
-		"hype_basic":
-			apply_emotion_delta_bull(5)
-		# ---- 升级版 ----
-		"buy_plus":
-			var spend2: float = cash * 0.30
-			_buy_with_cash(spend2, true)   # 同时拉升 +3%
-		"sell_plus":
-			var n2: int = int(floor(float(shares) * 0.30))
-			_sell_shares(n2, true)         # 同时压低 -3%
-		"insider_plus":
-			apply_price_change(0.05)
-		"hype_plus":
-			apply_emotion_delta_bull(10)
-		# ---- 商店占位卡 ----
-		"crash_basic":
-			apply_price_change(-0.03)
-		"panic_basic":
-			apply_emotion_delta_bull(-5)
-			apply_price_change(-0.02)
-		_:
-			push_warning("Unknown effect_id: %s" % effect_id)
+	_effect_system.dispatch(effect_id)
 
 
 # ===========================================================
@@ -246,7 +259,7 @@ func apply_emotion_delta_bull(delta: int) -> void:
 		return
 
 
-func _buy_with_cash(spend: float, affect_price: bool) -> void:
+func _buy_with_cash(spend: float, trade_price_pct: float = 0.0) -> void:
 	if spend <= 0.0 or price <= 0.0:
 		return
 	if spend > cash:
@@ -259,11 +272,11 @@ func _buy_with_cash(spend: float, affect_price: bool) -> void:
 	cash -= cost
 	shares += n
 	_log("  买入 %d 股 @ ¥%.2f, 花费 ¥%s" % [n, price, _fmt_money(cost)])
-	if affect_price:
-		apply_price_change(0.03)
+	if trade_price_pct != 0.0:
+		apply_price_change(trade_price_pct)
 
 
-func _sell_shares(n: int, affect_price: bool) -> void:
+func _sell_shares(n: int, trade_price_pct: float = 0.0) -> void:
 	if n <= 0:
 		_log("  持仓不足, 无法卖出")
 		return
@@ -272,8 +285,8 @@ func _sell_shares(n: int, affect_price: bool) -> void:
 	shares -= n
 	cash += income
 	_log("  卖出 %d 股 @ ¥%.2f, 收入 ¥%s" % [n, price, _fmt_money(income)])
-	if affect_price:
-		apply_price_change(-0.03)
+	if trade_price_pct != 0.0:
+		apply_price_change(trade_price_pct)
 
 
 # ===========================================================
@@ -328,6 +341,7 @@ func _start_day() -> void:
 	day += 1
 	turn_in_day = 0
 	day_open_price = price
+	action_points = ACTION_POINTS_INITIAL
 	day_open_assets = get_total_assets()
 	_log("==== 第 %d / %d 天 开盘 ¥%.2f ====" % [day, DAYS_PER_LEVEL, day_open_price])
 	emit_signal("day_started", day)
@@ -337,7 +351,7 @@ func _start_day() -> void:
 func _start_turn() -> void:
 	turn_in_day += 1
 	turn_global += 1
-	action_points = ACTION_POINTS_PER_TURN
+	action_points = min(action_points + 1, ACTION_POINTS_MAX)
 	# 本回合 OHLC 初始化
 	cur_open = price
 	cur_high = price
@@ -382,9 +396,16 @@ func _settle_turn() -> void:
 		"high":  max(old_price, price),
 		"low":   min(old_price, price),
 		"kind":  "settle",
+		"card_name": "自然波动",
+		"price_delta_pct": drift * 100.0,
+		"emotion_delta": 0,
 	})
 	emit_signal("intraday_updated")
 	# 2. 提交一根回合 K
+	var turn_cards: Array = []
+	for ic in intraday_candles:
+		if ic["kind"] == "play":
+			turn_cards.append(String(ic["card_name"]))
 	candles.append({
 		"turn_global": turn_global,
 		"day": day,
@@ -393,6 +414,7 @@ func _settle_turn() -> void:
 		"high": cur_high,
 		"low":  cur_low,
 		"close": price,
+		"cards": turn_cards,
 	})
 	emit_signal("candle_committed", turn_global)
 	# 3. 触发回合结束
