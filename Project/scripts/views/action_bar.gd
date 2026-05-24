@@ -12,7 +12,8 @@ func _ready() -> void:
 
 func _refresh() -> void:
 	lbl_action_points.text = "行动力 %d / %d   %s" % [Game.action_points, Game.ACTION_POINTS_PER_TURN, UF.ap_dots(Game.action_points, Game.ACTION_POINTS_PER_TURN)]
-	var ratio: float = float(Game.action_points) / float(Game.ACTION_POINTS_PER_TURN)
+	var cap: int = max(Game.ACTION_POINTS_PER_TURN, 1)
+	var ratio: float = float(Game.action_points) / float(cap)
 	if ratio >= 0.75:
 		lbl_action_points.add_theme_color_override("font_color", UF.COL_AP_ON)
 	elif ratio >= 0.50:

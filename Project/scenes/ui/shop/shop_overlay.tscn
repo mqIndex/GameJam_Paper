@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/views/shop/shop_overlay.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://scenes/ui/shop/shop_buy_panel.tscn" id="2_buy"]
 [ext_resource type="PackedScene" path="res://scenes/ui/shop/shop_upgrade_panel.tscn" id="3_upgrade"]
 [ext_resource type="PackedScene" path="res://scenes/ui/shop/shop_delete_panel.tscn" id="4_delete"]
+[ext_resource type="PackedScene" path="res://scenes/ui/shop/shop_talent_panel.tscn" id="5_talent"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_shop"]
 bg_color = Color(0.106, 0.165, 0.255, 1)
@@ -130,6 +131,8 @@ size_flags_vertical = 3
 [node name="升级" parent="ShopPanel/Margin/RootVBox/Tabs" instance=ExtResource("3_upgrade")]
 
 [node name="删卡" parent="ShopPanel/Margin/RootVBox/Tabs" instance=ExtResource("4_delete")]
+
+[node name="天赋" parent="ShopPanel/Margin/RootVBox/Tabs" instance=ExtResource("5_talent")]
 
 [node name="BottomBar" type="HBoxContainer" parent="ShopPanel/Margin/RootVBox"]
 layout_mode = 2

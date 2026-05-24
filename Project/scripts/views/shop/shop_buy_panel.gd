@@ -24,7 +24,8 @@ func refresh() -> void:
 		var card: Card = Game.shop_offers[i]
 		var sc = ShopCardScene.instantiate()
 		grid.add_child(sc)
-		var can_afford: bool = Game.cash >= Game.SHOP_BUY_PRICE
-		sc.setup(card, Game.SHOP_BUY_PRICE, "购买", UF.COL_UP, can_afford)
+		var price_due: int = card.shop_price if card.shop_price > 0 else Game.SHOP_BUY_PRICE
+		var can_afford: bool = Game.cash >= price_due
+		sc.setup(card, price_due, "购买", UF.COL_UP, can_afford)
 		var idx_capture: int = i
 		sc.action_pressed.connect(func(): Game.shop_buy_card(idx_capture))

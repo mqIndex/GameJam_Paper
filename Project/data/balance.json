@@ -1,5 +1,5 @@
 {
-  "_comment": "数值平衡配置。改这里 → 重启游戏即可生效。键名与 game_state.gd 中的 const 同名,缺失项会回退到代码默认。",
+  "_comment": "数值平衡配置。改这里 → 重启游戏即可生效。键名与 game_state.gd 中的 var 同名,缺失项会回退到代码默认。",
 
   "DAYS_PER_LEVEL": 5,
   "TURNS_PER_DAY": 10,
@@ -18,7 +18,7 @@
   "INITIAL_BULL": 50,
   "EMOTION_TOTAL": 100,
 
-  "NATURAL_DRIFT_CLAMP": 0.03,
+  "NATURAL_DRIFT_CLAMP": 0.10,
   "NATURAL_VOLATILITY_SIGMA_DEFAULT": 0.012,
 
   "SHOP_BUY_PRICE": 1000,

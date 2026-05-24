@@ -1,0 +1,2 @@
+id,name,description,price,in_first_day,effect_id
+cascade_combo,连携效应,"连续打出 3 张买牌或 3 张卖牌时, 最后一张多触发一次 (资源不足时该次失效, 始终不消耗行动力)",0,TRUE,cascade_combo
