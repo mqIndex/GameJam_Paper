@@ -11,12 +11,8 @@
   "FIRST_TURN_DRAW": 6,
   "TURN_DRAW": 2,
   "HAND_LIMIT": 10,
-<<<<<<< Updated upstream
   "ACTION_POINTS_INITIAL": 2,
   "ACTION_POINTS_PER_TURN": 1,
-=======
-  "ACTION_POINTS_INITIAL": 3,
->>>>>>> Stashed changes
   "ACTION_POINTS_MAX": 6,
 
   "INITIAL_BULL": 50,

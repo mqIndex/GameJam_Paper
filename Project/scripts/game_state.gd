@@ -24,21 +24,16 @@ var SETTLE_DISCOUNT: float = 0.5              # 周五未卖筹码强制折价
 var FIRST_TURN_DRAW: int = 6                  # 第一回合摸 6 张
 var TURN_DRAW: int = 2                        # 此后每回合摸 2 张
 var HAND_LIMIT: int = 10
-<<<<<<< Updated upstream
-var ACTION_POINTS_INITIAL: int = 2
-var ACTION_POINTS_PER_TURN: int = 1
-var ACTION_POINTS_MAX: int = 6
-=======
-var ACTION_POINTS_INITIAL: int = 3            # 第 1 回合行动力 (策划: 1/2/3/4/5+ 回合 = 3/4/5/6/6)
+var ACTION_POINTS_INITIAL: int = 2            # 每天首回合 AP (策划: 每天开盘 PER_TURN 重置为此, 每回合末 +1 直到 MAX)
+var ACTION_POINTS_PER_TURN: int = 1           # 运行时: 当前回合 AP 上限 (_start_day 重置, _settle_turn 末递增)
 var ACTION_POINTS_MAX: int = 6                # 行动力上限
->>>>>>> Stashed changes
 
 # ===== 情绪参数 =====
 var INITIAL_BULL: int = 50                    # 初始上涨情绪
 var EMOTION_TOTAL: int = 100                  # 上涨 + 下跌 = 100
 
 # ===== 自然波动 (clamp 范围 / σ 可调) =====
-var NATURAL_DRIFT_CLAMP: float = 0.03         # ±3%
+var NATURAL_DRIFT_CLAMP: float = 0.10         # ±10% (策划 4.3)
 var NATURAL_VOLATILITY_SIGMA_DEFAULT: float = 0.012   # σ 暂取 1.2%, 待数值组确认
 var natural_volatility_sigma: float = 0.012
 
@@ -411,25 +406,17 @@ func draw_cards(n: int) -> int:
 	return got
 
 
-# 第一回合保底: 至少 1 买 + 1 卖 + 1 技能 (策划 7.2.8)
-# 在普通抽牌之后调用, 缺什么就从 draw_pile 里取一张顶上去
-func _ensure_first_turn_floor() -> void:
-	var have_buy: bool = false
-	var have_sell: bool = false
-	var have_skill: bool = false
-	for c in hand:
-		if c.is_buy(): have_buy = true
-		elif c.is_sell(): have_sell = true
-		elif c.is_skill(): have_skill = true
-	_force_one_into_hand_if_missing(have_buy, Card.Kind.BUY)
-	_force_one_into_hand_if_missing(have_sell, Card.Kind.SELL)
-	_force_one_into_hand_if_missing(have_skill, Card.Kind.SKILL)
+# 整局第一回合保底: 先种 1 买 + 1 卖 + 1 技能 (策划 7.2.8)
+# 在 draw_cards 之前调用, 保证三类齐全且总手牌 = FIRST_TURN_DRAW
+func _seed_first_turn() -> void:
+	_take_first_of_kind(Card.Kind.BUY)
+	_take_first_of_kind(Card.Kind.SELL)
+	_take_first_of_kind(Card.Kind.SKILL)
 
 
-func _force_one_into_hand_if_missing(have: bool, kind: int) -> void:
-	if have: return
-	if hand.size() >= HAND_LIMIT: return
-	for i in range(draw_pile.size() - 1, -1, -1):
+func _take_first_of_kind(kind: int) -> bool:
+	if hand.size() >= HAND_LIMIT: return false
+	for i in range(draw_pile.size()):
 		if draw_pile[i].kind == kind:
 			hand.append(draw_pile[i])
 			draw_pile.remove_at(i)
@@ -444,13 +431,7 @@ func _start_day() -> void:
 	day += 1
 	turn_in_day = 0
 	day_open_price = price
-<<<<<<< Updated upstream
 	ACTION_POINTS_PER_TURN = ACTION_POINTS_INITIAL
-=======
-	# 每天重置市场情绪到中性 (策划: 上一天累计情绪不带到新一天)
-	bull = INITIAL_BULL
-	bear = EMOTION_TOTAL - INITIAL_BULL
->>>>>>> Stashed changes
 	day_open_assets = get_total_assets()
 	# 突发事件: 清当天事件残留 (modifier / banned / dur 都按"持续到下次事件"截断在天结束)
 	_clear_event_state()
@@ -463,12 +444,7 @@ func _start_day() -> void:
 func _start_turn() -> void:
 	turn_in_day += 1
 	turn_global += 1
-<<<<<<< Updated upstream
 	action_points = ACTION_POINTS_PER_TURN
-=======
-	# 行动力按回合数递增 (策划: 1/2/3/4/5+ 回合 = 3/4/5/6/6)
-	action_points = min(ACTION_POINTS_INITIAL + (turn_in_day - 1), ACTION_POINTS_MAX)
->>>>>>> Stashed changes
 	# 本回合 OHLC 初始化
 	cur_open = price
 	cur_high = price
@@ -535,6 +511,7 @@ func _settle_turn() -> void:
 		var min_p: float = max(1.0, day_open_price * (1.0 - dn_cap))
 		if price < min_p: price = min_p
 	_track_price()
+	_log("  回合末自然波动 %+.2f%% → ¥%.2f" % [drift * 100.0, price])
 	# 1.5 自然波动作为分时 K 最后一根
 	intraday_candles.append({
 		"open":  old_price,
@@ -569,10 +546,18 @@ func _settle_turn() -> void:
 		"cards": turn_cards,
 	})
 	emit_signal("candle_committed", turn_global)
-	ACTION_POINTS_PER_TURN = min(ACTION_POINTS_PER_TURN+1, ACTION_POINTS_MAX)
+	ACTION_POINTS_PER_TURN = min(ACTION_POINTS_PER_TURN + 1, ACTION_POINTS_MAX)
 	# 3. 触发回合结束
 	emit_signal("turn_ended", day, turn_in_day)
-	# 4. 推进
+	# 4. 突发事件 dur_turns 倒计时 (短期事件如 超预期财报 / 财报逆袭 = 3)
+	if event_modifier_dur > 0:
+		event_modifier_dur -= 1
+		if event_modifier_dur == 0:
+			_log("  [突发事件] 「%s」效果到期" % (current_event.name if current_event != null else ""))
+			_clear_event_state()
+			emit_signal("event_triggered", null)
+			emit_signal("state_changed")
+	# 5. 推进
 	if turn_in_day >= TURNS_PER_DAY:
 		_end_day()
 	else:
@@ -661,7 +646,9 @@ func _settle_level() -> void:
 # 自然波动 / 情绪倍率
 # ===========================================================
 func _roll_natural_drift() -> float:
-	var mu: float = (float(bull) - 50.0) / 50.0 * NATURAL_DRIFT_CLAMP
+	# 突发事件: 市场失真 → μ 强制为 0
+	var decoupled: bool = event_modifiers.get("decouple", false)
+	var mu: float = 0.0 if decoupled else (float(bull) - 50.0) / 50.0 * NATURAL_DRIFT_CLAMP
 	var x: float = _gaussian(mu, natural_volatility_sigma)
 	return clamp(x, -NATURAL_DRIFT_CLAMP, NATURAL_DRIFT_CLAMP)
 
@@ -684,10 +671,10 @@ func _emotion_modifier_for_price(rate: float) -> float:
 	var m: float = 1.0
 	if rate >= 0.0:
 		# buy direction
-		if bull <= 30: return 0.5
-		elif bull <= 50: return 0.8
-		elif bull <= 70: return 1.5
-		else: return 2.0
+		if bull <= 30: m = 0.5
+		elif bull <= 50: m = 0.8
+		elif bull <= 70: m = 1.5
+		else: m = 2.0
 	else:
 		# sell / 砸盘 direction; 看下跌情绪 (=100-bull)
 		var bear_v: int = EMOTION_TOTAL - bull
