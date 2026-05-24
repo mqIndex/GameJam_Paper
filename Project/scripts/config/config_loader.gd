@@ -115,6 +115,7 @@ func _load_cards() -> void:
 			"price_pct":       _float(_cell(row, col, "price_pct")),
 			"emotion_delta":   int(_cell_or(row, col, "emotion_delta", "0")),
 			"trade_price_pct": _float(_cell(row, col, "trade_price_pct")),
+			"trade_shares":    int(_cell_or(row, col, "trade_shares", "0")),
 		}
 		cards[eid] = entry
 	f.close()
