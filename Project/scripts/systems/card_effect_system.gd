@@ -29,6 +29,17 @@ func dispatch(effect_id: String) -> void:
 	var emotion_delta: int = int(tpl.get("emotion_delta", 0))
 	var trade_price_pct: float = float(tpl.get("trade_price_pct", 0.0))
 	var trade_shares: int = int(tpl.get("trade_shares", 0))
+	# 新机制 (情绪锚定 / 反转 / 回合倍率 / 事件刷新)
+	var emotion_set: int = int(tpl.get("emotion_set", -1))
+	var emotion_invert: bool = bool(tpl.get("emotion_invert", false))
+	var reroll_event: bool = bool(tpl.get("reroll_event", false))
+	var emotion_mul_turn: float = float(tpl.get("emotion_mul_turn", 0.0))
+	# 选择类机制 (内幕/顺势/计划/流动性/化整)
+	var event_preview: bool = bool(tpl.get("event_preview", false))
+	var discard_then_draw: bool = bool(tpl.get("discard_then_draw", false))
+	var topdeck_pick: bool = bool(tpl.get("topdeck_pick", false))
+	var liquidity_chance: float = float(tpl.get("liquidity_chance", 0.0))
+	var shatter: bool = bool(tpl.get("shatter", false))
 
 	# 突发事件 modifier 叠加
 	var em: Dictionary = _gs.event_modifiers
@@ -42,6 +53,15 @@ func dispatch(effect_id: String) -> void:
 	trade_price_pct *= trade_mul
 
 	# 情绪先于价格 (panic_basic: 先降情绪再压价, 情绪会影响压价倍率)
+	# 锚定 / 反转优先于 delta (稳定人心 / 舆论反转)
+	if emotion_invert:
+		_gs.invert_emotion()
+	if emotion_set >= 0:
+		_gs.set_emotion_bull(emotion_set)
+	# 水军出动: 给本回合后续情绪变化设倍率, 但不影响本卡自身的 emotion_delta (本卡 delta=0)
+	if emotion_mul_turn > 0.0:
+		_gs.turn_emotion_mul = emotion_mul_turn
+		_gs._log("  [水军出动] 本回合情绪变化 ×%.1f" % emotion_mul_turn)
 	if emotion_delta != 0:
 		_gs.apply_emotion_delta_bull(emotion_delta)
 
@@ -58,3 +78,20 @@ func dispatch(effect_id: String) -> void:
 
 	if price_pct != 0.0:
 		_gs.apply_price_change(price_pct)
+
+	# 风云变幻: 强制刷新当前突发事件 (排在最后, 避免被本卡其它效果污染)
+	if reroll_event:
+		_gs._log("  [风云变幻] 刷新当前突发事件")
+		_gs._trigger_random_event()
+
+	# 选择类卡: 由 game_state 发 request_* 信号给 UI; UI 收集后回调 apply_*
+	if event_preview:
+		_gs.request_event_preview()
+	if discard_then_draw:
+		_gs.request_discard_choice()
+	if topdeck_pick:
+		_gs.request_topdeck_choice()
+	if liquidity_chance > 0.0:
+		_gs.try_apply_liquidity(liquidity_chance)
+	if shatter:
+		_gs.request_shatter()

@@ -1,11 +1,21 @@
-﻿effect_id,name,kind,cost,description,image_path,upgrade_to,in_starter,starter_count,in_shop,buy_pct,sell_pct,price_pct,emotion_delta,trade_price_pct,trade_shares
-buy_basic,买入,BUY,1,"固定买入 100 股, 股价 +1%",,buy_plus,TRUE,5,TRUE,0,0,0,0,0.01,100
-sell_basic,卖出,SELL,1,"固定卖出 100 股, 股价 -1%",,sell_plus,TRUE,5,TRUE,0,0,0,0,-0.01,100
-insider_basic,内幕消息,SKILL,1,直接拉升股价 +3%,,insider_plus,TRUE,1,TRUE,0,0,0.03,0,0,0
-hype_basic,大V吹票,SKILL,1,上涨情绪 +5,,hype_plus,TRUE,1,TRUE,0,0,0,5,0,0
-buy_plus,买入+,BUY,1,"消耗总资金 30% 买入筹码, 同时拉升股价 +3%",,,FALSE,0,FALSE,0.3,0,0,0,0.03,0
-sell_plus,卖出+,SELL,1,"卖出当前持仓 30% 换回金钱, 同时压低股价 -3%",,,FALSE,0,FALSE,0,0.3,0,0,-0.03,0
-insider_plus,内幕消息+,SKILL,1,直接拉升股价 +5%,,,FALSE,0,FALSE,0,0,0.05,0,0,0
-hype_plus,大V吹票+,SKILL,1,上涨情绪 +10,,,FALSE,0,FALSE,0,0,0,10,0,0
-crash_basic,打压消息,SKILL,1,直接压低股价 -3%,,,FALSE,0,TRUE,0,0,-0.03,0,0,0
-panic_basic,恐慌消息,SKILL,1,"上涨情绪 -5, 股价 -2%",,,FALSE,0,TRUE,0,0,-0.02,-5,0,0
+﻿ effect_id,name,kind,cost,description,image_path,upgrade_to,in_starter,starter_count,in_shop,buy_pct,sell_pct,price_pct,emotion_delta,trade_price_pct,trade_shares,emotion_set,emotion_invert,reroll_event,emotion_mul_turn,event_preview,discard_then_draw,topdeck_pick,liquidity_chance,shatter,shop_unique,shop_price,daily_limit,daily_exile
+buy_basic,买入,BUY,1,"固定买入 100 股, 股价 +1%",,buy_plus,TRUE,5,TRUE,0,0,0,0,0.01,100,-1,FALSE,FALSE,0,FALSE,FALSE,FALSE,0,FALSE,FALSE,0,0,FALSE
+sell_basic,卖出,SELL,1,"固定卖出 100 股, 股价 -1%",,sell_plus,TRUE,5,TRUE,0,0,0,0,-0.01,100,-1,FALSE,FALSE,0,FALSE,FALSE,FALSE,0,FALSE,FALSE,0,0,FALSE
+insider_basic,内幕消息,SKILL,2,提前选择下一次突发事件 (三选一; 每天限 1 次; 全卡组限 1 张; 当日打出后封存在弃牌堆不被抽回),,,FALSE,0,TRUE,0,0,0,0,0,0,-1,FALSE,FALSE,0,TRUE,FALSE,FALSE,0,FALSE,TRUE,5000,1,TRUE
+hype_basic,大V吹票,SKILL,1,上涨情绪 +5,,hype_plus,TRUE,1,TRUE,0,0,0,5,0,0,-1,FALSE,FALSE,0,FALSE,FALSE,FALSE,0,FALSE,FALSE,0,0,FALSE
+buy_plus,买入+,BUY,1,"消耗总资金 30% 买入筹码, 同时拉升股价 +3%",,,FALSE,0,FALSE,0.3,0,0,0,0.03,0,-1,FALSE,FALSE,0,FALSE,FALSE,FALSE,0,FALSE,FALSE,0,0,FALSE
+sell_plus,卖出+,SELL,1,"卖出当前持仓 30% 换回金钱, 同时压低股价 -3%",,,FALSE,0,FALSE,0,0.3,0,0,-0.03,0,-1,FALSE,FALSE,0,FALSE,FALSE,FALSE,0,FALSE,FALSE,0,0,FALSE
+insider_plus,内幕消息+,SKILL,1,直接拉升股价 +5%,,,FALSE,0,FALSE,0,0,0.05,0,0,0,-1,FALSE,FALSE,0,FALSE,FALSE,FALSE,0,FALSE,FALSE,0,0,FALSE
+hype_plus,大V吹票+,SKILL,1,上涨情绪 +10,,,FALSE,0,FALSE,0,0,0,10,0,0,-1,FALSE,FALSE,0,FALSE,FALSE,FALSE,0,FALSE,FALSE,0,0,FALSE
+crash_basic,打压消息,SKILL,1,场内情绪 -5,,,FALSE,0,TRUE,0,0,0,-5,0,0,-1,FALSE,FALSE,0,FALSE,FALSE,FALSE,0,FALSE,FALSE,0,0,FALSE
+panic_basic,恐慌消息,SKILL,1,"上涨情绪 -5, 股价 -2%",,,FALSE,0,TRUE,0,0,-0.02,-5,0,0,-1,FALSE,FALSE,0,FALSE,FALSE,FALSE,0,FALSE,FALSE,0,0,FALSE
+small_buy,小买一笔,BUY,0,"买入 50 股, 不影响股价 (全卡组限 1 张)",,,FALSE,0,TRUE,0,0,0,0,0,50,-1,FALSE,FALSE,0,FALSE,FALSE,FALSE,0,FALSE,TRUE,0,0,FALSE
+small_sell,小卖一笔,SELL,0,"卖出 50 股, 不影响股价 (全卡组限 1 张)",,,FALSE,0,TRUE,0,0,0,0,0,50,-1,FALSE,FALSE,0,FALSE,FALSE,FALSE,0,FALSE,TRUE,0,0,FALSE
+sentiment_flip,舆论反转,SKILL,3,当前情绪反转 (100 - 当前 bull; 全卡组限 1 张),,,FALSE,0,TRUE,0,0,0,0,0,0,-1,TRUE,FALSE,0,FALSE,FALSE,FALSE,0,FALSE,TRUE,0,0,FALSE
+calm_market,稳定人心,SKILL,3,市场情绪固定到 50,,,FALSE,0,TRUE,0,0,0,0,0,0,50,FALSE,FALSE,0,FALSE,FALSE,FALSE,0,FALSE,FALSE,0,0,FALSE
+reroll_event,风云变幻,SKILL,2,刷新当前突发事件 (每天限 1 次),,,FALSE,0,TRUE,0,0,0,0,0,0,-1,FALSE,TRUE,0,FALSE,FALSE,FALSE,0,FALSE,FALSE,0,1,FALSE
+troll_swarm,水军出动,SKILL,0,本回合所有情绪变化 ×2,,,FALSE,0,TRUE,0,0,0,0,0,0,-1,FALSE,FALSE,2.0,FALSE,FALSE,FALSE,0,FALSE,FALSE,0,0,FALSE
+trend_follow,顺势而为,SKILL,1,弃 1 张手牌, 抽 1 张,,,FALSE,0,TRUE,0,0,0,0,0,0,-1,FALSE,FALSE,0,FALSE,TRUE,FALSE,0,FALSE,FALSE,0,0,FALSE
+plan_well,计划得当,SKILL,1,从抽牌堆选 1 张放到牌堆顶,,,FALSE,0,TRUE,0,0,0,0,0,0,-1,FALSE,FALSE,0,FALSE,FALSE,TRUE,0,FALSE,FALSE,0,0,FALSE
+liquidity_flood,流动性泛滥,SKILL,2,50% 概率使所有手牌费用 -1 (最低 0; 仅本回合),,,FALSE,0,TRUE,0,0,0,0,0,0,-1,FALSE,FALSE,0,FALSE,FALSE,FALSE,0.5,FALSE,FALSE,0,0,FALSE
+shatter_card,化整为零,SKILL,3,选任意 BUY/SELL 牌进弃牌堆, 各换为 2 张本回合限定的小买/小卖,,,FALSE,0,TRUE,0,0,0,0,0,0,-1,FALSE,FALSE,0,FALSE,FALSE,FALSE,0,TRUE,FALSE,0,0,FALSE

@@ -116,6 +116,22 @@ func _load_cards() -> void:
 			"emotion_delta":   int(_cell_or(row, col, "emotion_delta", "0")),
 			"trade_price_pct": _float(_cell(row, col, "trade_price_pct")),
 			"trade_shares":    int(_cell_or(row, col, "trade_shares", "0")),
+			# 新机制 (2026-05-23): 情绪锚定 / 反转 / 回合倍率 / 事件刷新
+			"emotion_set":      int(_cell_or(row, col, "emotion_set", "-1")),
+			"emotion_invert":   _bool(_cell(row, col, "emotion_invert")),
+			"reroll_event":     _bool(_cell(row, col, "reroll_event")),
+			"emotion_mul_turn": _float(_cell(row, col, "emotion_mul_turn")),
+			# 选择类机制 (2026-05-23 第二批): 信号驱动, UI 弹窗 → 回调 game_state apply_*
+			"event_preview":     _bool(_cell(row, col, "event_preview")),
+			"discard_then_draw": _bool(_cell(row, col, "discard_then_draw")),
+			"topdeck_pick":      _bool(_cell(row, col, "topdeck_pick")),
+			"liquidity_chance":  _float(_cell(row, col, "liquidity_chance")),
+			"shatter":           _bool(_cell(row, col, "shatter")),
+			# 商店/牌组约束 (2026-05-23 平衡): 唯一卡 / 个性化售价 / 每日使用上限 / 当日封存
+			"shop_unique":  _bool(_cell(row, col, "shop_unique")),
+			"shop_price":   int(_cell_or(row, col, "shop_price", "0")),
+			"daily_limit":  int(_cell_or(row, col, "daily_limit", "0")),
+			"daily_exile":  _bool(_cell(row, col, "daily_exile")),
 		}
 		cards[eid] = entry
 	f.close()

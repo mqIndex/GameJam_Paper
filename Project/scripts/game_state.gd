@@ -72,6 +72,11 @@ signal candle_committed(turn_global: int)        # 回合 K 入库
 signal intraday_updated                          # 分时新点
 signal level_finished(victory: bool, final_assets: float)
 signal log_message(msg: String)
+# 选择类卡: 派发后 emit 一个 request 信号, UI 弹窗收集玩家选择, 回调 game_state.apply_*
+signal event_preview_requested(events: Array)             # 三选一突发事件 (Array of Event)
+signal discard_choice_requested(hand_cards: Array)        # 顺势而为: 选 1 张手牌弃掉
+signal topdeck_choice_requested(draw_pile_cards: Array)   # 计划得当: 选 1 张抽牌堆牌上顶
+signal shatter_choice_requested(buy_sell_cards: Array)    # 化整为零: 多选 BUY/SELL 牌
 signal event_triggered(event)                    # Event 实例 或 null (清空时)
 
 # ===== 局内状态 =====
@@ -97,6 +102,10 @@ var event_modifier_dur: int = 0                          # >0 = 短期 N 回合,
 var banned_effect_ids: Array = []                        # 当前被禁出的 effect_id
 var triggered_event_ids_this_level: Dictionary = {}      # 本关已触发过的事件 id (一关不重复)
 var skills_played_this_turn: int = 0                     # 本回合已使用技能牌数 (skill_cap_per_turn 计数)
+var turn_emotion_mul: float = 1.0                        # 本回合情绪变化倍率 (水军出动 → 2.0; _start_turn 重置)
+var pending_event_id: String = ""                        # 内幕消息预选: 下次 _trigger_random_event 优先用此 id
+var liquidity_buffed_cards: Array = []                   # 本回合 流动性泛滥 命中后 cost-1 的 Card 引用; _settle_turn 末还原
+var daily_play_count: Dictionary = {}                    # effect_id → 本日已使用次数 (供 daily_limit 检查); _start_day 重置
 
 # ===== K线 =====
 var candles: Array = []                         # 已结算回合 K, 每根 {turn_global, day, turn_in_day, open, high, low, close}
@@ -163,6 +172,8 @@ func new_level() -> void:
 	discard_pile.clear()
 	draw_pile = CardDatabase.build_starter_deck()
 	draw_pile.shuffle()
+	liquidity_buffed_cards.clear()
+	daily_play_count.clear()
 	candles.clear()
 	intraday_ticks.clear()
 	intraday_candles.clear()
@@ -210,8 +221,16 @@ func play_card(index: int) -> bool:
 	if banned_effect_ids.has(c.effect_id):
 		_log("[突发事件] 此卡当前被禁用: %s" % c.name)
 		return false
+	# 平衡: 每日使用上限 (daily_limit)
+	if c.daily_limit > 0:
+		var used: int = int(daily_play_count.get(c.effect_id, 0))
+		if used >= c.daily_limit:
+			_log("「%s」今日已使用 %d 次, 达到上限" % [c.name, c.daily_limit])
+			return false
 	action_points -= c.cost
 	hand.remove_at(index)
+	if c.daily_limit > 0:
+		daily_play_count[c.effect_id] = int(daily_play_count.get(c.effect_id, 0)) + 1
 	# 记录出牌前价位
 	var price_before: float = price
 	var hi_before: float = cur_high
@@ -244,6 +263,9 @@ func play_card(index: int) -> bool:
 		"emotion_delta": bull - bull_before,
 	})
 	discard_pile.append(c)
+	if c.daily_exile:
+		c.daily_exiled = true
+		_log("  [封存] 「%s」当日不再洗回牌堆" % c.name)
 	_log("打出「%s」: %s" % [c.name, c.description])
 	emit_signal("intraday_updated")
 	emit_signal("hand_changed")
@@ -329,6 +351,8 @@ func apply_price_change(rate: float, ignore_emotion_modifier: bool = false) -> v
 # 突发事件: emotion_floor / emotion_ceiling 在此处 clamp
 func apply_emotion_delta_bull(delta: int) -> void:
 	var old: int = bull
+	if turn_emotion_mul != 1.0 and delta != 0:
+		delta = int(round(float(delta) * turn_emotion_mul))
 	bull = clamp(bull + delta, 0, EMOTION_TOTAL)
 	if event_modifiers.has("emotion_floor"):
 		bull = max(bull, int(event_modifiers["emotion_floor"]))
@@ -338,6 +362,176 @@ func apply_emotion_delta_bull(delta: int) -> void:
 	_log("  情绪 上涨%+d → %d/%d" % [delta, bull, bear])
 	if old == bull:
 		return
+
+
+# 直接把 bull 设到指定值 (稳定人心: 50)
+func set_emotion_bull(v: int) -> void:
+	var old: int = bull
+	bull = clamp(v, 0, EMOTION_TOTAL)
+	if event_modifiers.has("emotion_floor"):
+		bull = max(bull, int(event_modifiers["emotion_floor"]))
+	if event_modifiers.has("emotion_ceiling"):
+		bull = min(bull, int(event_modifiers["emotion_ceiling"]))
+	bear = EMOTION_TOTAL - bull
+	_log("  情绪 强制设定 → %d/%d" % [bull, bear])
+	if old == bull:
+		return
+
+
+# 当前情绪反转 (舆论反转: bull = total - bull)
+func invert_emotion() -> void:
+	set_emotion_bull(EMOTION_TOTAL - bull)
+
+
+# ===========================================================
+# 选择类卡 API: dispatch → request_* signal → UI 弹窗 → apply_*
+# ===========================================================
+
+# 内幕消息: 抽 3 个候选事件 (排除本关已触发, 不足 3 张则有几张算几张), emit 让 UI 三选一
+func request_event_preview() -> void:
+	var pool: Array = EventDatabase.build_event_pool()
+	var filtered: Array = []
+	for ev in pool:
+		if not triggered_event_ids_this_level.has(ev.id):
+			filtered.append(ev)
+	if filtered.is_empty():
+		filtered = pool
+	filtered.shuffle()
+	var n: int = min(3, filtered.size())
+	var picks: Array = []
+	for i in range(n):
+		picks.append(filtered[i])
+	if picks.is_empty():
+		_log("  [内幕消息] 候选池为空, 无效果")
+		return
+	_log("  [内幕消息] 提供 %d 个事件候选, 等待玩家选择" % picks.size())
+	emit_signal("event_preview_requested", picks)
+
+
+# UI 回调: 玩家从三选一里选定的事件 id
+func set_pending_event(event_id: String) -> void:
+	pending_event_id = event_id
+	_log("  [内幕消息] 已预选下一次事件: %s" % event_id)
+
+
+# 顺势而为: 让 UI 列出当前手牌让玩家选 1 张
+func request_discard_choice() -> void:
+	if hand.is_empty():
+		_log("  [顺势而为] 手牌为空, 直接抽 1")
+		draw_cards(1)
+		return
+	emit_signal("discard_choice_requested", hand.duplicate())
+
+
+# UI 回调: 弃 hand[idx] 后抽 1
+func discard_one_then_draw(idx: int) -> void:
+	if idx < 0 or idx >= hand.size():
+		return
+	var c: Card = hand[idx]
+	hand.remove_at(idx)
+	discard_pile.append(c)
+	_log("  [顺势而为] 弃掉「%s」" % c.name)
+	emit_signal("hand_changed")
+	draw_cards(1)
+	emit_signal("state_changed")
+
+
+# 计划得当: 让 UI 列出抽牌堆所有牌让玩家选 1 张
+func request_topdeck_choice() -> void:
+	if draw_pile.is_empty():
+		_log("  [计划得当] 抽牌堆为空, 无效果")
+		return
+	emit_signal("topdeck_choice_requested", draw_pile.duplicate())
+
+
+# UI 回调: 把 draw_pile[idx] 移到牌堆顶 (pop_back 是抽牌, 所以堆顶 = 数组末尾)
+func place_on_top_of_draw(idx: int) -> void:
+	if idx < 0 or idx >= draw_pile.size():
+		return
+	var c: Card = draw_pile[idx]
+	draw_pile.remove_at(idx)
+	draw_pile.append(c)
+	_log("  [计划得当] 「%s」已放到牌堆顶, 下次必抽" % c.name)
+	emit_signal("state_changed")
+
+
+# 流动性泛滥: chance 概率让所有手牌 cost -1 (最低 0), 仅本回合生效, _settle_turn 末还原
+func try_apply_liquidity(chance: float) -> void:
+	if randf() >= chance:
+		_log("  [流动性泛滥] 未触发 (%.0f%% 概率)" % (chance * 100.0))
+		return
+	var n: int = 0
+	for c in hand:
+		if c.cost > 0:
+			c.cost -= 1
+			liquidity_buffed_cards.append(c)
+			n += 1
+	_log("  [流动性泛滥] 触发! %d 张手牌费用 -1 (仅本回合)" % n)
+	emit_signal("hand_changed")
+	emit_signal("state_changed")
+
+
+# 还原流动性泛滥的 cost-1 buff (回合末调用; Card 可能已经离开 hand 进 discard, 引用还原仍生效)
+func _revert_liquidity_buffs() -> void:
+	if liquidity_buffed_cards.is_empty():
+		return
+	for c in liquidity_buffed_cards:
+		c.cost += 1
+	_log("  [流动性泛滥] 回合结束, %d 张卡费用还原" % liquidity_buffed_cards.size())
+	liquidity_buffed_cards.clear()
+	emit_signal("hand_changed")
+
+
+# 化整为零: 让 UI 列出手牌中所有 BUY/SELL 牌让玩家多选
+func request_shatter() -> void:
+	var cands: Array = []
+	for c in hand:
+		if c.is_buy() or c.is_sell():
+			cands.append(c)
+	if cands.is_empty():
+		_log("  [化整为零] 手牌中没有 BUY/SELL 牌, 无效果")
+		return
+	emit_signal("shatter_choice_requested", cands)
+
+
+# UI 回调: 玩家选定的卡 (Array of Card 实例) 全部进弃牌堆, 每张 BUY 换 2 张 small_buy, 每张 SELL 换 2 张 small_sell (全部 transient)
+func shatter_cards(picked_cards: Array) -> void:
+	if picked_cards.is_empty():
+		return
+	var add_buy: int = 0
+	var add_sell: int = 0
+	for c in picked_cards:
+		var idx: int = hand.find(c)
+		if idx < 0:
+			continue
+		hand.remove_at(idx)
+		discard_pile.append(c)
+		if c.is_buy():
+			add_buy += 2
+		elif c.is_sell():
+			add_sell += 2
+	for i in range(add_buy):
+		hand.append(CardDatabase.make_by_effect("small_buy", "shatter_b_%d_%d" % [turn_global, i], true))
+	for i in range(add_sell):
+		hand.append(CardDatabase.make_by_effect("small_sell", "shatter_s_%d_%d" % [turn_global, i], true))
+	_log("  [化整为零] 碎掉 %d 张 → 生成 %d 小买 + %d 小卖 (本回合限定)" % [picked_cards.size(), add_buy, add_sell])
+	emit_signal("hand_changed")
+	emit_signal("state_changed")
+
+
+# transient 卡清理: 从手/抽/弃牌堆里全部移除, 不入任何堆 (相当于销毁)
+func _strip_transient_cards() -> void:
+	var removed: int = 0
+	for arr in [hand, draw_pile, discard_pile]:
+		var i: int = arr.size() - 1
+		while i >= 0:
+			if arr[i].transient:
+				arr.remove_at(i)
+				removed += 1
+			i -= 1
+	if removed > 0:
+		_log("  [本回合限定卡] 清理 %d 张" % removed)
+		emit_signal("hand_changed")
 
 
 func _buy_with_cash(spend: float, trade_price_pct: float = 0.0) -> void:
@@ -395,10 +589,21 @@ func draw_cards(n: int) -> int:
 		if hand.size() >= HAND_LIMIT: break
 		if draw_pile.is_empty():
 			if discard_pile.is_empty(): break
-			draw_pile = discard_pile.duplicate()
-			discard_pile.clear()
+			var reshuffleable: Array = []
+			var keep_exiled: Array = []
+			for dc in discard_pile:
+				if dc.daily_exiled:
+					keep_exiled.append(dc)
+				else:
+					reshuffleable.append(dc)
+			if reshuffleable.is_empty(): break
+			draw_pile = reshuffleable
+			discard_pile = keep_exiled
 			draw_pile.shuffle()
-			_log("  抽牌堆空, 等待区 %d 张洗回" % draw_pile.size())
+			if keep_exiled.is_empty():
+				_log("  抽牌堆空, 等待区 %d 张洗回" % draw_pile.size())
+			else:
+				_log("  抽牌堆空, 等待区 %d 张洗回 (封存 %d 张留在弃牌堆)" % [draw_pile.size(), keep_exiled.size()])
 		hand.append(draw_pile.pop_back())
 		got += 1
 	if got > 0:
@@ -435,6 +640,7 @@ func _start_day() -> void:
 	bull = INITIAL_BULL
 	bear = EMOTION_TOTAL - INITIAL_BULL
 	day_open_assets = get_total_assets()
+	daily_play_count.clear()
 	# 突发事件: 清当天事件残留 (modifier / banned / dur 都按"持续到下次事件"截断在天结束)
 	_clear_event_state()
 	emit_signal("event_triggered", null)
@@ -444,6 +650,8 @@ func _start_day() -> void:
 
 
 func _start_turn() -> void:
+	# 化整为零产物: 上回合留下的临时卡, 在新回合开始时全部消失 (不入弃牌堆)
+	_strip_transient_cards()
 	turn_in_day += 1
 	turn_global += 1
 	action_points = ACTION_POINTS_PER_TURN
@@ -458,6 +666,7 @@ func _start_turn() -> void:
 	# UI 仍认为是 SETTLE 阶段而把所有手牌按钮 disable
 	phase = Phase.PLAY
 	skills_played_this_turn = 0
+	turn_emotion_mul = 1.0
 	# 抽牌 (会发 hand_changed)
 	# 每天第 1 回合摸 6 张 (首日及每天开始时的"起始手牌"); 其它回合摸 2 张.
 	# 整局首回合: 先种 1 买 + 1 卖 + 1 技能, 再补到 6 张 (策划 7.2.8, 修复 "缺类型补 1 → 7 张" bug)
@@ -549,6 +758,7 @@ func _settle_turn() -> void:
 	})
 	emit_signal("candle_committed", turn_global)
 	ACTION_POINTS_PER_TURN = min(ACTION_POINTS_PER_TURN + 1, ACTION_POINTS_MAX)
+	_revert_liquidity_buffs()
 	# 3. 触发回合结束
 	emit_signal("turn_ended", day, turn_in_day)
 	# 4. 突发事件 dur_turns 倒计时 (短期事件如 超预期财报 / 财报逆袭 = 3)
@@ -591,12 +801,20 @@ func _end_day() -> void:
 
 func _enter_shop() -> void:
 	phase = Phase.SHOP
-	shop_offers = CardDatabase.build_shop_offers(day)   # 用 day 作 seed, 不同天给不同四张
+	shop_offers = CardDatabase.build_shop_offers(day, _owned_effect_ids())   # 用 day 作 seed; owned 用于过滤 shop_unique
 	_log("---- 进入第 %d 天 盘后商店 ----" % day)
 	emit_signal("phase_changed", phase)
 	emit_signal("shop_entered", day)
 	emit_signal("shop_changed")
 	emit_signal("state_changed")
+
+
+# 玩家牌组里出现过的全部 effect_id (去重), 供 shop_unique 过滤
+func _owned_effect_ids() -> Array:
+	var seen: Dictionary = {}
+	for c in get_full_deck():
+		seen[c.effect_id] = true
+	return seen.keys()
 
 
 # 玩家点 "离开商店" 进入下一天
@@ -612,7 +830,11 @@ func leave_shop_to_next_day() -> void:
 	for c in hand:
 		discard_pile.append(c)
 	hand.clear()
-	# 把所有牌合并到抽牌堆, 重洗
+	# 把所有牌合并到抽牌堆, 重洗 (跨日, 解除当日封存)
+	for c in discard_pile:
+		c.daily_exiled = false
+	for c in draw_pile:
+		c.daily_exiled = false
 	for c in discard_pile:
 		draw_pile.append(c)
 	discard_pile.clear()
@@ -763,16 +985,17 @@ func current_delete_price() -> int:
 func shop_buy_card(offer_index: int) -> bool:
 	if phase != Phase.SHOP: return false
 	if offer_index < 0 or offer_index >= shop_offers.size(): return false
-	if cash < SHOP_BUY_PRICE:
-		_log("现金不足, 无法购买 (需要 ¥%d)" % SHOP_BUY_PRICE)
-		return false
 	var card: Card = shop_offers[offer_index]
-	cash -= SHOP_BUY_PRICE
+	var price_due: int = card.shop_price if card.shop_price > 0 else SHOP_BUY_PRICE
+	if cash < price_due:
+		_log("现金不足, 无法购买 (需要 ¥%d)" % price_due)
+		return false
+	cash -= price_due
 	# 进入抽牌堆 (杀戮尖塔: 新卡进 deck, 下一次洗牌时随机)
 	draw_pile.append(card)
 	draw_pile.shuffle()
 	shop_offers.remove_at(offer_index)
-	_log("[商店] 买入「%s」, 花费 ¥%d" % [card.name, SHOP_BUY_PRICE])
+	_log("[商店] 买入「%s」, 花费 ¥%d" % [card.name, price_due])
 	emit_signal("shop_changed")
 	emit_signal("state_changed")
 	return true
@@ -852,6 +1075,18 @@ func _locate_in_deck(deck_index: int) -> Dictionary:
 func _trigger_random_event() -> void:
 	# 清旧事件
 	_clear_event_state()
+	# 内幕消息: 玩家已预选下一次事件 → 优先使用
+	if pending_event_id != "":
+		var picked_ev: Event = EventDatabase.make_by_id(pending_event_id)
+		pending_event_id = ""
+		if picked_ev != null:
+			triggered_event_ids_this_level[picked_ev.id] = true
+			current_event = picked_ev
+			_log("[突发事件] (玩家预选生效)")
+			_apply_event_effects(picked_ev)
+			emit_signal("event_triggered", picked_ev)
+			emit_signal("state_changed")
+			return
 	# 候选池: 排除本关已触发
 	var pool: Array = EventDatabase.build_event_pool()
 	var filtered: Array = []

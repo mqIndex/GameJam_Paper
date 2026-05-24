@@ -18,8 +18,13 @@ var cost: int = 1                # 行动力消耗
 var description: String = ""
 var effect_id: String = ""       # 由 GameState._dispatch_effect 解析
 var image_path: String = ""      # 相对 res:// 或绝对; 空字符串 = 无图(UI 回退到纯色块)
+var transient: bool = false      # 临时卡: 下一次 _start_turn 时从手/抽/弃牌堆移除; 化整为零产物
+var shop_price: int = 0          # >0 时覆盖 SHOP_BUY_PRICE; 0 = 走默认
+var daily_limit: int = 0         # >0 时每天最多打 N 次, 0 = 不限
+var daily_exile: bool = false    # 模板属性: 当日打出后封存在弃牌堆; 重洗时被跳过, 进入下一日才解封
+var daily_exiled: bool = false   # 运行时状态: 当日已被封存; leave_shop_to_next_day 清除
 
-func _init(p_id: String, p_name: String, p_kind: int, p_cost: int, p_desc: String, p_effect_id: String, p_image_path: String = "") -> void:
+func _init(p_id: String, p_name: String, p_kind: int, p_cost: int, p_desc: String, p_effect_id: String, p_image_path: String = "", p_transient: bool = false) -> void:
 	id = p_id
 	name = p_name
 	kind = p_kind
@@ -27,6 +32,7 @@ func _init(p_id: String, p_name: String, p_kind: int, p_cost: int, p_desc: Strin
 	description = p_desc
 	effect_id = p_effect_id
 	image_path = p_image_path
+	transient = p_transient
 
 
 func is_buy() -> bool:   return kind == Kind.BUY

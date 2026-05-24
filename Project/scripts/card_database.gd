@@ -23,13 +23,13 @@ static func build_starter_deck() -> Array:
 
 
 # ---- 工厂: 按 effect_id 造一张新卡 (用 unique_id 区分实例) ----
-static func make_by_effect(effect_id: String, unique_id: String) -> Card:
+static func make_by_effect(effect_id: String, unique_id: String, transient: bool = false) -> Card:
 	var cfg = Engine.get_main_loop().root.get_node_or_null("Cfg")
 	var t: Variant = null if cfg == null else cfg.get_card_template(effect_id)
 	if t == null:
 		push_warning("Unknown effect_id in factory: %s" % effect_id)
-		return Card.new(unique_id, "未知", Card.Kind.SKILL, 1, "?", effect_id, "")
-	return Card.new(
+		return Card.new(unique_id, "未知", Card.Kind.SKILL, 1, "?", effect_id, "", transient)
+	var card := Card.new(
 		unique_id,
 		String(t.get("name", "?")),
 		Card.kind_from_string(String(t.get("kind", "SKILL"))),
@@ -37,7 +37,12 @@ static func make_by_effect(effect_id: String, unique_id: String) -> Card:
 		String(t.get("description", "")),
 		effect_id,
 		String(t.get("image_path", "")),
+		transient,
 	)
+	card.shop_price  = int(t.get("shop_price", 0))
+	card.daily_limit = int(t.get("daily_limit", 0))
+	card.daily_exile = bool(t.get("daily_exile", false))
+	return card
 
 
 # ---- 升级映射: effect_id → 升级版 effect_id; "" = 不能升级 ----
@@ -51,16 +56,34 @@ static func upgrade_target(effect_id: String) -> String:
 	return String(t.get("upgrade_to", ""))
 
 
-# ---- 商店占位卡池: 每天展示 4 张; 用 seed 轮选, 保持测试可重复 ----
-static func build_shop_offers(seed_index: int) -> Array:
+# ---- 商店占位卡池: 每天展示 6 张; 用 seed 轮选, 保持测试可重复 ----
+# owned_effect_ids: 玩家当前牌组里的所有 effect_id, 用来过滤 shop_unique=TRUE 且已拥有的卡
+static func build_shop_offers(seed_index: int, owned_effect_ids: Array = []) -> Array:
 	var offers: Array = []
 	var cfg = Engine.get_main_loop().root.get_node_or_null("Cfg")
 	if cfg == null:
 		return offers
-	var pool: Array = cfg.shop_pool_ids()
+	var raw_pool: Array = cfg.shop_pool_ids()
+	if raw_pool.is_empty():
+		return offers
+	# 1) 过滤 shop_unique 已拥有的
+	var pool: Array = []
+	for eid in raw_pool:
+		var t: Variant = cfg.get_card_template(eid)
+		var unique: bool = t != null and bool(t.get("shop_unique", false))
+		if unique and owned_effect_ids.has(eid):
+			continue
+		pool.append(eid)
 	if pool.is_empty():
 		return offers
-	for i in range(4):
-		var eid: String = pool[(seed_index + i) % pool.size()]
+	# 2) 按 seed 轮选, 同一天 6 张内 effect_id 不重复; 池小于 6 时直接展示全部
+	var picked_ids: Dictionary = {}
+	var step: int = 0
+	while offers.size() < 6 and step < pool.size() * 2:
+		var eid: String = pool[(seed_index + step) % pool.size()]
+		step += 1
+		if picked_ids.has(eid):
+			continue
+		picked_ids[eid] = true
 		offers.append(make_by_effect(eid, "shop_%d_%s" % [seed_index, eid]))
 	return offers
