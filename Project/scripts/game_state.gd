@@ -432,6 +432,8 @@ func _start_day() -> void:
 	turn_in_day = 0
 	day_open_price = price
 	ACTION_POINTS_PER_TURN = ACTION_POINTS_INITIAL
+	bull = INITIAL_BULL
+	bear = EMOTION_TOTAL - INITIAL_BULL
 	day_open_assets = get_total_assets()
 	# 突发事件: 清当天事件残留 (modifier / banned / dur 都按"持续到下次事件"截断在天结束)
 	_clear_event_state()

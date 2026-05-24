@@ -13,6 +13,7 @@ const Event = preload("res://scripts/event.gd")
 
 # 突发事件 UI 节点 (运行时创建)
 var _event_dialog: AcceptDialog = null
+var _event_msg: RichTextLabel = null      # dialog 内部 vbox 里复用的内容标签
 var _event_tip: PanelContainer = null
 var _tip_title: RichTextLabel = null
 var _tip_desc: RichTextLabel = null
@@ -48,6 +49,18 @@ func _setup_event_dialog() -> void:
 	_event_dialog.dialog_close_on_escape = true
 	_event_dialog.size = Vector2i(420, 220)
 	add_child(_event_dialog)
+	# 只创建一次内容 RichTextLabel, 之后复用; 否则每次弹窗都会叠加一份导致重叠
+	_event_msg = RichTextLabel.new()
+	_event_msg.name = "MsgRich"
+	_event_msg.bbcode_enabled = true
+	_event_msg.fit_content = true
+	_event_msg.scroll_active = false
+	_event_msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_event_msg.custom_minimum_size = Vector2(380, 100)
+	_event_msg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_event_msg.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_event_msg.add_theme_font_size_override("normal_font_size", 14)
+	_event_dialog.add_child(_event_msg)
 
 
 func _setup_event_tip() -> void:
@@ -102,20 +115,9 @@ func _on_event_triggered(ev) -> void:
 			cat_text = "中性"
 			cat_color = UF.COL_GOLD
 	_event_dialog.title = "突发事件 · %s" % cat_text
-	# 染色: 用 RichTextLabel 替换默认 message
-	if _event_dialog.has_node("MsgRich"):
-		_event_dialog.get_node("MsgRich").queue_free()
-	var msg := RichTextLabel.new()
-	msg.name = "MsgRich"
-	msg.bbcode_enabled = true
-	msg.fit_content = true
-	msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	msg.custom_minimum_size = Vector2(380, 100)
-	msg.add_theme_font_size_override("normal_font_size", 14)
-	msg.text = "[color=#%s][b]%s[/b][/color]\n\n%s\n\n[color=#ffd166]%s[/color]" % [
+	_event_msg.text = "[color=#%s][b]%s[/b][/color]\n\n%s\n\n[color=#ffd166]%s[/color]" % [
 		cat_color.to_html(false), ev_obj.name, ev_obj.desc, ev_obj.effect_desc
 	]
-	_event_dialog.add_child(msg)
 	_event_dialog.popup_centered()
 
 
@@ -140,20 +142,10 @@ func _on_btn_event_pressed() -> void:
 		return
 	# 不重新弹窗 (避免重复展示), 只在事件刷新瞬间弹一次; 这里改为直接显示当前事件
 	_event_dialog.title = "突发事件 · %s" % _category_name(ev)
-	if _event_dialog.has_node("MsgRich"):
-		_event_dialog.get_node("MsgRich").queue_free()
-	var msg := RichTextLabel.new()
-	msg.name = "MsgRich"
-	msg.bbcode_enabled = true
-	msg.fit_content = true
-	msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	msg.custom_minimum_size = Vector2(380, 100)
-	msg.add_theme_font_size_override("normal_font_size", 14)
 	var col := _category_color(ev)
-	msg.text = "[color=#%s][b]%s[/b][/color]\n\n%s\n\n[color=#ffd166]%s[/color]" % [
+	_event_msg.text = "[color=#%s][b]%s[/b][/color]\n\n%s\n\n[color=#ffd166]%s[/color]" % [
 		col.to_html(false), ev.name, ev.desc, ev.effect_desc
 	]
-	_event_dialog.add_child(msg)
 	_event_dialog.popup_centered()
 
 
