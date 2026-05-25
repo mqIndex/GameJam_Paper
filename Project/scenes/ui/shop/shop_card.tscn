@@ -1,19 +1,22 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://yqw82o2fhyce"]
 
-[ext_resource type="Script" path="res://scripts/views/shop/shop_card.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://dych53j2o7ku6" path="res://scripts/views/shop/shop_card.gd" id="1_script"]
 
-[node name="ShopCard" type="Control"]
+[node name="ShopCard" type="Control" unique_id=1894738156]
 custom_minimum_size = Vector2(92, 166)
+layout_mode = 3
+anchors_preset = 0
 script = ExtResource("1_script")
 
-[node name="CardVisual" type="Panel" parent="."]
+[node name="CardVisual" type="Panel" parent="." unique_id=1613867909]
+z_index = 1
+layout_mode = 0
 offset_left = 4.0
-offset_top = 0.0
 offset_right = 88.0
 offset_bottom = 122.0
 
-[node name="VBox" type="VBoxContainer" parent="CardVisual"]
-anchors_preset = 15
+[node name="VBox" type="VBoxContainer" parent="CardVisual" unique_id=1964859583]
+layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 4.0
@@ -23,35 +26,37 @@ offset_bottom = -4.0
 mouse_filter = 2
 theme_override_constants/separation = 2
 
-[node name="LblName" type="Label" parent="CardVisual/VBox"]
+[node name="LblName" type="Label" parent="CardVisual/VBox" unique_id=2145950895]
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 horizontal_alignment = 1
 
-[node name="LblCost" type="Label" parent="CardVisual/VBox"]
+[node name="LblCost" type="Label" parent="CardVisual/VBox" unique_id=1124425347]
 layout_mode = 2
 theme_override_font_sizes/font_size = 9
 horizontal_alignment = 1
 
-[node name="LblDesc" type="Label" parent="CardVisual/VBox"]
+[node name="LblDesc" type="Label" parent="CardVisual/VBox" unique_id=21838723]
 layout_mode = 2
-theme_override_font_sizes/font_size = 8
+size_flags_vertical = 3
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+theme_override_font_sizes/font_size = 8
 horizontal_alignment = 1
 autowrap_mode = 3
-size_flags_vertical = 3
 
-[node name="LblPrice" type="Label" parent="."]
+[node name="LblPrice" type="Label" parent="." unique_id=1560615992]
+layout_mode = 0
 offset_left = 4.0
 offset_top = 126.0
 offset_right = 88.0
 offset_bottom = 140.0
-theme_override_font_sizes/font_size = 10
 theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
-horizontal_alignment = 1
+theme_override_font_sizes/font_size = 10
 text = "¥0"
+horizontal_alignment = 1
 
-[node name="BtnAction" type="Button" parent="."]
+[node name="BtnAction" type="Button" parent="." unique_id=1881105842]
+layout_mode = 0
 offset_left = 4.0
 offset_top = 142.0
 offset_right = 88.0

@@ -178,6 +178,7 @@ func test_end_to_end_spawn_defeat() -> void:
 		return
 
 	g.new_level()
+	g._clear_event_state()
 	var opp = g.get_opponent_state()
 	if opp == null:
 		_say("  [SKIP] 无对手状态")
@@ -185,6 +186,12 @@ func test_end_to_end_spawn_defeat() -> void:
 	if not opp.present:
 		g._spawn_opponent()
 	_assert(opp.present, "对手已入场")
+	var found_opponent_candle := false
+	for ic in g.intraday_candles:
+		if String(ic.get("kind", "")) == "opponent":
+			found_opponent_candle = true
+			break
+	_assert(found_opponent_candle, "对手入场行动已写入分时K")
 
 	var liq = opp.liquidation_price
 	_say("  平仓线=%.2f, 当前价=%.2f" % [liq, g.price])

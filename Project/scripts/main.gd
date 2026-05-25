@@ -27,6 +27,10 @@ const COL_UP: Color = Color("#06d6a0")
 const COL_DOWN: Color = Color("#ef476f")
 
 var _choice_dialog: CardChoiceDialog = null
+var _opponent_popup: PanelContainer = null
+var _opponent_popup_title: Label = null
+var _opponent_popup_body: Label = null
+var _opponent_popup_tween: Tween = null
 
 const MIN_WINDOW_SIZE: Vector2 = Vector2(960.0, 540.0)
 const OUTER_PAD: float = 8.0
@@ -43,6 +47,8 @@ const DATA_PANEL_MIN_W: float = 300.0
 const DATA_PANEL_WIDTH_RATIO: float = 0.29
 const DATA_PANEL_MAX_W: float = 420.0
 const END_DIALOG_SIZE: Vector2 = Vector2(512.0, 280.0)
+const OPPONENT_POPUP_SIZE: Vector2 = Vector2(332.0, 126.0)
+const OPPONENT_POPUP_DURATION: float = 2.4
 
 
 func _ready() -> void:
@@ -55,6 +61,8 @@ func _ready() -> void:
 	_relayout()
 	Game.log_message.connect(_append_log)
 	_setup_choice_dialog()
+	_build_opponent_popup()
+	Game.opponent_entered.connect(_on_opponent_entered_popup)
 	$PlayerPanel.pile_clicked.connect(_on_pile_clicked)
 	$TurnPanel.pile_clicked.connect(_on_pile_clicked)
 	Game.new_level()
@@ -112,6 +120,96 @@ func _on_shatter_choice_requested(buy_sell_cards: Array) -> void:
 		buy_sell_cards,
 		func(picked):
 			Game.shatter_cards(picked)
+	)
+
+
+func _build_opponent_popup() -> void:
+	_opponent_popup = PanelContainer.new()
+	_opponent_popup.name = "OpponentEntryPopup"
+	_opponent_popup.visible = false
+	_opponent_popup.z_index = 220
+	_opponent_popup.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_opponent_popup.custom_minimum_size = OPPONENT_POPUP_SIZE
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.04, 0.07, 0.13, 0.84)
+	sb.border_color = Color(COL_DOWN.r, COL_DOWN.g, COL_DOWN.b, 0.78)
+	sb.border_width_left = 1
+	sb.border_width_top = 1
+	sb.border_width_right = 1
+	sb.border_width_bottom = 1
+	sb.corner_radius_top_left = 5
+	sb.corner_radius_top_right = 5
+	sb.corner_radius_bottom_left = 5
+	sb.corner_radius_bottom_right = 5
+	sb.content_margin_left = 14.0
+	sb.content_margin_top = 10.0
+	sb.content_margin_right = 14.0
+	sb.content_margin_bottom = 10.0
+	_opponent_popup.add_theme_stylebox_override("panel", sb)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	_opponent_popup.add_child(vbox)
+
+	_opponent_popup_title = Label.new()
+	_opponent_popup_title.add_theme_font_size_override("font_size", 15)
+	_opponent_popup_title.add_theme_color_override("font_color", COL_DOWN)
+	_opponent_popup_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(_opponent_popup_title)
+
+	_opponent_popup_body = Label.new()
+	_opponent_popup_body.add_theme_font_size_override("font_size", 12)
+	_opponent_popup_body.add_theme_color_override("font_color", COL_TEXT_DIM)
+	_opponent_popup_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_opponent_popup_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_opponent_popup_body.custom_minimum_size = Vector2(OPPONENT_POPUP_SIZE.x - 28.0, 0.0)
+	vbox.add_child(_opponent_popup_body)
+	add_child(_opponent_popup)
+	_position_opponent_popup()
+
+
+func _on_opponent_entered_popup(_opponent_id: String) -> void:
+	if _opponent_popup == null:
+		return
+	var opp = Game.get_opponent_state()
+	if opp == null:
+		return
+	_opponent_popup_title.text = "庄家入场 · %s" % opp.display_name
+	_opponent_popup_body.text = "做空 %d 股 @ ¥%.2f\n平仓线 ¥%.2f  现金 ¥%s" % [
+		opp.short_position,
+		opp.entry_avg_price,
+		opp.liquidation_price,
+		UF.fmt_money(opp.cash)
+	]
+	_position_opponent_popup()
+	_opponent_popup.visible = true
+	if _opponent_popup_tween != null and _opponent_popup_tween.is_valid():
+		_opponent_popup_tween.kill()
+	_opponent_popup.modulate = Color(1, 1, 1, 0)
+	_opponent_popup_tween = create_tween()
+	_opponent_popup_tween.tween_property(_opponent_popup, "modulate", Color(1, 1, 1, 1), 0.14)
+	_opponent_popup_tween.tween_interval(OPPONENT_POPUP_DURATION)
+	_opponent_popup_tween.tween_property(_opponent_popup, "modulate", Color(1, 1, 1, 0), 0.28)
+	_opponent_popup_tween.tween_callback(_hide_opponent_popup)
+
+
+func _hide_opponent_popup() -> void:
+	if _opponent_popup != null:
+		_opponent_popup.visible = false
+
+
+func _position_opponent_popup() -> void:
+	if _opponent_popup == null:
+		return
+	var view_size: Vector2 = size
+	if view_size.x <= 0.0 or view_size.y <= 0.0:
+		view_size = get_viewport_rect().size
+	view_size.x = max(view_size.x, MIN_WINDOW_SIZE.x)
+	view_size.y = max(view_size.y, MIN_WINDOW_SIZE.y)
+	_opponent_popup.size = OPPONENT_POPUP_SIZE
+	_opponent_popup.position = Vector2(
+		(view_size.x - OPPONENT_POPUP_SIZE.x) * 0.5,
+		max(64.0, (view_size.y - OPPONENT_POPUP_SIZE.y) * 0.34)
 	)
 
 
@@ -225,6 +323,7 @@ func _relayout() -> void:
 	)
 	var dialog_pos: Vector2 = (view_size - dialog_size) * 0.5
 	_set_rect(end_dialog, Rect2(dialog_pos, dialog_size))
+	_position_opponent_popup()
 
 
 func _set_rect(ctrl: Control, rect: Rect2) -> void:

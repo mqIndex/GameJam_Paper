@@ -19,10 +19,18 @@ func _ready() -> void:
 	add_theme_stylebox_override("panel", UF.panel_stylebox())
 	resized.connect(_layout_bar)
 	Game.opponent_state_changed.connect(_refresh)
-	Game.opponent_entered.connect(func(_id): _refresh())
-	Game.opponent_defeated.connect(func(_id, _r): _refresh())
+	Game.opponent_entered.connect(_on_opponent_entered)
+	Game.opponent_defeated.connect(_on_opponent_defeated)
 	Game.state_changed.connect(_refresh)
 	_layout_bar()
+
+
+func _on_opponent_entered(_opponent_id: String) -> void:
+	_refresh()
+
+
+func _on_opponent_defeated(_opponent_id: String, _reward_card_id: String) -> void:
+	_refresh()
 
 
 func _set_bar_color(c: Color) -> void:

@@ -102,11 +102,13 @@ func _on_card_hover_exit(card: Button) -> void:
 	t.set_ease(Tween.EASE_OUT)
 	t.tween_property(card, "scale", Vector2(1.0, 1.0), TWEEN_DURATION)
 	t.tween_property(card, "position:y", _baseline_y, TWEEN_DURATION)
+	var card_ref: WeakRef = weakref(card)
 	t.chain().tween_callback(func():
-		if not is_instance_valid(card) or card.get_parent() != self:
+		var card_node := card_ref.get_ref() as Button
+		if card_node == null or card_node.get_parent() != self:
 			return
-		card.z_index = 0
-		card.remove_meta("_fan_hovering")
+		card_node.z_index = 0
+		card_node.remove_meta("_fan_hovering")
 	)
 	_hover_tweens[card] = t
 

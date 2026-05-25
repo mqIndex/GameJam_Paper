@@ -22,5 +22,10 @@ static func flash_rect(rect: ColorRect, color: Color, duration: float) -> void:
 	rect.color = Color(color.r, color.g, color.b, 0.35)
 	rect.visible = true
 	var tw := rect.create_tween()
+	var rect_ref: WeakRef = weakref(rect)
 	tw.tween_property(rect, "color:a", 0.0, duration).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_callback(func(): rect.visible = false)
+	tw.tween_callback(func():
+		var node := rect_ref.get_ref() as ColorRect
+		if node != null:
+			node.visible = false
+	)

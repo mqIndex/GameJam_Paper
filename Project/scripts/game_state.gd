@@ -1364,8 +1364,30 @@ func _tick_opponent() -> void:
 		return
 	if not _opponent_state.present or _opponent_state.defeated_this_level:
 		return
-	var decision: Dictionary = _opponent_brain.tick(_opponent_state, self)
-	await _apply_opponent_action(decision)
+	var action_slots: int = _opponent_action_slot_count()
+	for i in range(action_slots):
+		if _opponent_state == null:
+			return
+		if not _opponent_state.present or _opponent_state.defeated_this_level:
+			return
+		var decision: Dictionary = _opponent_brain.tick(_opponent_state, self)
+		await _apply_opponent_action(decision)
+		if String(decision.get("action", "idle")) == "idle":
+			return
+
+
+func _opponent_action_slot_count() -> int:
+	if _opponent_state == null:
+		return 0
+	var level: int = max(1, _opponent_state.level)
+	var count: int = 1
+	var second_prob: float = clampf(0.18 + float(level - 1) * 0.2, 0.18, 0.60)
+	var third_prob: float = clampf(0.06 + float(level - 1) * 0.1, 0.0, 0.30)
+	if randf() < second_prob:
+		count += 1
+		if randf() < third_prob:
+			count += 1
+	return count
 
 
 func _apply_opponent_action(decision: Dictionary) -> void:
@@ -1383,11 +1405,13 @@ func _apply_opponent_action(decision: Dictionary) -> void:
 
 	var atomic_delay: float = _opponent_action_delay()
 
-	var price_before := price
-	var event_labels: Array[String] = []
-	var emotion_delta_total: int = 0
 	for act in actions:
 		act = act.strip_edges()
+		var price_before: float = price
+		var hi_before: float = cur_high
+		var lo_before: float = cur_low
+		var bull_before: int = bull
+		var event_label: String = ""
 		# 通知 UI 播放对应特效 (在效果应用之前发, 让特效与状态变化同步可见)
 		emit_signal("opponent_action_played", act, params)
 		match act:
@@ -1398,7 +1422,7 @@ func _apply_opponent_action(decision: Dictionary) -> void:
 					apply_price_change(-x, true)
 					_log("[庄家] %s 加空 %d 股, 压股价 −%.1f%%" % [
 						_opponent_state.display_name, n, x * 100.0])
-					event_labels.append("加空")
+					event_label = "加空"
 				else:
 					_log("[庄家] %s 现金不足, 无法继续加空" % _opponent_state.display_name)
 					if _opponent_state.cash <= 0.0:
@@ -1407,53 +1431,60 @@ func _apply_opponent_action(decision: Dictionary) -> void:
 			"bad_news":
 				var k: int = int(params.get("K", _opponent_state.action_k_emotion))
 				apply_emotion_delta_bull(-k)
-				emotion_delta_total -= k
-				event_labels.append("利空")
+				event_label = "利空"
 				_log("[庄家] %s 散播利空, 上涨情绪 -%d" % [
 					_opponent_state.display_name, k])
 			"cover":
 				var m: int = int(params.get("M", _opponent_state.action_m_cover))
 				var old_liq := _opponent_state.liquidation_price
 				_opponent_state.cover(m)
-				event_labels.append("平仓")
+				event_label = "平仓"
 				_log("[庄家] %s 主动减仓 %d 股, 平仓线 ¥%.1f → ¥%.1f" % [
 					_opponent_state.display_name, m, old_liq, _opponent_state.liquidation_price])
 			"pump_trap":
 				var y: float = float(params.get("Y", _opponent_state.pump_trap_y_pct))
 				apply_price_change(y, true)
-				event_labels.append("拉抬")
+				event_label = "拉抬"
 				_log("[庄家] %s 拉抬陷阱, 股价 +%.1f%%" % [
 					_opponent_state.display_name, y * 100.0])
 			"idle":
-				event_labels.append("静观")
+				event_label = "静观"
 				_log("[庄家] %s 静观" % _opponent_state.display_name)
+		if event_label != "":
+			_record_opponent_candle(price_before, hi_before, lo_before, bull_before, event_label)
 		# 等下一步, 让特效播完
 		emit_signal("opponent_state_changed")
 		if atomic_delay > 0.0:
 			await get_tree().create_timer(atomic_delay).timeout
-
-	# 追加分时K
-	var price_after := price
-	var effect_label := "/".join(event_labels)
-	if effect_label == "":
-		effect_label = action_id
-	intraday_candles.append({
-		"open": price_before,
-		"close": price_after,
-		"high": max(price_before, price_after),
-		"low": min(price_before, price_after),
-		"kind": "opponent",
-		"card_name": "[庄家] %s" % effect_label,
-		"effect_label": effect_label,
-		"price_delta_pct": (price_after / price_before - 1.0) * 100.0 if price_before > 0.0 else 0.0,
-		"emotion_delta": emotion_delta_total,
-	})
-	emit_signal("intraday_updated")
+		if _opponent_state == null or _opponent_state.defeated_this_level:
+			break
 	emit_signal("opponent_acted", action_id, params)
 	emit_signal("opponent_state_changed")
 
 	if bubble != "":
 		emit_signal("opponent_bubble", bubble)
+
+
+func _record_opponent_candle(price_before: float, hi_before: float, lo_before: float, bull_before: int, effect_label: String) -> void:
+	var price_after: float = price
+	var k_high: float = max(price_before, price_after)
+	var k_low: float = min(price_before, price_after)
+	if cur_high > hi_before and cur_high > k_high:
+		k_high = cur_high
+	if cur_low < lo_before and cur_low < k_low:
+		k_low = cur_low
+	intraday_candles.append({
+		"open": price_before,
+		"close": price_after,
+		"high": k_high,
+		"low": k_low,
+		"kind": "opponent",
+		"card_name": "[庄家] %s" % effect_label,
+		"effect_label": effect_label,
+		"price_delta_pct": (price_after / price_before - 1.0) * 100.0 if price_before > 0.0 else 0.0,
+		"emotion_delta": bull - bull_before,
+	})
+	emit_signal("intraday_updated")
 
 
 func _check_opponent_liquidation() -> void:

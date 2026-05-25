@@ -17,10 +17,22 @@ func _ready() -> void:
 	k_chart.draw.connect(_on_draw_chart)
 	k_chart.mouse_filter = Control.MOUSE_FILTER_PASS
 	k_chart.mouse_exited.connect(_on_k_chart_mouse_exited)
-	Game.state_changed.connect(func(): _queue_redraw())
-	Game.candle_committed.connect(func(_t): _queue_redraw())
+	Game.state_changed.connect(_on_state_changed)
+	Game.candle_committed.connect(_on_candle_committed)
 	Game.intraday_updated.connect(_on_intraday_updated)
-	Game.turn_ended.connect(func(_d, _t): _queue_redraw())
+	Game.turn_ended.connect(_on_turn_ended)
+
+
+func _on_state_changed() -> void:
+	_queue_redraw()
+
+
+func _on_candle_committed(_turn_global: int) -> void:
+	_queue_redraw()
+
+
+func _on_turn_ended(_day: int, _turn_in_day: int) -> void:
+	_queue_redraw()
 
 
 func _process(_delta: float) -> void:
@@ -72,7 +84,7 @@ func _show_daily_tooltip(local_pos: Vector2) -> void:
 	var cards: Array = found.get("cards", [])
 	if found.has("_floating") and cards.is_empty():
 		for ic in Game.intraday_candles:
-			if ic["kind"] == "play":
+			if ic["kind"] == "play" or ic["kind"] == "opponent":
 				cards.append(String(ic["card_name"]))
 	var cards_text: String = ""
 	if not cards.is_empty():
@@ -392,19 +404,20 @@ func _draw_opponent_marker(candle: Dictionary, slot_cx: float, candle_rect: Rect
 	else:
 		marker_color = UF.COL_GOLD
 	k_chart.draw_rect(candle_rect.grow(1.0), marker_color, false, 1.5)
+	var marker_center_y: float = clampf(candle_rect.position.y - 11.0, section.position.y + 16.0, section.position.y + section.size.y - 18.0)
+	var marker_center := Vector2(slot_cx, marker_center_y)
 	k_chart.draw_dashed_line(
-		Vector2(slot_cx, section.position.y + 18.0),
-		Vector2(slot_cx, section.position.y + section.size.y - 4.0),
+		Vector2(slot_cx, marker_center_y + 8.0),
+		Vector2(slot_cx, candle_rect.position.y),
 		Color(marker_color.r, marker_color.g, marker_color.b, 0.45),
 		1.0, 3.0, true)
-	var tag_pos := Vector2(slot_cx - 8.0, section.position.y + 15.0)
-	k_chart.draw_circle(tag_pos + Vector2(7.0, -4.0), 7.0, Color(0.0, 0.0, 0.0, 0.72))
-	k_chart.draw_arc(tag_pos + Vector2(7.0, -4.0), 7.0, 0.0, TAU, 18, marker_color, 1.2)
+	k_chart.draw_circle(marker_center, 7.0, Color(0.0, 0.0, 0.0, 0.72))
+	k_chart.draw_arc(marker_center, 7.0, 0.0, TAU, 18, marker_color, 1.2)
 	k_chart.draw_string(
-		ThemeDB.fallback_font, tag_pos + Vector2(2.0, 0.0),
+		ThemeDB.fallback_font, marker_center + Vector2(-5.0, 4.0),
 		"庄", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, marker_color)
 	var label: String = String(candle.get("effect_label", ""))
 	if label != "":
 		k_chart.draw_string(
-			ThemeDB.fallback_font, tag_pos + Vector2(14.0, 0.0),
+			ThemeDB.fallback_font, marker_center + Vector2(10.0, 4.0),
 			label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, marker_color)

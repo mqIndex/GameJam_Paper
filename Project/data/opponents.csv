@@ -1,4 +1,5 @@
-opponent_id,display_name,personality,level,n0,m0,initial_cash,action_n,action_x_pct,action_k_emotion,action_m_cover,pump_trap_y_pct,critical_threshold,reaction_threshold,hard_hold_weight,w_add_short,w_bad_news,w_cover,w_idle,w_pump_trap,trigger_prob_per_turn,trigger_rise_pct,dialog_enter,dialog_react,dialog_cover,dialog_trap,dialog_dying,dialog_defeat,reward_card_id
-boss_six,老六,conservative,1,500,25000,100000,100,0.015,3,80,0,0.20,0.03,0.1,1.0,1.0,1.5,1.5,0,0.15,0.20,"看见你赚得不错啊…叔叔来分一杯羹。","别太嚣张。","顶不住了，先收一点。","","快不行了…","妈的，算我栽了。",reward_six
-boss_blade,大刀,aggressive,2,1000,60000,240000,200,0.025,5,100,0,0.10,0.02,0.4,1.5,0.8,0.5,0.5,0,0.25,0.15,"小鬼，别皮了。","敢拉？给我等着。","草……","","啊……","*&%#！",reward_blade
-boss_snake,老蛇,cunning,3,1500,100000,400000,250,0.03,7,150,0.02,0.18,0.025,0.2,1.0,1.5,1.0,1.0,1.2,0.40,0.10,"我看你像条肥鱼。","上钩了。","啧，算你狠。","看，涨了吧？追啊。","你…怎么会…","你…怎么会…",reward_snake
+﻿opponent_id,display_name,personality,level,n0,m0,initial_cash,action_n,action_x_pct,action_k_emotion,action_m_cover,pump_trap_y_pct,critical_threshold,reaction_threshold,hard_hold_weight,w_add_short,w_bad_news,w_cover,w_idle,w_pump_trap,trigger_prob_per_turn,trigger_rise_pct,dialog_enter,dialog_react,dialog_cover,dialog_trap,dialog_dying,dialog_defeat,reward_card_id
+# 对手ID,显示名称,性格标签,难度等级,初始空仓股数,旧保证金字段,初始现金,单次加空股数,加空压价比例,利空情绪点数,单次平仓股数,诱多拉升比例,危急阈值,反击触发涨幅,硬撑权重,加空权重,利空权重,平仓权重,静观权重,诱多权重,旧每回合触发率,旧涨幅触发线,入场台词,反击台词,平仓台词,诱多台词,濒死台词,失败台词,奖励卡ID
+boss_six,老六,conservative,1,500,25000,100000,100,0.015,3,80,0,0.2,0.03,0.1,1,1,1.5,0.6,0,0.15,0.2,看见你赚得不错啊…叔叔来分一杯羹。,别太嚣张。,顶不住了，先收一点。,,快不行了…,妈的，算我栽了。,reward_six
+boss_blade,大刀,aggressive,2,1000,60000,240000,200,0.025,5,100,0,0.1,0.02,0.4,1.5,0.8,0.5,0.5,0,0.25,0.15,小鬼，别皮了。,敢拉？给我等着。,草……,,啊……,*&%#！,reward_blade
+boss_snake,老蛇,cunning,3,1500,100000,400000,250,0.03,7,150,0.02,0.18,0.025,0.2,1,1.5,1,1,1.2,0.4,0.1,我看你像条肥鱼。,上钩了。,啧，算你狠。,看，涨了吧？追啊。,你…怎么会…,你…怎么会…,reward_snake

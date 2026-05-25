@@ -62,16 +62,18 @@ func refresh() -> void:
 		sc.action_pressed.connect(func(): Game.shop_upgrade_card(idx_capture))
 		var upgraded: Card = CardDatabase.make_by_effect(target_eid, "_preview_%d" % i)
 		var info: String = "升级后: %s\n耗 %d → %d\n%s" % [upgraded.name, card.cost, upgraded.cost, upgraded.description]
-		var sc_ref = sc
-		var info_ref: String = info
-		sc.card_hovered.connect(func(hovering: bool):
-			if hovering:
-				_show_tooltip(sc_ref, info_ref)
-			else:
-				_tooltip.visible = false
-		)
+		sc.card_hovered.connect(_on_card_hovered.bind(weakref(sc), info))
 	lbl_empty.visible = not any_upgradable
 	_update_columns()
+
+
+func _on_card_hovered(hovering: bool, card_ref: WeakRef, text: String) -> void:
+	if hovering:
+		var node := card_ref.get_ref() as Control
+		if node != null:
+			_show_tooltip(node, text)
+	else:
+		_tooltip.visible = false
 
 
 func _show_tooltip(node: Control, text: String) -> void:

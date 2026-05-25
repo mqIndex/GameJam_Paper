@@ -132,6 +132,8 @@ func _load_cards() -> void:
 		var row: PackedStringArray = f.get_csv_line()
 		if row.size() == 0:
 			continue
+		if _is_csv_comment(row):
+			continue
 		var eid: String = _cell(row, col, "effect_id").strip_edges()
 		if eid == "":
 			continue
@@ -201,6 +203,8 @@ func _load_talents() -> void:
 		var row: PackedStringArray = f.get_csv_line()
 		if row.size() == 0:
 			continue
+		if _is_csv_comment(row):
+			continue
 		var tid: String = _cell(row, col, "id").strip_edges()
 		if tid == "":
 			continue
@@ -222,6 +226,12 @@ func _cell(row: PackedStringArray, col: Dictionary, key: String) -> String:
 	if idx >= row.size():
 		return ""
 	return row[idx]
+
+
+func _is_csv_comment(row: PackedStringArray) -> bool:
+	if row.size() == 0:
+		return false
+	return row[0].strip_edges().begins_with("#")
 
 
 func _cell_or(row: PackedStringArray, col: Dictionary, key: String, fallback: String) -> String:
@@ -261,6 +271,8 @@ func _load_opponents() -> void:
 	while not f.eof_reached():
 		var row: PackedStringArray = f.get_csv_line()
 		if row.size() == 0:
+			continue
+		if _is_csv_comment(row):
 			continue
 		var oid: String = _cell(row, col, "opponent_id").strip_edges()
 		if oid == "":
