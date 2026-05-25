@@ -1,0 +1,17 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/views/entity_avatar.gd" id="1_script"]
+
+[node name="EntityAvatar" type="Panel"]
+custom_minimum_size = Vector2(64, 64)
+script = ExtResource("1_script")
+
+[node name="AvatarRect" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 2.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = -2.0
+color = Color(0.149, 0.224, 0.353, 1)

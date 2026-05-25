@@ -1,0 +1,27 @@
+[gd_scene format=3 uid="uid://ddukf4gxhq0pc"]
+
+[ext_resource type="Script" uid="uid://b5cykkmgs8q03" path="res://scripts/views/pile_button.gd" id="1_script"]
+
+[node name="PileButton" type="Button" unique_id=2052560671]
+custom_minimum_size = Vector2(96, 22)
+script = ExtResource("1_script")
+
+[node name="HBox" type="HBoxContainer" parent="." unique_id=631806870]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_right = -8.0
+mouse_filter = 2
+theme_override_constants/separation = 6
+alignment = 1
+
+[node name="LblName" type="Label" parent="HBox" unique_id=1128241767]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "抽牌堆"
+
+[node name="LblCount" type="Label" parent="HBox" unique_id=1656258881]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "0"

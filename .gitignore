@@ -22,6 +22,8 @@ Godot_v*_console.exe
 # IDE / OS
 .vscode/
 .idea/
+.superpowers/
+superpowers/
 .DS_Store
 Thumbs.db
 

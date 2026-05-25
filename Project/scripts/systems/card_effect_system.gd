@@ -29,6 +29,7 @@ func dispatch(effect_id: String) -> void:
 	var emotion_delta: int = int(tpl.get("emotion_delta", 0))
 	var trade_price_pct: float = float(tpl.get("trade_price_pct", 0.0))
 	var trade_shares: int = int(tpl.get("trade_shares", 0))
+	var draw_count: int = int(tpl.get("draw_count", 0))
 	# 新机制 (情绪锚定 / 反转 / 回合倍率 / 事件刷新)
 	var emotion_set: int = int(tpl.get("emotion_set", -1))
 	var emotion_invert: bool = bool(tpl.get("emotion_invert", false))
@@ -99,3 +100,6 @@ func dispatch(effect_id: String) -> void:
 		_gs.discard_hand_redraw()
 	if bool(tpl.get("mob_swing", false)):
 		_gs.apply_mob_swing()
+
+	if draw_count > 0:
+		_gs.draw_cards(draw_count)

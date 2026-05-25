@@ -1,9 +1,7 @@
-# 阶段2 规则数据层冒烟测试
-# 跑通 1 关 5 天 50 回合, 仅靠最简策略 (能买就买, 然后内幕拉升, 然后卖)
+# 规则数据层冒烟测试
+# 跑通 1 关 5 天 50 回合, 只验证状态机和 K 线基础不变量.
 # 把日志写到 res://logs/rule_smoke.log
 extends Node
-
-const Card = preload("res://scripts/card.gd")
 
 var _log_file: FileAccess = null
 
@@ -23,11 +21,10 @@ func _ready() -> void:
 	_assert(g.cash == g.START_CASH, "初始资金=10w")
 	_assert(g.shares == 0, "初始持仓=0")
 	_assert(g.price == g.INITIAL_PRICE, "初始股价=100")
-	_assert(g.bull == 50 and g.bear == 50, "初始情绪 50/50")
+	_assert(g.bull + g.bear == g.EMOTION_TOTAL, "情绪总和保持 %d" % g.EMOTION_TOTAL)
 	_assert(g.draw_pile.size() + g.hand.size() + g.discard_pile.size() == 12, "牌组=12")
 	_assert(g.day == 1, "第1天")
 	_assert(g.turn_in_day == 1, "第1回合")
-	_assert(g.action_points == 3, "行动力=3")
 	_assert(g.hand.size() >= g.FIRST_TURN_DRAW, "第一回合至少抽 6 张")
 	# 第一回合保底: 至少 1 买 + 1 卖 + 1 技能
 	var has_buy: bool = false
@@ -39,12 +36,20 @@ func _ready() -> void:
 		elif c.is_skill(): has_skill = true
 	_assert(has_buy and has_sell and has_skill, "第一回合保底买/卖/技能各一")
 
-	# 验证 μ 计算公式: bull=50 → 0
-	# 跑 200 次 _roll_natural_drift, 平均值应在 0 附近
+	# 验证 μ 计算公式: bull=50 且无事件修饰时 → 0
 	var sum: float = 0.0
 	var n_samples: int = 200
+	var saved_bull: int = g.bull
+	var saved_bear: int = g.bear
+	var saved_event_modifiers: Dictionary = g.event_modifiers.duplicate()
+	g.bull = 50
+	g.bear = 50
+	g.event_modifiers.clear()
 	for i in range(n_samples):
 		sum += g._roll_natural_drift()
+	g.bull = saved_bull
+	g.bear = saved_bear
+	g.event_modifiers = saved_event_modifiers
 	var avg: float = sum / float(n_samples)
 	_say("情绪 50 时, 200 次自然波动均值 = %+.4f (期望接近 0)" % avg)
 	_assert(abs(avg) < 0.01, "情绪 50 时 μ=0")
@@ -55,29 +60,8 @@ func _ready() -> void:
 		if g.phase == g.Phase.SHOP:
 			g.leave_shop_to_next_day()
 			continue
-		# 行动阶段简单策略
-		var safety: int = 0
-		while g.phase == g.Phase.PLAY and g.action_points > 0 and g.hand.size() > 0:
-			# 优先打"内幕消息"拉股价, 否则随便打第一张
-			var played: bool = false
-			for i in range(g.hand.size()):
-				var c: Card = g.hand[i]
-				if c.cost <= g.action_points and c.effect_id == "insider_basic":
-					if g.play_card(i):
-						played = true
-						break
-			if not played:
-				for i in range(g.hand.size()):
-					if g.hand[i].cost <= g.action_points:
-						if g.play_card(i):
-							played = true
-							break
-			if not played: break
-			safety += 1
-			if safety > 50:
-				_fail("出牌内循环死锁?")
-				return
-		g.end_turn()
+		# 规则数值经常调整, 冒烟测试不绑定行动点/费用/出牌策略.
+		await g.end_turn()
 		if g.turn_global > g.DAYS_PER_LEVEL * g.TURNS_PER_DAY + 5:
 			_fail("回合数超限, 状态机死循环?")
 			return

@@ -1,34 +1,87 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3 uid="uid://dnwopclkbknh0"]
 
-[ext_resource type="Script" path="res://scripts/views/enemy_panel.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://dviqib7dech7o" path="res://scripts/views/enemy_panel.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://scenes/ui/entity_avatar.tscn" id="2_avatar"]
 
-[node name="EnemyPanel" type="Panel"]
+[node name="EnemyPanel" type="Panel" unique_id=737401336]
 offset_right = 168.0
 offset_bottom = 204.0
 script = ExtResource("1_script")
 
-[node name="VBox" type="VBoxContainer" parent="."]
-offset_left = 10.0
-offset_top = 10.0
-offset_right = 158.0
-offset_bottom = 194.0
-theme_override_constants/separation = 4
+[node name="VBox" type="VBoxContainer" parent="." unique_id=800583120]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = -8.0
+theme_override_constants/separation = 3
 
-[node name="LblTitle" type="Label" parent="VBox"]
-theme_override_font_sizes/font_size = 11
+[node name="LblTitle" type="Label" parent="VBox" unique_id=2077513862]
+layout_mode = 2
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+theme_override_font_sizes/font_size = 10
 text = "商战对手"
 
-[node name="Avatar" type="ColorRect" parent="VBox"]
-custom_minimum_size = Vector2(64, 64)
-color = Color(0.149, 0.224, 0.353, 1)
+[node name="AvatarSlot" type="CenterContainer" parent="VBox" unique_id=1975033916]
+layout_mode = 2
+size_flags_horizontal = 3
 
-[node name="LblStatus" type="Label" parent="VBox"]
-theme_override_font_sizes/font_size = 11
+[node name="Avatar" parent="VBox/AvatarSlot" unique_id=233283998 instance=ExtResource("2_avatar")]
+custom_minimum_size = Vector2(72, 72)
+layout_mode = 2
+
+[node name="LblName" type="Label" parent="VBox" unique_id=1355415455]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
+theme_override_font_sizes/font_size = 13
+text = "对手"
+horizontal_alignment = 1
+
+[node name="LblStatus" type="Label" parent="VBox" unique_id=511802398]
+layout_mode = 2
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
-text = "未出现"
+theme_override_font_sizes/font_size = 11
+text = "(未出现)"
+horizontal_alignment = 1
 
-[node name="BtnEnemyDeck" type="Button" parent="VBox"]
+[node name="HSeparator" type="HSeparator" parent="VBox" unique_id=1304465269]
+layout_mode = 2
+
+[node name="StatsGrid" type="GridContainer" parent="VBox"]
+layout_mode = 2
+columns = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 2
+
+[node name="LblPosition" type="Label" parent="VBox/StatsGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
 theme_override_font_sizes/font_size = 10
-disabled = true
-text = "对手牌组"
+text = "仓位 --"
+
+[node name="LblAvgPrice" type="Label" parent="VBox/StatsGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+theme_override_font_sizes/font_size = 10
+text = "均价 --"
+
+[node name="LblCash" type="Label" parent="VBox/StatsGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+theme_override_font_sizes/font_size = 10
+text = "现金 --"
+
+[node name="LblMargin" type="Label" parent="VBox/StatsGrid"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+theme_override_font_sizes/font_size = 10
+text = "保证金 --"
+
+[node name="BubbleLabel" type="Label" parent="VBox" unique_id=167761263]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
+theme_override_font_sizes/font_size = 11
+autowrap_mode = 3

@@ -7,10 +7,14 @@ const ShopCardScene = preload("res://scenes/ui/shop/shop_card.tscn")
 @onready var grid: GridContainer = $Margin/VBox/Grid
 @onready var lbl_price: Label = $Margin/VBox/LblPrice
 
+const CARD_SLOT_W: float = 100.0
+
 
 func _ready() -> void:
+	resized.connect(_update_columns)
 	Game.shop_changed.connect(refresh)
 	refresh()
+	call_deferred("_update_columns")
 
 
 func refresh() -> void:
@@ -27,3 +31,10 @@ func refresh() -> void:
 		sc.setup(card, del_price, "删除", UF.COL_DOWN, can_afford)
 		var idx_capture: int = i
 		sc.action_pressed.connect(func(): Game.shop_delete_card(idx_capture))
+	_update_columns()
+
+
+func _update_columns() -> void:
+	if grid == null:
+		return
+	grid.columns = max(1, int(floor(size.x / CARD_SLOT_W)))

@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/views/turn_panel.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://scenes/ui/pile_button.tscn" id="2_pile"]
 
 [node name="TurnPanel" type="Panel"]
 offset_right = 136.0
@@ -8,10 +9,15 @@ offset_bottom = 204.0
 script = ExtResource("1_script")
 
 [node name="VBox" type="VBoxContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 offset_left = 10.0
 offset_top = 10.0
-offset_right = 126.0
-offset_bottom = 194.0
+offset_right = -10.0
+offset_bottom = -10.0
 theme_override_constants/separation = 8
 alignment = 1
 
@@ -26,6 +32,13 @@ custom_minimum_size = Vector2(116, 80)
 theme_override_font_sizes/font_size = 13
 text = "结束回合
 (空格)"
+
+[node name="DiscardPileSlot" type="CenterContainer" parent="VBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="DiscardPileButton" parent="VBox/DiscardPileSlot" instance=ExtResource("2_pile")]
+pile_kind = "discard"
 
 [node name="Hint2" type="Label" parent="VBox"]
 theme_override_font_sizes/font_size = 10
