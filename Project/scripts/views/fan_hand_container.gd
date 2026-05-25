@@ -69,7 +69,7 @@ func relayout_cards() -> void:
 	for i in range(n):
 		var btn: Button = cards[i]
 		# 只重置不在 hover 状态的卡牌,避免打断动画
-		if btn.has_meta("_fan_hovering"):
+		if btn.has_meta("_fan_hovering") or btn.has_meta("_hand_animating"):
 			continue
 		btn.position = Vector2(start_x + float(i) * (CARD_WIDTH + sep), _baseline_y)
 		btn.scale = Vector2(1.0, 1.0)

@@ -47,6 +47,13 @@ func setup(card: Card, index: int) -> void:
 	var hover_sb := sb.duplicate() as StyleBoxFlat
 	hover_sb.bg_color = UF.COL_PANEL_LIGHT
 	add_theme_stylebox_override("hover", hover_sb)
+	var pressed_sb := sb.duplicate() as StyleBoxFlat
+	pressed_sb.bg_color = UF.COL_PANEL_LIGHT.lerp(col, 0.2)
+	add_theme_stylebox_override("pressed", pressed_sb)
+	var hover_pressed_sb := pressed_sb.duplicate() as StyleBoxFlat
+	hover_pressed_sb.bg_color = UF.COL_PANEL_LIGHT.lerp(col, 0.28)
+	add_theme_stylebox_override("hover_pressed", hover_pressed_sb)
+	add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	var disabled_sb := sb.duplicate() as StyleBoxFlat
 	disabled_sb.border_color = UF.COL_AP_OFF
 	disabled_sb.bg_color = Color("#0a1422")
@@ -113,13 +120,14 @@ func _get_drag_data(_at_position: Vector2) -> Variant:
 	_is_dragging = true
 	var preview := Control.new()
 	var card_view := duplicate() as Control
+	card_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card_view.scale = Vector2(HOVER_SCALE, HOVER_SCALE)
 	card_view.position = -card_view.custom_minimum_size * 0.5
-	card_view.modulate = Color(1, 1, 1, 0.85)
+	card_view.modulate = Color(1, 1, 1, 0.92)
 	preview.add_child(card_view)
 	set_drag_preview(preview)
 	# Make the original semi-transparent during drag
-	modulate = Color(1, 1, 1, 0.4)
+	modulate = Color(1, 1, 1, 0.55)
 	return {"card_index": _card_index}
 
 
