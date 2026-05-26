@@ -139,7 +139,7 @@ layout_mode = 2
 
 [node name="MascotSlot" type="Panel" parent="VBox"]
 layout_mode = 2
-custom_minimum_size = Vector2(0, 180)
+custom_minimum_size = Vector2(0, 200)
 size_flags_vertical = 3
 
 [node name="MascotVBox" type="VBoxContainer" parent="VBox/MascotSlot"]

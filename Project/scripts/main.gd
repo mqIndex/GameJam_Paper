@@ -41,17 +41,17 @@ const OUTER_PAD: float = 8.0
 const GAP: float = 8.0
 const TOP_BAR_H: float = 36.0
 const SUBTITLE_H: float = 22.0
-const MONEY_BAR_W: float = 88.0
-const PLAYER_TARGET_BAR_W: float = 88.0
+const MONEY_BAR_W: float = 132.0
+const PLAYER_TARGET_BAR_W: float = 132.0
 const ACTION_BAR_H: float = 28.0
 const BOTTOM_ROW_H: float = 204.0
 const BOTTOM_ROW_MIN_H: float = 164.0
 const ENEMY_W: float = 168.0
 const TURN_W: float = 136.0
 const PLAYER_W: float = 184.0
-const DATA_PANEL_MIN_W: float = 200.0
-const DATA_PANEL_WIDTH_RATIO: float = 0.193
-const DATA_PANEL_MAX_W: float = 280.0
+const DATA_PANEL_MIN_W: float = 160.0
+const DATA_PANEL_WIDTH_RATIO: float = 0.154
+const DATA_PANEL_MAX_W: float = 224.0
 const END_DIALOG_SIZE: Vector2 = Vector2(512.0, 280.0)
 const OPPONENT_POPUP_SIZE: Vector2 = Vector2(332.0, 126.0)
 const OPPONENT_POPUP_DURATION: float = 2.4
@@ -402,7 +402,9 @@ func _relayout() -> void:
 	_set_rect(top_bar, Rect2(OUTER_PAD, top_y, content_w, TOP_BAR_H))
 	_set_rect(enemy_hp_bar, Rect2(OUTER_PAD, middle_y, MONEY_BAR_W, side_h))
 	_set_rect(chart_panel, Rect2(chart_x, middle_y, chart_w, chart_h))
-	_set_rect(data_panel, Rect2(data_x, middle_y, data_w, side_h))
+	# DataPanel 下边缘 = ActionBar 下边缘 (action_y + ACTION_BAR_H)
+	var data_h: float = action_y + ACTION_BAR_H - middle_y
+	_set_rect(data_panel, Rect2(data_x, middle_y, data_w, data_h))
 	_set_rect(player_target_bar, Rect2(player_target_x, middle_y, PLAYER_TARGET_BAR_W, side_h))
 	_set_rect(action_bar, Rect2(chart_x, action_y, chart_w, ACTION_BAR_H))
 

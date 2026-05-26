@@ -43,7 +43,7 @@ offset_bottom = 44.0
 layout_mode = 0
 offset_left = 8.0
 offset_top = 52.0
-offset_right = 96.0
+offset_right = 140.0
 offset_bottom = 512.0
 
 [node name="ChartPanel" parent="." unique_id=1687685113 instance=ExtResource("4_chart")]
@@ -55,9 +55,9 @@ offset_bottom = 464.0
 
 [node name="DataPanel" parent="." unique_id=1722963715 instance=ExtResource("5_data")]
 layout_mode = 0
-offset_left = 900.0
+offset_left = 920.0
 offset_top = 52.0
-offset_right = 1176.0
+offset_right = 1132.0
 offset_bottom = 512.0
 
 [node name="PlayerTargetBar" parent="." unique_id=1290821814 instance=ExtResource("14_player_target")]
@@ -65,7 +65,7 @@ layout_mode = 0
 offset_left = 1184.0
 offset_top = 52.0
 offset_right = 1272.0
-offset_bottom = 512.0
+offset_bottom = 502.0
 
 [node name="ActionBar" parent="." unique_id=2049971350 instance=ExtResource("6_action")]
 layout_mode = 0
