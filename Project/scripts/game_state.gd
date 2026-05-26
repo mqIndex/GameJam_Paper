@@ -28,8 +28,8 @@ var START_CASH: float = 100000.0
 var VICTORY_TARGET: float = 120000.0          # 第一关
 var INITIAL_PRICE: float = 100.0
 var SETTLE_DISCOUNT: float = 0.5              # 周五未卖筹码强制折价
-var FIRST_TURN_DRAW: int = 6                  # 第一回合摸 6 张
-var TURN_DRAW: int = 2                        # 此后每回合摸 2 张
+var FIRST_TURN_DRAW: int = 6                  # 每回合开局摸牌数 (改版后每个回合都重抽; 整局首回合先 seed 1 买 1 卖 1 技能再补到这个数)
+var TURN_DRAW: int = 6                        # 兼容旧 balance.json: 现已与 FIRST_TURN_DRAW 等价; 不再单独使用
 var HAND_LIMIT: int = 10
 var ACTION_POINTS_INITIAL: int = 2            # 每天首回合 AP (策划: 每天开盘 PER_TURN 重置为此, 每回合末 +1 直到 MAX)
 var ACTION_POINTS_PER_TURN: int = 1           # 运行时: 当前回合 AP 上限 (_start_day 重置, _settle_turn 末递增)
@@ -739,19 +739,16 @@ func _start_turn() -> void:
 	combo_buy_count = 0
 	combo_sell_count = 0
 	# 抽牌 (会发 hand_changed)
-	# 每天第 1 回合摸 6 张 (首日及每天开始时的"起始手牌"); 其它回合摸 2 张.
-	# 整局首回合: 先种 1 买 + 1 卖 + 1 技能, 再补到 6 张 (策划 7.2.8, 修复 "缺类型补 1 → 7 张" bug)
-	if turn_in_day == 1:
-		if turn_global == 1:
-			_seed_first_turn()
-			var to_draw: int = max(0, FIRST_TURN_DRAW - hand.size())
-			if to_draw > 0:
-				draw_cards(to_draw)
-			emit_signal("hand_changed")
-		else:
-			draw_cards(FIRST_TURN_DRAW)
+	# 新机制: 每回合都从抽牌堆重抽 FIRST_TURN_DRAW (6) 张; 上一回合手牌已在 _settle_turn 末进弃牌堆
+	# 整局首回合: 先种 1 买 + 1 卖 + 1 技能, 再补到 FIRST_TURN_DRAW (策划 7.2.8)
+	if turn_global == 1:
+		_seed_first_turn()
+		var to_draw: int = max(0, FIRST_TURN_DRAW - hand.size())
+		if to_draw > 0:
+			draw_cards(to_draw)
+		emit_signal("hand_changed")
 	else:
-		draw_cards(TURN_DRAW)
+		draw_cards(FIRST_TURN_DRAW)
 	# 突发事件: 账户审查 - 抽完牌后随机弃 N 张
 	if event_modifiers.has("freeze_per_turn"):
 		var n: int = int(event_modifiers["freeze_per_turn"])
@@ -833,6 +830,14 @@ func _settle_turn() -> void:
 	emit_signal("candle_committed", turn_global)
 	ACTION_POINTS_PER_TURN = min(ACTION_POINTS_PER_TURN + 1, ACTION_POINTS_MAX)
 	_revert_liquidity_buffs()
+	# 新机制: 回合结束时手牌全部进弃牌堆; 下回合开局重抽 FIRST_TURN_DRAW 张
+	if not hand.is_empty():
+		var dumped: int = hand.size()
+		for c in hand:
+			discard_pile.append(c)
+		hand.clear()
+		_log("  回合结束, 手牌 %d 张进弃牌堆" % dumped)
+		emit_signal("hand_changed")
 	# 3. 触发回合结束
 	emit_signal("turn_ended", day, turn_in_day)
 	# 4. 突发事件 dur_turns 倒计时 (短期事件如 超预期财报 / 财报逆袭 = 3)

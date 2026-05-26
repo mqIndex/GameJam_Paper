@@ -31,4 +31,4 @@ size_flags_horizontal = 3
 [node name="LblCardCostHint" type="Label" parent="HBox"]
 theme_override_font_sizes/font_size = 12
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
-text = "选中卡牌查看费用"
+text = "每个交易日结束后必须卖出股票, 不然以 8 折结算"
