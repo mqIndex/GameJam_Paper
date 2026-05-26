@@ -1,52 +1,70 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://bown1hmc4qvnx"]
 
-[ext_resource type="Script" path="res://scripts/views/enemy_hp_bar.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://c0ke036or1yo7" path="res://scripts/views/enemy_hp_bar.gd" id="1_script"]
 
-[node name="EnemyHpBar" type="Panel"]
-offset_right = 56.0
+[node name="EnemyHpBar" type="Panel" unique_id=488248333]
+offset_right = 88.0
 offset_bottom = 460.0
 script = ExtResource("1_script")
 
-[node name="LblTitle" type="Label" parent="."]
+[node name="LblTitle" type="Label" parent="." unique_id=167723635]
+layout_mode = 0
 offset_left = 4.0
 offset_top = 4.0
-offset_right = 52.0
-offset_bottom = 18.0
-theme_override_font_sizes/font_size = 9
+offset_right = 84.0
+offset_bottom = 16.0
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+theme_override_font_sizes/font_size = 10
+text = "对手平仓"
 horizontal_alignment = 1
-text = "平仓线"
 
-[node name="LblLiqPrice" type="Label" parent="."]
+[node name="LblValue" type="Label" parent="." unique_id=321175532]
+layout_mode = 0
+offset_left = 2.0
+offset_top = 18.0
+offset_right = 86.0
+offset_bottom = 40.0
+theme_override_colors/font_color = Color(1, 0.365, 0.424, 1)
+theme_override_font_sizes/font_size = 18
+text = "--"
+horizontal_alignment = 1
+clip_text = true
+
+[node name="IconSlot" type="Panel" parent="." unique_id=939466937]
+layout_mode = 0
+offset_left = 32.0
+offset_top = 44.0
+offset_right = 56.0
+offset_bottom = 68.0
+
+[node name="LblLiqPrice" type="Label" parent="." unique_id=1692669565]
+visible = false
+layout_mode = 0
 offset_left = 2.0
 offset_top = 20.0
-offset_right = 54.0
+offset_right = 86.0
 offset_bottom = 38.0
-theme_override_font_sizes/font_size = 12
 theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
-horizontal_alignment = 1
+theme_override_font_sizes/font_size = 12
 text = "--"
+horizontal_alignment = 1
 
-[node name="BarBg" type="ColorRect" parent="."]
-offset_left = 14.0
-offset_top = 44.0
-offset_right = 42.0
-offset_bottom = 432.0
-color = Color(0.102, 0.102, 0.18, 1)
+[node name="BarBg" type="ColorRect" parent="." unique_id=1415956128]
+visible = false
+layout_mode = 0
+color = Color(0, 0, 0, 0)
 
-[node name="BarFill" type="ColorRect" parent="."]
-offset_left = 14.0
-offset_top = 44.0
-offset_right = 42.0
-offset_bottom = 432.0
-color = Color(0.024, 0.839, 0.627, 1)
+[node name="BarFill" type="ColorRect" parent="." unique_id=1931922317]
+visible = false
+layout_mode = 0
+color = Color(1, 0.365, 0.424, 1)
 
-[node name="LblValue" type="Label" parent="."]
+[node name="LblValueBottom" type="Label" parent="." unique_id=283123008]
+visible = false
+layout_mode = 0
 offset_left = 4.0
 offset_top = 436.0
 offset_right = 52.0
 offset_bottom = 456.0
 theme_override_font_sizes/font_size = 10
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-horizontal_alignment = 1
 text = "--"

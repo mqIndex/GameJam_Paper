@@ -27,7 +27,8 @@ var _bubble_arrow: Control = null
 
 
 func _ready() -> void:
-	add_theme_stylebox_override("panel", UF.panel_stylebox())
+	add_theme_stylebox_override("panel", UF.panel_stylebox(UF.COL_NEON_RED))
+	_decorate_avatar_slot(UF.COL_NEON_RED)
 	_build_bubble_overlay()
 	Game.opponent_state_changed.connect(_refresh)
 	Game.opponent_entered.connect(_on_opponent_entered)
@@ -36,6 +37,26 @@ func _ready() -> void:
 	Game.opponent_action_played.connect(_on_action_played)
 	Game.state_changed.connect(_refresh)
 	_refresh()
+
+
+# 在 AvatarSlot 周围加一个霓虹描边 (后续可替换为头像 PNG 框)
+func _decorate_avatar_slot(border: Color) -> void:
+	var slot: CenterContainer = $VBox/AvatarSlot
+	if slot == null or slot.has_node("AvatarDeco"):
+		return
+	var deco := Panel.new()
+	deco.name = "AvatarDeco"
+	deco.show_behind_parent = true
+	deco.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	deco.add_theme_stylebox_override("panel", UF.neon_panel_stylebox(border))
+	slot.add_child(deco)
+	slot.move_child(deco, 0)
+	deco.anchor_right = 1.0
+	deco.anchor_bottom = 1.0
+	deco.offset_left = -2.0
+	deco.offset_top = -2.0
+	deco.offset_right = 2.0
+	deco.offset_bottom = 2.0
 
 
 func _on_opponent_entered(_opponent_id: String) -> void:

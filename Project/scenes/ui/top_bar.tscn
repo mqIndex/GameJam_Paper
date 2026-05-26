@@ -2,96 +2,138 @@
 
 [ext_resource type="Script" path="res://scripts/views/top_bar.gd" id="1_script"]
 
-[node name="TopBar" type="Panel"]
+[node name="TopBar" type="Control"]
 offset_right = 1264.0
 offset_bottom = 36.0
 script = ExtResource("1_script")
+mouse_filter = 2
 
-[node name="HBox" type="HBoxContainer" parent="."]
+[node name="LeftBar" type="Panel" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 320.0
+offset_bottom = 36.0
+
+[node name="HBox" type="HBoxContainer" parent="LeftBar"]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
 offset_left = 12.0
 offset_top = 6.0
 offset_right = -12.0
 offset_bottom = -6.0
-theme_override_constants/separation = 14
+theme_override_constants/separation = 10
 
-[node name="LblDay" type="Label" parent="HBox"]
+[node name="LblDay" type="Label" parent="LeftBar/HBox"]
 theme_override_font_sizes/font_size = 13
 text = "第 1 / 5 天 (周一)"
 
-[node name="Sep1" type="Label" parent="HBox"]
+[node name="Sep1" type="Label" parent="LeftBar/HBox"]
 theme_override_font_sizes/font_size = 16
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
 text = "|"
 
-[node name="LblTurn" type="Label" parent="HBox"]
+[node name="LblTurn" type="Label" parent="LeftBar/HBox"]
 theme_override_font_sizes/font_size = 13
 text = "第 1 / 10 回合"
 
-[node name="Sep2" type="Label" parent="HBox"]
-theme_override_font_sizes/font_size = 16
-theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
-text = "|"
-
-[node name="LblPrice" type="Label" parent="HBox"]
-theme_override_font_sizes/font_size = 14
-theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
-text = "¥100.00"
-
-[node name="Sep3" type="Label" parent="HBox"]
-theme_override_font_sizes/font_size = 16
-theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
-text = "|"
-
-[node name="LblBull" type="Label" parent="HBox"]
-theme_override_font_sizes/font_size = 12
-theme_override_colors/font_color = Color(0.024, 0.839, 0.627, 1)
-text = "上涨 50"
-
-[node name="Slash" type="Label" parent="HBox"]
-theme_override_font_sizes/font_size = 12
-theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
-text = "/"
-
-[node name="LblBear" type="Label" parent="HBox"]
-theme_override_font_sizes/font_size = 12
-theme_override_colors/font_color = Color(0.937, 0.278, 0.435, 1)
-text = "50 下跌"
-
-[node name="LblEmotionState" type="Label" parent="HBox"]
-theme_override_font_sizes/font_size = 11
-theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
-text = "· 偏多"
-
-[node name="Spacer" type="Control" parent="HBox"]
+[node name="Spacer1" type="Control" parent="LeftBar/HBox"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="BtnEmotion" type="Button" parent="HBox"]
-custom_minimum_size = Vector2(76, 24)
-theme_override_font_sizes/font_size = 11
-text = "情绪详情"
-
-[node name="BtnEvent" type="Button" parent="HBox"]
-custom_minimum_size = Vector2(76, 24)
+[node name="BtnEvent" type="Button" parent="LeftBar/HBox"]
+custom_minimum_size = Vector2(86, 24)
 theme_override_font_sizes/font_size = 11
 text = "突发事件"
 
-[node name="BtnPause" type="Button" parent="HBox"]
-custom_minimum_size = Vector2(28, 24)
-theme_override_font_sizes/font_size = 11
-text = "⏸"
+[node name="MidBar" type="Panel" parent="."]
+offset_left = 328.0
+offset_top = 0.0
+offset_right = 720.0
+offset_bottom = 36.0
 
-[node name="BtnPlay" type="Button" parent="HBox"]
-custom_minimum_size = Vector2(28, 24)
-theme_override_font_sizes/font_size = 11
-text = "▶"
+[node name="HBox" type="HBoxContainer" parent="MidBar"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 4.0
+offset_right = -10.0
+offset_bottom = -4.0
+theme_override_constants/separation = 8
 
-[node name="BtnFF" type="Button" parent="HBox"]
+[node name="IconEmotion" type="Panel" parent="MidBar/HBox"]
+custom_minimum_size = Vector2(24, 24)
+
+[node name="LblEmotionTitle" type="Label" parent="MidBar/HBox"]
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
+text = "市场情绪"
+vertical_alignment = 1
+
+[node name="EmotionBarSlot" type="Control" parent="MidBar/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="LblEmotionState" type="Label" parent="MidBar/HBox"]
+custom_minimum_size = Vector2(48, 0)
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
+text = "偏多"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RightBar" type="Panel" parent="."]
+offset_left = 728.0
+offset_top = 0.0
+offset_right = 1264.0
+offset_bottom = 36.0
+
+[node name="HBox" type="HBoxContainer" parent="RightBar"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 4.0
+offset_right = -10.0
+offset_bottom = -4.0
+theme_override_constants/separation = 8
+
+[node name="LblTalentTitle" type="Label" parent="RightBar/HBox"]
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
+text = "天赋"
+vertical_alignment = 1
+
+[node name="TalentIconsSlot" type="HBoxContainer" parent="RightBar/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="BtnPause" type="Button" parent="RightBar/HBox"]
 custom_minimum_size = Vector2(28, 24)
 theme_override_font_sizes/font_size = 11
-text = "⏩"
+text = "II"
+
+[node name="BtnPlay" type="Button" parent="RightBar/HBox"]
+custom_minimum_size = Vector2(28, 24)
+theme_override_font_sizes/font_size = 11
+text = ">"
+
+[node name="BtnFF" type="Button" parent="RightBar/HBox"]
+custom_minimum_size = Vector2(28, 24)
+theme_override_font_sizes/font_size = 11
+text = ">>"
+
+[node name="HBox" type="Control" parent="."]
+visible = false
+
+[node name="LblPrice" type="Label" parent="HBox"]
+text = "¥100.00"
+
+[node name="LblBull" type="Label" parent="HBox"]
+text = "上涨 50"
+
+[node name="LblBear" type="Label" parent="HBox"]
+text = "50 下跌"

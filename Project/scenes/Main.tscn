@@ -3,16 +3,17 @@
 [ext_resource type="Script" uid="uid://d1blbpqbkg6ok" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://scenes/ui/top_bar.tscn" id="2_top_bar"]
 [ext_resource type="PackedScene" path="res://scenes/ui/enemy_hp_bar.tscn" id="3_enemy_hp_bar"]
-[ext_resource type="PackedScene" path="res://scenes/ui/chart_panel.tscn" id="4_chart"]
+[ext_resource type="PackedScene" uid="uid://csmfjxrx51het" path="res://scenes/ui/chart_panel.tscn" id="4_chart"]
 [ext_resource type="PackedScene" path="res://scenes/ui/data_panel.tscn" id="5_data"]
 [ext_resource type="PackedScene" path="res://scenes/ui/action_bar.tscn" id="6_action"]
-[ext_resource type="PackedScene" path="res://scenes/ui/enemy_panel.tscn" id="7_enemy"]
+[ext_resource type="PackedScene" uid="uid://dnwopclkbknh0" path="res://scenes/ui/enemy_panel.tscn" id="7_enemy"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hand_panel.tscn" id="8_hand"]
 [ext_resource type="PackedScene" path="res://scenes/ui/turn_panel.tscn" id="9_turn"]
 [ext_resource type="PackedScene" path="res://scenes/ui/player_panel.tscn" id="10_player"]
 [ext_resource type="PackedScene" path="res://scenes/ui/end_dialog.tscn" id="11_end"]
 [ext_resource type="PackedScene" path="res://scenes/ui/shop/shop_overlay.tscn" id="12_shop"]
 [ext_resource type="PackedScene" path="res://scenes/ui/deck_preview_popup.tscn" id="13_deck"]
+[ext_resource type="PackedScene" uid="uid://dyv8pvh8bmy1b" path="res://scenes/ui/player_target_bar.tscn" id="14_player_target"]
 
 [node name="Main" type="Control" unique_id=1846624010]
 layout_mode = 3
@@ -29,10 +30,10 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.051, 0.106, 0.165, 1)
+color = Color(0.024, 0.031, 0.051, 1)
 
 [node name="TopBar" parent="." unique_id=26865201 instance=ExtResource("2_top_bar")]
-layout_mode = 0
+anchors_preset = 0
 offset_left = 8.0
 offset_top = 8.0
 offset_right = 1272.0
@@ -42,12 +43,12 @@ offset_bottom = 44.0
 layout_mode = 0
 offset_left = 8.0
 offset_top = 52.0
-offset_right = 64.0
+offset_right = 96.0
 offset_bottom = 512.0
 
 [node name="ChartPanel" parent="." unique_id=1687685113 instance=ExtResource("4_chart")]
 layout_mode = 0
-offset_left = 72.0
+offset_left = 99.0
 offset_top = 52.0
 offset_right = 892.0
 offset_bottom = 464.0
@@ -55,6 +56,13 @@ offset_bottom = 464.0
 [node name="DataPanel" parent="." unique_id=1722963715 instance=ExtResource("5_data")]
 layout_mode = 0
 offset_left = 900.0
+offset_top = 52.0
+offset_right = 1176.0
+offset_bottom = 512.0
+
+[node name="PlayerTargetBar" parent="." unique_id=1290821814 instance=ExtResource("14_player_target")]
+layout_mode = 0
+offset_left = 1184.0
 offset_top = 52.0
 offset_right = 1272.0
 offset_bottom = 512.0

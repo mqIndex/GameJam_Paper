@@ -11,6 +11,7 @@ const CardChoiceDialog = preload("res://scripts/views/card_choice_dialog.gd")
 @onready var enemy_hp_bar: Control = $EnemyHpBar
 @onready var chart_panel: Control = $ChartPanel
 @onready var data_panel: Control = $DataPanel
+@onready var player_target_bar: Control = $PlayerTargetBar
 @onready var action_bar: Control = $ActionBar
 @onready var enemy_panel: Control = $EnemyPanel
 @onready var hand_panel: Control = $HandPanel
@@ -31,21 +32,24 @@ var _opponent_popup: PanelContainer = null
 var _opponent_popup_title: Label = null
 var _opponent_popup_body: Label = null
 var _opponent_popup_tween: Tween = null
+var _subtitle_banner: Label = null
 
 const MIN_WINDOW_SIZE: Vector2 = Vector2(960.0, 540.0)
 const OUTER_PAD: float = 8.0
 const GAP: float = 8.0
 const TOP_BAR_H: float = 36.0
-const MONEY_BAR_W: float = 56.0
+const SUBTITLE_H: float = 22.0
+const MONEY_BAR_W: float = 88.0
+const PLAYER_TARGET_BAR_W: float = 88.0
 const ACTION_BAR_H: float = 28.0
 const BOTTOM_ROW_H: float = 204.0
 const BOTTOM_ROW_MIN_H: float = 164.0
 const ENEMY_W: float = 168.0
 const TURN_W: float = 136.0
 const PLAYER_W: float = 184.0
-const DATA_PANEL_MIN_W: float = 300.0
-const DATA_PANEL_WIDTH_RATIO: float = 0.29
-const DATA_PANEL_MAX_W: float = 420.0
+const DATA_PANEL_MIN_W: float = 200.0
+const DATA_PANEL_WIDTH_RATIO: float = 0.193
+const DATA_PANEL_MAX_W: float = 280.0
 const END_DIALOG_SIZE: Vector2 = Vector2(512.0, 280.0)
 const OPPONENT_POPUP_SIZE: Vector2 = Vector2(332.0, 126.0)
 const OPPONENT_POPUP_DURATION: float = 2.4
@@ -62,6 +66,8 @@ func _ready() -> void:
 	Game.log_message.connect(_append_log)
 	_setup_choice_dialog()
 	_build_opponent_popup()
+	_build_subtitle_banner()
+	_apply_bg_texture()
 	Game.opponent_entered.connect(_on_opponent_entered_popup)
 	$PlayerPanel.pile_clicked.connect(_on_pile_clicked)
 	$TurnPanel.pile_clicked.connect(_on_pile_clicked)
@@ -120,6 +126,67 @@ func _on_shatter_choice_requested(buy_sell_cards: Array) -> void:
 		buy_sell_cards,
 		func(picked):
 			Game.shatter_cards(picked)
+	)
+
+
+# 主背景贴图: 在 BG ColorRect 之上叠一个 TextureRect, 纹理缺失则不挂, 保留 ColorRect 颜色作 fallback
+func _apply_bg_texture() -> void:
+	if has_node("BgTexture"):
+		return
+	if not ResourceLoader.exists(UF.PATH_BG_MAIN):
+		return
+	var tex = load(UF.PATH_BG_MAIN) as Texture2D
+	if tex == null:
+		return
+	var tr := TextureRect.new()
+	tr.name = "BgTexture"
+	tr.texture = tex
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tr.modulate = Color(1, 1, 1, 0.55)  # 半透明叠加, 避免抢 UI 视觉
+	tr.anchor_right = 1.0
+	tr.anchor_bottom = 1.0
+	tr.offset_left = 0.0
+	tr.offset_top = 0.0
+	tr.offset_right = 0.0
+	tr.offset_bottom = 0.0
+	tr.z_index = -10
+	add_child(tr)
+	move_child(tr, 1)  # BG 是 index 0, BgTexture index 1
+
+
+# 标题横幅 (中上方红橙强调字, 仅显示氛围标语, 不影响游戏逻辑)
+func _build_subtitle_banner() -> void:
+	if has_node("SubtitleBanner"):
+		_subtitle_banner = get_node("SubtitleBanner") as Label
+		return
+	_subtitle_banner = Label.new()
+	_subtitle_banner.name = "SubtitleBanner"
+	_subtitle_banner.text = "不要怕，是技术性调整！"
+	_subtitle_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_subtitle_banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_subtitle_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_subtitle_banner.z_index = 5
+	_subtitle_banner.add_theme_font_size_override("font_size", 16)
+	_subtitle_banner.add_theme_color_override("font_color", UF.COL_NEON_RED)
+	_subtitle_banner.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	_subtitle_banner.add_theme_constant_override("outline_size", 3)
+	add_child(_subtitle_banner)
+	_position_subtitle_banner()
+
+
+func _position_subtitle_banner() -> void:
+	if _subtitle_banner == null:
+		return
+	var view_size: Vector2 = size
+	if view_size.x <= 0.0 or view_size.y <= 0.0:
+		view_size = get_viewport_rect().size
+	var w: float = max(420.0, view_size.x * 0.5)
+	_subtitle_banner.size = Vector2(w, SUBTITLE_H)
+	_subtitle_banner.position = Vector2(
+		(view_size.x - w) * 0.5,
+		OUTER_PAD + TOP_BAR_H + 2.0
 	)
 
 
@@ -288,22 +355,26 @@ func _relayout() -> void:
 
 	var content_w: float = view_size.x - OUTER_PAD * 2.0
 	var top_y: float = OUTER_PAD
-	var middle_y: float = top_y + TOP_BAR_H + GAP
+	# 在 TopBar 与中间内容之间为 SubtitleBanner 预留行高, 防止覆盖图表
+	var middle_y: float = top_y + TOP_BAR_H + GAP + SUBTITLE_H
 	var bottom_h: float = clamp(view_size.y * 0.283, BOTTOM_ROW_MIN_H, BOTTOM_ROW_H)
 	var bottom_y: float = view_size.y - OUTER_PAD - bottom_h
 	var action_y: float = bottom_y - GAP - ACTION_BAR_H
-	var chart_h: float = max(160.0, action_y - GAP - middle_y)
-	var side_h: float = max(200.0, bottom_y + 4.0 - middle_y)
+	var chart_h: float = max(140.0, action_y - GAP - middle_y)
+	var side_h: float = max(180.0, bottom_y + 4.0 - middle_y)
 
 	var data_w: float = clamp(view_size.x * DATA_PANEL_WIDTH_RATIO, DATA_PANEL_MIN_W, DATA_PANEL_MAX_W)
 	var chart_x: float = OUTER_PAD + MONEY_BAR_W + GAP
-	var data_x: float = view_size.x - OUTER_PAD - data_w
+	# PlayerTargetBar 贴右边, DataPanel 紧靠 PlayerTargetBar 左侧
+	var player_target_x: float = view_size.x - OUTER_PAD - PLAYER_TARGET_BAR_W
+	var data_x: float = player_target_x - GAP - data_w
 	var chart_w: float = max(300.0, data_x - GAP - chart_x)
 
 	_set_rect(top_bar, Rect2(OUTER_PAD, top_y, content_w, TOP_BAR_H))
 	_set_rect(enemy_hp_bar, Rect2(OUTER_PAD, middle_y, MONEY_BAR_W, side_h))
 	_set_rect(chart_panel, Rect2(chart_x, middle_y, chart_w, chart_h))
 	_set_rect(data_panel, Rect2(data_x, middle_y, data_w, side_h))
+	_set_rect(player_target_bar, Rect2(player_target_x, middle_y, PLAYER_TARGET_BAR_W, side_h))
 	_set_rect(action_bar, Rect2(chart_x, action_y, chart_w, ACTION_BAR_H))
 
 	var fixed_bottom_w: float = ENEMY_W + TURN_W + PLAYER_W + GAP * 3.0
@@ -324,6 +395,7 @@ func _relayout() -> void:
 	var dialog_pos: Vector2 = (view_size - dialog_size) * 0.5
 	_set_rect(end_dialog, Rect2(dialog_pos, dialog_size))
 	_position_opponent_popup()
+	_position_subtitle_banner()
 
 
 func _set_rect(ctrl: Control, rect: Rect2) -> void:

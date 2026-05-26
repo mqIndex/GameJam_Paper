@@ -9,13 +9,23 @@ signal pile_clicked(pile_name: String)
 
 
 func _ready() -> void:
+	# 面板背景: 用默认 StyleBoxFlat 纯色; 不接入 panel_neon_default.png
 	add_theme_stylebox_override("panel", UF.panel_stylebox())
-	var sb := UF.panel_stylebox(UF.COL_HIGHLIGHT)
+	# 结束回合按钮: 用纯色 StyleBoxFlat (霓虹橙), 不接入 btn_end_turn.png
+	var sb := UF.neon_button_stylebox(UF.COL_NEON_ORANGE)
 	btn_end_turn.add_theme_stylebox_override("normal", sb)
 	var hover := sb.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(UF.COL_HIGHLIGHT.r, UF.COL_HIGHLIGHT.g, UF.COL_HIGHLIGHT.b, 0.18)
+	hover.bg_color = Color(UF.COL_NEON_ORANGE.r * 0.95, UF.COL_NEON_ORANGE.g * 0.65, UF.COL_NEON_ORANGE.b * 0.35, 1.0)
 	btn_end_turn.add_theme_stylebox_override("hover", hover)
-	btn_end_turn.add_theme_color_override("font_color", UF.COL_HIGHLIGHT)
+	var pressed_sb := sb.duplicate() as StyleBoxFlat
+	pressed_sb.bg_color = Color(UF.COL_NEON_ORANGE.r * 0.7, UF.COL_NEON_ORANGE.g * 0.4, UF.COL_NEON_ORANGE.b * 0.2, 1.0)
+	btn_end_turn.add_theme_stylebox_override("pressed", pressed_sb)
+	var disabled_sb := UF.panel_stylebox(UF.COL_AP_OFF)
+	btn_end_turn.add_theme_stylebox_override("disabled", disabled_sb)
+	btn_end_turn.add_theme_color_override("font_color", UF.COL_TEXT)
+	btn_end_turn.add_theme_font_size_override("font_size", UF.FS_H1)
+	btn_end_turn.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	btn_end_turn.add_theme_constant_override("outline_size", 2)
 	btn_end_turn.pressed.connect(_on_end_turn_pressed)
 	discard_pile_button.pressed.connect(_on_discard_pressed)
 	Game.state_changed.connect(_refresh)

@@ -29,35 +29,68 @@ func setup(card: Card, index: int) -> void:
 	_card_index = index
 	lbl_name.text = card.name
 	var col: Color = UF.kind_color(card.kind)
+	lbl_name.add_theme_color_override("font_color", col)
+	lbl_name.add_theme_font_size_override("font_size", UF.FS_H1)
+	lbl_name.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	lbl_name.add_theme_constant_override("outline_size", 2)
 	lbl_cost.text = "耗 %d" % card.cost
-	lbl_cost.add_theme_color_override("font_color", col)
+	lbl_cost.add_theme_color_override("font_color", UF.COL_GOLD)
+	lbl_cost.add_theme_font_size_override("font_size", UF.FS_BODY)
+	lbl_cost.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	lbl_cost.add_theme_constant_override("outline_size", 2)
 	lbl_desc.text = card.description
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = UF.COL_PANEL
-	sb.border_color = col
-	sb.border_width_top = 5
-	sb.border_width_left = 2
-	sb.border_width_right = 2
-	sb.border_width_bottom = 2
-	sb.corner_radius_top_left = 4
-	sb.corner_radius_top_right = 4
-	sb.corner_radius_bottom_left = 4
-	sb.corner_radius_bottom_right = 4
-	add_theme_stylebox_override("normal", sb)
-	var hover_sb := sb.duplicate() as StyleBoxFlat
-	hover_sb.bg_color = UF.COL_PANEL_LIGHT
-	add_theme_stylebox_override("hover", hover_sb)
-	var pressed_sb := sb.duplicate() as StyleBoxFlat
-	pressed_sb.bg_color = UF.COL_PANEL_LIGHT.lerp(col, 0.2)
-	add_theme_stylebox_override("pressed", pressed_sb)
-	var hover_pressed_sb := pressed_sb.duplicate() as StyleBoxFlat
-	hover_pressed_sb.bg_color = UF.COL_PANEL_LIGHT.lerp(col, 0.28)
-	add_theme_stylebox_override("hover_pressed", hover_pressed_sb)
-	add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	var disabled_sb := sb.duplicate() as StyleBoxFlat
-	disabled_sb.border_color = UF.COL_AP_OFF
-	disabled_sb.bg_color = Color("#0a1422")
-	add_theme_stylebox_override("disabled", disabled_sb)
+	lbl_desc.add_theme_color_override("font_color", UF.COL_TEXT)
+	lbl_desc.add_theme_font_size_override("font_size", UF.FS_BODY)
+	lbl_desc.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	lbl_desc.add_theme_constant_override("outline_size", 2)
+	# 卡牌框: 优先贴图版 StyleBoxTexture; 缺失则 fallback 到彩色描边
+	var tex_sb := UF.texture_card_stylebox(card.kind)
+	if tex_sb != null:
+		add_theme_stylebox_override("normal", tex_sb)
+		var hover_sb := (tex_sb as StyleBoxTexture).duplicate() as StyleBoxTexture
+		hover_sb.modulate_color = Color(1.15, 1.15, 1.15, 1.0)
+		add_theme_stylebox_override("hover", hover_sb)
+		var pressed_sb := (tex_sb as StyleBoxTexture).duplicate() as StyleBoxTexture
+		pressed_sb.modulate_color = Color(0.85, 0.85, 0.85, 1.0)
+		add_theme_stylebox_override("pressed", pressed_sb)
+		add_theme_stylebox_override("hover_pressed", pressed_sb.duplicate())
+		add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+		var disabled_sb := (tex_sb as StyleBoxTexture).duplicate() as StyleBoxTexture
+		disabled_sb.modulate_color = Color(0.45, 0.45, 0.45, 0.85)
+		add_theme_stylebox_override("disabled", disabled_sb)
+	else:
+		# fallback: 整圈彩边 StyleBoxFlat
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = UF.COL_BG_DEEP
+		sb.border_color = col
+		sb.border_width_top = 3
+		sb.border_width_left = 3
+		sb.border_width_right = 3
+		sb.border_width_bottom = 3
+		sb.corner_radius_top_left = 2
+		sb.corner_radius_top_right = 2
+		sb.corner_radius_bottom_left = 2
+		sb.corner_radius_bottom_right = 2
+		sb.shadow_color = Color(col.r, col.g, col.b, 0.30)
+		sb.shadow_size = 3
+		sb.shadow_offset = Vector2.ZERO
+		add_theme_stylebox_override("normal", sb)
+		var hover_sb := sb.duplicate() as StyleBoxFlat
+		hover_sb.bg_color = UF.COL_PANEL_LIGHT
+		hover_sb.shadow_size = 5
+		add_theme_stylebox_override("hover", hover_sb)
+		var pressed_sb := sb.duplicate() as StyleBoxFlat
+		pressed_sb.bg_color = UF.COL_PANEL_LIGHT.lerp(col, 0.2)
+		add_theme_stylebox_override("pressed", pressed_sb)
+		var hover_pressed_sb := pressed_sb.duplicate() as StyleBoxFlat
+		hover_pressed_sb.bg_color = UF.COL_PANEL_LIGHT.lerp(col, 0.28)
+		add_theme_stylebox_override("hover_pressed", hover_pressed_sb)
+		add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+		var disabled_sb := sb.duplicate() as StyleBoxFlat
+		disabled_sb.border_color = UF.COL_AP_OFF
+		disabled_sb.bg_color = Color("#05070b")
+		disabled_sb.shadow_size = 0
+		add_theme_stylebox_override("disabled", disabled_sb)
 	disabled = (Game.action_points < card.cost) or (Game.phase != Game.Phase.PLAY) or Game.is_level_over
 	if not pressed.is_connected(_on_pressed):
 		pressed.connect(_on_pressed)
