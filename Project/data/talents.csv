@@ -1,3 +1,4 @@
 ﻿id,name,description,price,in_first_day,effect_id
 # 天赋ID,显示名称,描述,价格,是否第一天出售,效果ID
 cascade_combo,连携效应,"连续打出 3 张买牌或 3 张卖牌时, 最后一张多触发一次 (资源不足时该次失效, 始终不消耗行动力)",0,TRUE,cascade_combo
+influence,影响力,"每使用 2 张使股价上升或下降的牌, 第 2 张多触发一次 (升/降分开计数; 资源不足时该次失效, 始终不消耗行动力)",5000,TRUE,influence
