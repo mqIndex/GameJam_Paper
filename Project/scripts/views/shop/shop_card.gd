@@ -31,6 +31,8 @@ func _ready() -> void:
 
 
 func setup(card: Card, price: int, action_text: String, action_color: Color, can_afford: bool, show_action: bool = true) -> void:
+	set_meta("effect_id", card.effect_id)
+	set_meta("talent_id", "")
 	if lbl_name == null:
 		card_visual = $CardVisual
 		lbl_name = $CardVisual/VBox/LblName
@@ -59,6 +61,8 @@ func setup(card: Card, price: int, action_text: String, action_color: Color, can
 
 # 天赋卡: 复用同一张视觉, 但 cost 行显示「天赋」标签, 颜色统一用 highlight 金色
 func setup_talent(talent: Talent, can_afford: bool, action_text: String = "购买", show_action: bool = true) -> void:
+	set_meta("effect_id", "")
+	set_meta("talent_id", talent.id)
 	if lbl_name == null:
 		card_visual = $CardVisual
 		lbl_name = $CardVisual/VBox/LblName

@@ -11,6 +11,12 @@ const Effects = preload("res://scripts/views/effects.gd")
 var _intraday_layout: Dictionary = {}
 var _daily_layout: Dictionary = {}
 
+const RIGHT_AXIS_W: float = 92.0
+const CHART_LEFT_PAD: float = 8.0
+const SECTION_LABEL_H: float = 22.0
+const DAILY_BOTTOM_PAD: float = 20.0
+const INTRADAY_BOTTOM_PAD: float = 14.0
+
 
 func _ready() -> void:
 	add_theme_stylebox_override("panel", UF.panel_stylebox())
@@ -157,10 +163,11 @@ func show_danmaku(messages: Array, intensity: int = 1) -> void:
 		var label := Label.new()
 		label.text = text
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		label.z_index = 30
-		label.add_theme_font_size_override("font_size", 17)
-		label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.64))
-		label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.55))
+		label.z_as_relative = false
+		label.z_index = 340
+		label.add_theme_font_size_override("font_size", 18)
+		label.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.84))
+		label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.78))
 		label.add_theme_constant_override("shadow_offset_x", 1)
 		label.add_theme_constant_override("shadow_offset_y", 1)
 		k_chart.add_child(label)
@@ -197,7 +204,7 @@ func _on_draw_chart() -> void:
 		return
 	var w: float = k_chart.size.x
 	var h: float = k_chart.size.y
-	var split: float = h * 0.55 - 4.0
+	var split: float = h * 0.62 - 4.0
 	var top := Rect2(0, 0, w, split)
 	var bot := Rect2(0, split + 8, w, h - split - 8)
 	_draw_section_label(top, "回合 K (本天蜡烛)", UF.COL_GOLD)
@@ -217,16 +224,40 @@ func _price_to_y(price_value: float, p_min: float, p_max: float, draw_y: float, 
 	return draw_y + draw_h - (price_value - p_min) / (p_max - p_min) * draw_h
 
 
+func _price_to_y_clamped(price_value: float, p_min: float, p_max: float, draw_y: float, draw_h: float) -> float:
+	return clampf(_price_to_y(price_value, p_min, p_max, draw_y, draw_h), draw_y, draw_y + draw_h)
+
+
+func _bottom_anchored_range(base_price: float, observed_min: float, observed_max: float, min_span: float) -> Dictionary:
+	var base: float = max(base_price, 0.01)
+	var p_min: float = min(base, observed_min)
+	var upward_span: float = max(observed_max - base, min_span)
+	var downward_span: float = max(base - p_min, 0.0)
+	var p_max: float = base + max(upward_span, downward_span * 3.0, min_span)
+	if downward_span > 0.0:
+		p_min -= max(downward_span * 0.08, min_span * 0.02)
+	p_max += max((p_max - base) * 0.10, min_span * 0.04)
+	if p_max - p_min < 0.01:
+		p_max = p_min + 1.0
+	return {"min": p_min, "max": p_max}
+
+
+func _draw_right_axis_label(draw_x: float, draw_y: float, draw_w: float, draw_h: float, y: float, label: String, col: Color, font_size: int = 11) -> void:
+	var label_x: float = draw_x + draw_w + 5.0
+	var label_y: float = clampf(y + 4.0, draw_y + 11.0, draw_y + draw_h - 2.0)
+	k_chart.draw_string(
+		ThemeDB.fallback_font, Vector2(label_x, label_y),
+		label, HORIZONTAL_ALIGNMENT_LEFT, RIGHT_AXIS_W - 6.0, font_size, col)
+
+
 func _draw_horizontal_price_line(draw_x: float, draw_y: float, draw_w: float, draw_h: float, p_min: float, p_max: float, price_value: float, label: String, col: Color) -> void:
 	if price_value <= 0.0 or p_max <= p_min:
 		return
-	var y: float = _price_to_y(price_value, p_min, p_max, draw_y, draw_h)
+	var y: float = _price_to_y_clamped(price_value, p_min, p_max, draw_y, draw_h)
 	k_chart.draw_dashed_line(
 		Vector2(draw_x, y), Vector2(draw_x + draw_w, y),
 		Color(col.r, col.g, col.b, 0.82), 1.2, 5.0, true)
-	k_chart.draw_string(
-		ThemeDB.fallback_font, Vector2(draw_x + 4, y - 3),
-		label, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, col)
+	_draw_right_axis_label(draw_x, draw_y, draw_w, draw_h, y, label, col, 11)
 
 
 func _opponent_liquidation_line() -> float:
@@ -237,10 +268,10 @@ func _opponent_liquidation_line() -> float:
 
 
 func _draw_daily_candles(r: Rect2) -> void:
-	var draw_x: float = r.position.x + 8
-	var draw_y: float = r.position.y + 22
-	var draw_w: float = r.size.x - 70
-	var draw_h: float = r.size.y - 36
+	var draw_x: float = r.position.x + CHART_LEFT_PAD
+	var draw_y: float = r.position.y + SECTION_LABEL_H
+	var draw_w: float = max(40.0, r.size.x - CHART_LEFT_PAD - RIGHT_AXIS_W)
+	var draw_h: float = max(24.0, r.size.y - SECTION_LABEL_H - DAILY_BOTTOM_PAD)
 
 	var current_day: int = max(Game.day, 1)
 	var todays: Array = []
@@ -266,41 +297,27 @@ func _draw_daily_candles(r: Rect2) -> void:
 			"等待回合结算后生成小时 K...", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, UF.COL_TEXT_DIM)
 		return
 
-	var p_min: float = todays[0]["low"]
-	var p_max: float = todays[0]["high"]
+	var day_base: float = max(Game.day_open_price, 0.01)
+	var observed_min: float = todays[0]["low"]
+	var observed_max: float = todays[0]["high"]
 	for c in todays:
-		if c["low"] < p_min:
-			p_min = c["low"]
-		if c["high"] > p_max:
-			p_max = c["high"]
-	p_min = min(p_min, Game.INITIAL_PRICE)
-	p_max = max(p_max, Game.INITIAL_PRICE)
+		observed_min = min(observed_min, float(c["low"]))
+		observed_max = max(observed_max, float(c["high"]))
+	var range := _bottom_anchored_range(day_base, observed_min, observed_max, max(day_base * 0.08, 2.0))
+	var p_min: float = float(range["min"])
+	var p_max: float = float(range["max"])
 	var avg_cost_line: float = Game.get_average_cost_price()
 	var liquidation_line: float = _opponent_liquidation_line()
-	if avg_cost_line > 0.0:
-		p_min = min(p_min, avg_cost_line)
-		p_max = max(p_max, avg_cost_line)
-	if liquidation_line > 0.0:
-		p_min = min(p_min, liquidation_line)
-		p_max = max(p_max, liquidation_line)
-	if p_max - p_min < 1.0:
-		p_max += 1.0
-		p_min -= 1.0
-	var pad: float = (p_max - p_min) * 0.1
-	p_min -= pad
-	p_max += pad
 
-	var base_y: float = draw_y + draw_h - (Game.INITIAL_PRICE - p_min) / (p_max - p_min) * draw_h
+	var base_y: float = _price_to_y_clamped(day_base, p_min, p_max, draw_y, draw_h)
 	k_chart.draw_dashed_line(
 		Vector2(draw_x, base_y), Vector2(draw_x + draw_w, base_y),
 		UF.COL_TEXT_DIM, 1.0, 4.0, true)
-	k_chart.draw_string(
-		ThemeDB.fallback_font, Vector2(draw_x + 2, base_y - 2),
-		"¥%.0f" % Game.INITIAL_PRICE, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UF.COL_TEXT_DIM)
+	_draw_right_axis_label(draw_x, draw_y, draw_w, draw_h, base_y, "开 ¥%.2f" % day_base, UF.COL_TEXT_DIM, 11)
 	if avg_cost_line > 0.0:
-		_draw_horizontal_price_line(draw_x, draw_y, draw_w, draw_h, p_min, p_max, avg_cost_line, "成本线 ¥%.2f" % avg_cost_line, UF.COL_BLUE)
+		_draw_horizontal_price_line(draw_x, draw_y, draw_w, draw_h, p_min, p_max, avg_cost_line, "成本 ¥%.2f" % avg_cost_line, UF.COL_BLUE)
 	if liquidation_line > 0.0:
-		_draw_horizontal_price_line(draw_x, draw_y, draw_w, draw_h, p_min, p_max, liquidation_line, "爆仓线 ¥%.1f" % liquidation_line, UF.COL_DOWN)
+		_draw_horizontal_price_line(draw_x, draw_y, draw_w, draw_h, p_min, p_max, liquidation_line, "爆仓 ¥%.1f" % liquidation_line, UF.COL_DOWN)
 
 	var slot_w: float = draw_w / float(Game.TURNS_PER_DAY)
 	var body_w: float = max(slot_w * 0.65, 6.0)
@@ -319,11 +336,11 @@ func _draw_daily_candles(r: Rect2) -> void:
 		var lo: float = float(c["low"])
 		var up: bool = cl >= op
 		var col := UF.COL_UP if up else UF.COL_DOWN
-		var hi_y: float = draw_y + draw_h - (hi - p_min) / (p_max - p_min) * draw_h
-		var lo_y: float = draw_y + draw_h - (lo - p_min) / (p_max - p_min) * draw_h
+		var hi_y: float = _price_to_y_clamped(hi, p_min, p_max, draw_y, draw_h)
+		var lo_y: float = _price_to_y_clamped(lo, p_min, p_max, draw_y, draw_h)
 		k_chart.draw_line(Vector2(slot_x, hi_y), Vector2(slot_x, lo_y), col, 1.0)
-		var op_y: float = draw_y + draw_h - (op - p_min) / (p_max - p_min) * draw_h
-		var cl_y: float = draw_y + draw_h - (cl - p_min) / (p_max - p_min) * draw_h
+		var op_y: float = _price_to_y_clamped(op, p_min, p_max, draw_y, draw_h)
+		var cl_y: float = _price_to_y_clamped(cl, p_min, p_max, draw_y, draw_h)
 		var top_y: float = min(op_y, cl_y)
 		var body_h: float = max(abs(op_y - cl_y), 1.0)
 		var rect2: Rect2 = Rect2(slot_x - body_w * 0.5, top_y, body_w, body_h)
@@ -338,6 +355,8 @@ func _draw_daily_candles(r: Rect2) -> void:
 		var ratio: float = float(i) / 2.0
 		var y: float = draw_y + draw_h - ratio * draw_h
 		var p: float = p_min + ratio * (p_max - p_min)
+		if i == 0 and abs(p - day_base) < 0.01:
+			continue
 		k_chart.draw_string(
 			ThemeDB.fallback_font, Vector2(draw_x + draw_w + 4, y + 4),
 			"¥%.0f" % p, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UF.COL_TEXT_DIM)
@@ -350,10 +369,10 @@ func _draw_daily_candles(r: Rect2) -> void:
 
 
 func _draw_intraday(r: Rect2) -> void:
-	var draw_x: float = r.position.x + 8
-	var draw_y: float = r.position.y + 22
-	var draw_w: float = r.size.x - 70
-	var draw_h: float = r.size.y - 30
+	var draw_x: float = r.position.x + CHART_LEFT_PAD
+	var draw_y: float = r.position.y + SECTION_LABEL_H
+	var draw_w: float = max(40.0, r.size.x - CHART_LEFT_PAD - RIGHT_AXIS_W)
+	var draw_h: float = max(22.0, r.size.y - SECTION_LABEL_H - INTRADAY_BOTTOM_PAD)
 
 	var candles: Array = Game.intraday_candles
 	var slot_count: int = max(10, candles.size())
@@ -366,27 +385,21 @@ func _draw_intraday(r: Rect2) -> void:
 		"slot_w": slot,
 	}
 
-	var p_min: float = Game.cur_open
-	var p_max: float = Game.cur_open
+	var turn_base: float = max(Game.cur_open, 0.01)
+	var observed_min: float = turn_base
+	var observed_max: float = turn_base
 	for c in candles:
-		p_min = min(p_min, float(c.get("low", c.get("close", Game.cur_open))))
-		p_max = max(p_max, float(c.get("high", c.get("close", Game.cur_open))))
-	var min_span: float = max(Game.cur_open * 0.10, 2.0)
-	if p_max - p_min < min_span:
-		var mid: float = (p_max + p_min) * 0.5
-		p_min = mid - min_span * 0.5
-		p_max = mid + min_span * 0.5
-	var pad: float = (p_max - p_min) * 0.15
-	p_min -= pad
-	p_max += pad
+		observed_min = min(observed_min, float(c.get("low", c.get("close", turn_base))))
+		observed_max = max(observed_max, float(c.get("high", c.get("close", turn_base))))
+	var range := _bottom_anchored_range(turn_base, observed_min, observed_max, max(turn_base * 0.06, 1.2))
+	var p_min: float = float(range["min"])
+	var p_max: float = float(range["max"])
 
-	var base_y: float = _price_to_y(Game.cur_open, p_min, p_max, draw_y, draw_h)
+	var base_y: float = _price_to_y_clamped(turn_base, p_min, p_max, draw_y, draw_h)
 	k_chart.draw_dashed_line(
 		Vector2(draw_x, base_y), Vector2(draw_x + draw_w, base_y),
 		UF.COL_TEXT_DIM, 1.0, 4.0, true)
-	k_chart.draw_string(
-		ThemeDB.fallback_font, Vector2(draw_x + 2, base_y - 2),
-		"开 ¥%.2f" % Game.cur_open, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UF.COL_TEXT_DIM)
+	_draw_right_axis_label(draw_x, draw_y, draw_w, draw_h, base_y, "开 ¥%.2f" % turn_base, UF.COL_TEXT_DIM, 11)
 
 	if candles.is_empty():
 		var y: float = base_y
@@ -395,18 +408,20 @@ func _draw_intraday(r: Rect2) -> void:
 		k_chart.draw_line(Vector2(cx, y - 3), Vector2(cx, y + 3), UF.COL_TEXT_DIM, 1.0)
 		k_chart.draw_string(
 			ThemeDB.fallback_font, Vector2(cx + 8, y - 4),
-			"¥%.2f (回合开始)" % Game.cur_open, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, UF.COL_TEXT_DIM)
+			"¥%.2f (回合开始)" % turn_base, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, UF.COL_TEXT_DIM)
 		for i in range(3):
 			var ratio: float = float(i) / 2.0
 			var yy: float = draw_y + draw_h - ratio * draw_h
 			var pp: float = p_min + ratio * (p_max - p_min)
+			if i == 0 and abs(pp - turn_base) < 0.01:
+				continue
 			k_chart.draw_string(
 				ThemeDB.fallback_font, Vector2(draw_x + draw_w + 4, yy + 4),
 				"¥%.1f" % pp, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UF.COL_TEXT_DIM)
 		return
 
-	var prev_price: float = Game.cur_open
-	var prev_point := Vector2(draw_x, _price_to_y(prev_price, p_min, p_max, draw_y, draw_h))
+	var prev_price: float = turn_base
+	var prev_point := Vector2(draw_x, _price_to_y_clamped(prev_price, p_min, p_max, draw_y, draw_h))
 	for i in range(candles.size()):
 		var c2: Dictionary = candles[i]
 		var cl: float = float(c2["close"])
@@ -418,7 +433,7 @@ func _draw_intraday(r: Rect2) -> void:
 			col = UF.COL_DOWN
 		else:
 			col = UF.COL_TEXT_DIM
-		var point := Vector2(slot_cx, _price_to_y(cl, p_min, p_max, draw_y, draw_h))
+		var point := Vector2(slot_cx, _price_to_y_clamped(cl, p_min, p_max, draw_y, draw_h))
 		k_chart.draw_line(prev_point, point, Color(col.r, col.g, col.b, 0.85), 2.0)
 		k_chart.draw_circle(point, 3.5, col)
 		if c2.has("kind") and c2["kind"] == "settle":
@@ -429,7 +444,7 @@ func _draw_intraday(r: Rect2) -> void:
 		prev_point = point
 
 	var last_price: float = float(candles[candles.size() - 1]["close"])
-	var last_y: float = _price_to_y(last_price, p_min, p_max, draw_y, draw_h)
+	var last_y: float = _price_to_y_clamped(last_price, p_min, p_max, draw_y, draw_h)
 	k_chart.draw_string(
 		ThemeDB.fallback_font, Vector2(draw_x + draw_w + 4, last_y - 2),
 		"¥%.2f" % last_price, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, UF.COL_HIGHLIGHT)
@@ -438,6 +453,8 @@ func _draw_intraday(r: Rect2) -> void:
 		var ratio: float = float(i) / 2.0
 		var y: float = draw_y + draw_h - ratio * draw_h
 		var p: float = p_min + ratio * (p_max - p_min)
+		if i == 0 and abs(p - turn_base) < 0.01:
+			continue
 		k_chart.draw_string(
 			ThemeDB.fallback_font, Vector2(draw_x + draw_w + 4, y + 4),
 			"¥%.1f" % p, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UF.COL_TEXT_DIM)

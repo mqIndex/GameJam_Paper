@@ -7,6 +7,7 @@ const UF = preload("res://scripts/views/ui_factory.gd")
 @onready var lbl_summary: Label = $ShopPanel/Margin/RootVBox/SummaryPanel/SumMargin/SumVBox/LblSummary
 @onready var btn_leave_shop: Button = $ShopPanel/Margin/RootVBox/BottomBar/BtnLeaveShop
 @onready var summary_panel: PanelContainer = $ShopPanel/Margin/RootVBox/SummaryPanel
+@onready var tabs: TabContainer = $ShopPanel/Margin/RootVBox/Tabs
 
 var _tutorial_button_override: String = ""
 
@@ -27,6 +28,8 @@ func _ready() -> void:
 
 func _on_shop_entered(_d: int) -> void:
 	visible = true
+	if tabs != null:
+		tabs.current_tab = 0
 	_refresh_header()
 
 

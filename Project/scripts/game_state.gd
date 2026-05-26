@@ -165,7 +165,7 @@ func should_start_tutorial() -> bool:
 
 
 func should_start_shop_tutorial() -> bool:
-	return phase == Phase.SHOP and day == 1 and tutorial_completed and not shop_tutorial_completed and not shop_tutorial_active
+	return false
 
 
 func set_tutorial_active(active: bool) -> void:
@@ -189,6 +189,92 @@ func finish_shop_tutorial() -> void:
 	shop_tutorial_completed = true
 	tutorial_active = false
 	emit_signal("state_changed")
+
+
+func tutorial_enter_shop() -> void:
+	if is_level_over:
+		return
+	if phase == Phase.SHOP:
+		return
+	day_close_summary = {
+		"day": day,
+		"open_price": day_open_price,
+		"close_price": price,
+		"price_change_pct": (price / day_open_price - 1.0) * 100.0 if day_open_price > 0.0 else 0.0,
+		"day_pnl": get_total_assets() - day_open_assets,
+		"total_assets": get_total_assets(),
+		"shares": shares,
+		"holding_value": get_holding_value(),
+		"cash": cash,
+	}
+	_enter_shop()
+
+
+func tutorial_leave_shop_for_event() -> void:
+	if phase == Phase.SHOP:
+		leave_shop_to_next_day()
+
+
+func tutorial_trigger_event(event_id: String) -> bool:
+	var ev: Event = EventDatabase.make_by_id(event_id)
+	if ev == null:
+		return false
+	_clear_event_state()
+	triggered_event_ids_this_level[ev.id] = true
+	current_event = ev
+	_apply_event_effects(ev)
+	emit_signal("event_triggered", ev)
+	emit_signal("intraday_updated")
+	emit_signal("state_changed")
+	return true
+
+
+func tutorial_ensure_talent_offer(talent_id: String) -> bool:
+	if talent_id == "":
+		return false
+	for t in owned_talents:
+		if t.id == talent_id:
+			return true
+	for t in talent_offers:
+		if t.id == talent_id:
+			return true
+	var talent := TalentDatabase.make_by_id(talent_id)
+	if talent == null:
+		return false
+	talent_offers.insert(0, talent)
+	emit_signal("talents_changed")
+	emit_signal("state_changed")
+	return true
+
+
+func tutorial_finish_and_continue_level() -> void:
+	shop_tutorial_active = false
+	shop_tutorial_completed = true
+	finish_tutorial()
+
+
+func tutorial_finish_and_start_formal_level() -> void:
+	tutorial_finish_and_continue_level()
+
+
+func _tutorial_carryover_effect_ids() -> Array:
+	var starter_counts := _effect_counts(CardDatabase.build_starter_deck())
+	var current_counts := _effect_counts(get_full_deck())
+	var carry: Array = []
+	for effect_id in current_counts.keys():
+		var extra: int = int(current_counts[effect_id]) - int(starter_counts.get(effect_id, 0))
+		for _i in range(max(0, extra)):
+			carry.append(effect_id)
+	return carry
+
+
+func _effect_counts(cards: Array) -> Dictionary:
+	var counts: Dictionary = {}
+	for c in cards:
+		if c == null or c.transient:
+			continue
+		counts[c.effect_id] = int(counts.get(c.effect_id, 0)) + 1
+	return counts
 
 
 # 从 /root/Cfg.balance 把数值刷到本节点的同名 var; 不存在的键保留代码默认.
@@ -230,7 +316,7 @@ func _apply_balance_from_cfg() -> void:
 	if b.has("TIGHT_CASH_MULTIPLIER"): TIGHT_CASH_MULTIPLIER = int(b["TIGHT_CASH_MULTIPLIER"])
 
 
-func new_level() -> void:
+func new_level(carried_effect_ids: Array = []) -> void:
 	cash = START_CASH
 	shares = 0
 	avg_cost_price = 0.0
@@ -244,6 +330,11 @@ func new_level() -> void:
 	hand.clear()
 	discard_pile.clear()
 	draw_pile = CardDatabase.build_starter_deck()
+	for i in range(carried_effect_ids.size()):
+		var carried_id: String = String(carried_effect_ids[i])
+		var carried_card: Card = CardDatabase.make_by_effect(carried_id, "tutorial_carry_%s_%d" % [carried_id, i])
+		if carried_card != null:
+			draw_pile.append(carried_card)
 	draw_pile.shuffle()
 	liquidity_buffed_cards.clear()
 	daily_play_count.clear()
@@ -256,6 +347,7 @@ func new_level() -> void:
 	is_level_over = false
 	phase = Phase.PLAY
 	shop_offers.clear()
+	talent_offers.clear()
 	shop_delete_count = 0
 	day_open_price = INITIAL_PRICE
 	day_open_assets = START_CASH
@@ -365,6 +457,9 @@ func _emit_card_danmaku(c: Card) -> void:
 		"hype_basic", "hype_plus", "troll_swarm":
 			messages = ["要起飞了！", "冲冲冲！", "大V发话了！", "热度起来了！"]
 			intensity = 2
+		"inflow_capital":
+			messages = ["满仓干了！", "老师我悟了！", "技术牛市！"]
+			intensity = 3
 		"sell_basic", "sell_plus", "small_sell":
 			messages = ["有人跑了？", "获利了结很正常", "先落袋一部分"]
 		"panic_basic", "crash_basic", "reward_blade":
@@ -1475,11 +1570,11 @@ func _check_opponent_spawn() -> void:
 		return
 	if _opponent_state.defeated_this_level or _opponent_state.present:
 		return
-	# 教学保护期: 第1关第1天不触发
-	if current_level_index == 0 and day == 1:
+	# 教学保护期: 第1关第1和2天不触发
+	if current_level_index == 0 and (day == 1 or day == 2):
 		return
 	# 基础概率 (按天数递增)
-	var base_table: Dictionary = {1: 0.20, 2: 0.35, 3: 0.50, 4: 0.65, 5: 0.80}
+	var base_table: Dictionary = {1: 0.12, 2: 0.24, 3: 0.40, 4: 0.60, 5: 0.80}
 	var base: float = base_table.get(day, 0.80)
 	# 涨幅加成: 当涨幅 >= 12% 时, bonus = 涨幅本身; 否则 0
 	var bonus: float = 0.0
