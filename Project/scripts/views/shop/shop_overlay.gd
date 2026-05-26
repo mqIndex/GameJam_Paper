@@ -8,6 +8,8 @@ const UF = preload("res://scripts/views/ui_factory.gd")
 @onready var btn_leave_shop: Button = $ShopPanel/Margin/RootVBox/BottomBar/BtnLeaveShop
 @onready var summary_panel: PanelContainer = $ShopPanel/Margin/RootVBox/SummaryPanel
 
+var _tutorial_button_override: String = ""
+
 
 func _ready() -> void:
 	btn_leave_shop.add_theme_color_override("font_color", UF.COL_HIGHLIGHT)
@@ -34,7 +36,23 @@ func _on_phase_changed(p: int) -> void:
 
 
 func _on_leave_shop_pressed() -> void:
+	var tutorial := _tutorial_overlay()
+	if tutorial != null and tutorial.has_method("is_shop_tutorial_active") and tutorial.call("is_shop_tutorial_active"):
+		if tutorial.has_method("handle_shop_continue"):
+			var consumed: bool = tutorial.call("handle_shop_continue")
+			if consumed:
+				return
 	Game.leave_shop_to_next_day()
+
+
+func set_tutorial_button_override(text: String) -> void:
+	_tutorial_button_override = text
+	btn_leave_shop.text = text
+
+
+func clear_tutorial_button_override() -> void:
+	_tutorial_button_override = ""
+	_refresh_header()
 
 
 func _refresh_header() -> void:
@@ -60,5 +78,16 @@ func _refresh_header() -> void:
 			pnl_str
 		]
 
-	if Game.day >= Game.DAYS_PER_LEVEL:
+	if _tutorial_button_override != "":
+		btn_leave_shop.text = _tutorial_button_override
+	elif Game.day >= Game.DAYS_PER_LEVEL:
 		btn_leave_shop.text = "结束本周, 进入最终结算 →"
+	else:
+		btn_leave_shop.text = "离开商店, 进入下一天 →"
+
+
+func _tutorial_overlay() -> Control:
+	var parent := get_parent()
+	if parent == null:
+		return null
+	return parent.get_node_or_null("TutorialOverlay") as Control

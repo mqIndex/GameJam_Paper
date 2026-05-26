@@ -11,10 +11,16 @@ const HOVER_SCALE: float = 1.2
 const HOVER_DURATION: float = 0.18
 const HOVER_Z_INDEX: int = 10
 
+signal play_blocked(reason: String, source: Control)
+signal play_block_hint_cleared(source: Control)
+
 var _card_index: int = -1
+var _play_block_reason: String = ""
 var _current_tween: Tween = null
 var _is_hovering: bool = false
 var _is_dragging: bool = false
+var _tutorial_highlight: Panel = null
+var _tutorial_highlight_tween: Tween = null
 
 
 func _ready() -> void:
@@ -27,6 +33,8 @@ func _ready() -> void:
 
 func setup(card: Card, index: int) -> void:
 	_card_index = index
+	set_meta("effect_id", card.effect_id)
+	set_meta("card_name", card.name)
 	lbl_name.text = card.name
 	var col: Color = UF.kind_color(card.kind)
 	lbl_name.add_theme_color_override("font_color", col)
@@ -91,19 +99,91 @@ func setup(card: Card, index: int) -> void:
 		disabled_sb.bg_color = Color("#05070b")
 		disabled_sb.shadow_size = 0
 		add_theme_stylebox_override("disabled", disabled_sb)
-	disabled = (Game.action_points < card.cost) or (Game.phase != Game.Phase.PLAY) or Game.is_level_over
+	disabled = false
+	refresh_play_block_reason()
 	if not pressed.is_connected(_on_pressed):
 		pressed.connect(_on_pressed)
 
 
+func refresh_play_block_reason() -> String:
+	var reason := Game.get_card_play_block_reason(_card_index)
+	set_play_block_reason(reason)
+	return reason
+
+
+func set_play_block_reason(reason: String) -> void:
+	_play_block_reason = reason
+	disabled = false
+	if _is_dragging:
+		return
+	if _play_block_reason == "":
+		modulate = Color.WHITE
+		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	else:
+		modulate = Color(1.0, 1.0, 1.0, 0.58)
+		mouse_default_cursor_shape = Control.CURSOR_HELP
+
+
+func set_tutorial_highlight(enabled: bool) -> void:
+	if enabled:
+		_ensure_tutorial_highlight()
+		_tutorial_highlight.visible = true
+		if _tutorial_highlight_tween == null or not _tutorial_highlight_tween.is_valid():
+			_tutorial_highlight.modulate = Color(1, 1, 1, 1)
+			_tutorial_highlight_tween = create_tween()
+			_tutorial_highlight_tween.set_loops()
+			_tutorial_highlight_tween.tween_property(_tutorial_highlight, "modulate:a", 0.35, 0.42).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			_tutorial_highlight_tween.tween_property(_tutorial_highlight, "modulate:a", 1.0, 0.42).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	else:
+		if _tutorial_highlight_tween != null and _tutorial_highlight_tween.is_valid():
+			_tutorial_highlight_tween.kill()
+		_tutorial_highlight_tween = null
+		if _tutorial_highlight != null:
+			_tutorial_highlight.visible = false
+			_tutorial_highlight.modulate = Color(1, 1, 1, 1)
+
+
+func _ensure_tutorial_highlight() -> void:
+	if _tutorial_highlight != null:
+		return
+	_tutorial_highlight = Panel.new()
+	_tutorial_highlight.name = "TutorialCardHighlight"
+	_tutorial_highlight.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tutorial_highlight.z_index = 80
+	_tutorial_highlight.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_tutorial_highlight.offset_left = -5.0
+	_tutorial_highlight.offset_top = -5.0
+	_tutorial_highlight.offset_right = 5.0
+	_tutorial_highlight.offset_bottom = 5.0
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(1.0, 0.74, 0.24, 0.09)
+	sb.border_color = Color(1.0, 0.74, 0.24, 1.0)
+	sb.border_width_left = 3
+	sb.border_width_top = 3
+	sb.border_width_right = 3
+	sb.border_width_bottom = 3
+	sb.corner_radius_top_left = 7
+	sb.corner_radius_top_right = 7
+	sb.corner_radius_bottom_left = 7
+	sb.corner_radius_bottom_right = 7
+	_tutorial_highlight.add_theme_stylebox_override("panel", sb)
+	add_child(_tutorial_highlight)
+
+
 func _on_pressed() -> void:
-	if not _is_dragging:
+	if _is_dragging:
+		return
+	if refresh_play_block_reason() != "":
+		_emit_play_blocked()
+	else:
 		Game.play_card(_card_index)
 
 
 func _on_mouse_entered() -> void:
-	if disabled:
+	if refresh_play_block_reason() != "":
+		_emit_play_blocked()
 		return
+	play_block_hint_cleared.emit(null)
 	_is_hovering = true
 	_tween_scale(Vector2(HOVER_SCALE, HOVER_SCALE), HOVER_DURATION)
 	z_index = HOVER_Z_INDEX
@@ -111,6 +191,7 @@ func _on_mouse_entered() -> void:
 
 func _on_mouse_exited() -> void:
 	_is_hovering = false
+	play_block_hint_cleared.emit(self)
 	if _is_dragging:
 		return
 	_tween_scale(Vector2.ONE, HOVER_DURATION)
@@ -118,13 +199,14 @@ func _on_mouse_exited() -> void:
 
 
 func _on_button_down() -> void:
-	if disabled:
+	if refresh_play_block_reason() != "":
+		_emit_play_blocked()
 		return
 	_tween_scale(Vector2(0.95, 0.95), 0.06)
 
 
 func _on_button_up() -> void:
-	if disabled:
+	if refresh_play_block_reason() != "":
 		return
 	if _is_hovering:
 		_cancel_current_tween()
@@ -148,7 +230,8 @@ func _cancel_current_tween() -> void:
 
 
 func _get_drag_data(_at_position: Vector2) -> Variant:
-	if disabled:
+	if refresh_play_block_reason() != "":
+		_emit_play_blocked()
 		return null
 	_is_dragging = true
 	var preview := Control.new()
@@ -167,7 +250,14 @@ func _get_drag_data(_at_position: Vector2) -> Variant:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_DRAG_END:
 		_is_dragging = false
-		modulate = Color(1, 1, 1, 1)
+		refresh_play_block_reason()
 		if not _is_hovering:
 			_tween_scale(Vector2.ONE, HOVER_DURATION)
 			z_index = 0
+
+
+func _emit_play_blocked() -> void:
+	var reason := refresh_play_block_reason()
+	if reason == "":
+		return
+	play_blocked.emit(reason, self)

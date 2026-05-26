@@ -5,7 +5,7 @@ const OpponentState = preload("res://scripts/systems/opponent_state.gd")
 
 
 func tick(opp: OpponentState, gs) -> Dictionary:
-	# 健康度 = 1 - 危险度 (对手离平仓线越远越健康)
+	# 健康度 = 1 - 危险度 (对手离爆仓线越远越健康)
 	var health: float = 1.0 - opp.get_danger_pct(gs.price)
 	var turn_rise := _calc_turn_rise(gs)
 	var branch := ""
