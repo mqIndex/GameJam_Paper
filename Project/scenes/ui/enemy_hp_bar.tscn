@@ -15,7 +15,7 @@ offset_right = 84.0
 offset_bottom = 16.0
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
 theme_override_font_sizes/font_size = 10
-text = "对手平仓"
+text = "剩余资金"
 horizontal_alignment = 1
 
 [node name="LblValue" type="Label" parent="." unique_id=321175532]

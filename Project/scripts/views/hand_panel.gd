@@ -13,12 +13,19 @@ const CARD_ANIM_Z: int = 260
 
 var _last_hand_keys: Array = []
 var _pending_enter_keys: Dictionary = {}
+var _block_hint: PanelContainer = null
+var _block_hint_label: Label = null
+var _block_hint_tween: Tween = null
+var _block_hint_source: WeakRef = null
 
 
 func _ready() -> void:
 	add_theme_stylebox_override("panel", UF.panel_stylebox())
+	_build_block_hint()
 	Game.hand_changed.connect(_refresh_hand)
 	Game.state_changed.connect(_refresh_state)
+	Game.phase_changed.connect(_on_phase_changed)
+	Game.card_play_blocked.connect(_on_global_card_play_blocked)
 
 
 func _refresh_hand() -> void:
@@ -37,6 +44,10 @@ func _refresh_hand() -> void:
 		var btn = CardButtonScene.instantiate()
 		fan_container.add_child(btn)
 		btn.setup(card, i)
+		if btn.has_signal("play_blocked"):
+			btn.play_blocked.connect(_on_card_play_blocked)
+		if btn.has_signal("play_block_hint_cleared"):
+			btn.play_block_hint_cleared.connect(_on_card_play_hint_cleared)
 		if _pending_enter_keys.has(String(next_keys[i])):
 			btn.visible = false
 	if fan_container.has_method("relayout_cards"):
@@ -51,11 +62,13 @@ func _refresh_state() -> void:
 		return
 	var children: Array = fan_container.get_children()
 	for i in range(min(children.size(), Game.hand.size())):
-		var btn = children[i] as Button
+		var btn = children[i] as Control
 		if btn == null:
 			continue
-		var c: Card = Game.hand[i]
-		btn.disabled = (Game.action_points < c.cost) or (Game.phase != Game.Phase.PLAY) or Game.is_level_over
+		if btn.has_method("refresh_play_block_reason"):
+			btn.call("refresh_play_block_reason")
+		elif btn.has_method("set_play_block_reason"):
+			btn.call("set_play_block_reason", Game.get_card_play_block_reason(i))
 
 
 func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
@@ -64,6 +77,114 @@ func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
 
 func _drop_data(_at_position: Vector2, _data: Variant) -> void:
 	pass
+
+
+func _build_block_hint() -> void:
+	_block_hint = PanelContainer.new()
+	_block_hint.name = "CardBlockReasonHint"
+	_block_hint.top_level = true
+	_block_hint.visible = false
+	_block_hint.z_index = 245
+	_block_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.04, 0.07, 0.13, 0.90)
+	sb.border_color = Color(UF.COL_HIGHLIGHT.r, UF.COL_HIGHLIGHT.g, UF.COL_HIGHLIGHT.b, 0.82)
+	sb.border_width_left = 1
+	sb.border_width_top = 1
+	sb.border_width_right = 1
+	sb.border_width_bottom = 1
+	sb.corner_radius_top_left = 5
+	sb.corner_radius_top_right = 5
+	sb.corner_radius_bottom_left = 5
+	sb.corner_radius_bottom_right = 5
+	sb.content_margin_left = 12.0
+	sb.content_margin_top = 8.0
+	sb.content_margin_right = 12.0
+	sb.content_margin_bottom = 8.0
+	_block_hint.add_theme_stylebox_override("panel", sb)
+	_block_hint_label = Label.new()
+	_block_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_block_hint_label.custom_minimum_size = Vector2(360.0, 0.0)
+	_block_hint_label.add_theme_font_size_override("font_size", 13)
+	_block_hint_label.add_theme_color_override("font_color", UF.COL_TEXT)
+	_block_hint_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.65))
+	_block_hint_label.add_theme_constant_override("shadow_offset_x", 1)
+	_block_hint_label.add_theme_constant_override("shadow_offset_y", 1)
+	_block_hint.add_child(_block_hint_label)
+	add_child(_block_hint)
+
+
+func _on_card_play_blocked(reason: String, source: Control) -> void:
+	show_play_block_reason(reason, source)
+
+
+func _on_card_play_hint_cleared(source: Control) -> void:
+	hide_play_block_reason(source)
+
+
+func _on_global_card_play_blocked(reason: String) -> void:
+	show_play_block_reason(reason)
+
+
+func _on_phase_changed(_phase: int) -> void:
+	_refresh_state()
+
+
+func show_play_block_reason(reason: String, source: Control = null) -> void:
+	if reason == "" or _block_hint == null or _block_hint_label == null:
+		hide_play_block_reason()
+		return
+	_block_hint_source = weakref(source) if source != null else null
+	_block_hint_label.text = reason
+	_block_hint.visible = true
+	_block_hint.modulate = Color(1, 1, 1, 0)
+	_block_hint.reset_size()
+	call_deferred("_position_block_hint", weakref(source) if source != null else null)
+	if _block_hint_tween != null and _block_hint_tween.is_valid():
+		_block_hint_tween.kill()
+	_block_hint_tween = create_tween()
+	_block_hint_tween.tween_property(_block_hint, "modulate:a", 1.0, 0.10)
+	_block_hint_tween.tween_interval(1.85)
+	_block_hint_tween.tween_property(_block_hint, "modulate:a", 0.0, 0.22)
+	_block_hint_tween.tween_callback(_hide_block_hint)
+
+
+func hide_play_block_reason(source: Control = null) -> void:
+	if _block_hint == null:
+		return
+	if source != null and _block_hint_source != null:
+		var active_source := _block_hint_source.get_ref() as Control
+		if active_source != null and active_source != source:
+			return
+	if _block_hint_tween != null and _block_hint_tween.is_valid():
+		_block_hint_tween.kill()
+	_hide_block_hint()
+
+
+func _position_block_hint(source_ref: WeakRef = null) -> void:
+	if _block_hint == null or not _block_hint.visible:
+		return
+	var viewport_size: Vector2 = get_viewport_rect().size
+	var hand_rect := get_global_rect()
+	var hint_size: Vector2 = _block_hint.get_combined_minimum_size()
+	hint_size.x = min(max(hint_size.x, 280.0), min(520.0, viewport_size.x - 24.0))
+	_block_hint.size = hint_size
+	var anchor_x: float = hand_rect.get_center().x
+	if source_ref != null:
+		var source := source_ref.get_ref() as Control
+		if source != null:
+			anchor_x = source.get_global_rect().get_center().x
+	var x: float = clampf(anchor_x - hint_size.x * 0.5, 12.0, max(12.0, viewport_size.x - hint_size.x - 12.0))
+	var y: float = hand_rect.position.y - hint_size.y - 10.0
+	if y < 8.0:
+		y = hand_rect.position.y + 10.0
+	_block_hint.global_position = Vector2(x, y)
+
+
+func _hide_block_hint() -> void:
+	if _block_hint != null:
+		_block_hint.visible = false
+	_block_hint_source = null
 
 
 func _make_hand_keys() -> Array:
@@ -194,6 +315,8 @@ func _finish_enter_animation(card_ref: WeakRef, ghost_ref: WeakRef, key: String)
 		card.scale = Vector2.ONE
 		card.modulate = Color.WHITE
 		card.z_index = 0
+		if card.has_method("refresh_play_block_reason"):
+			card.call("refresh_play_block_reason")
 	var ghost := ghost_ref.get_ref() as Node
 	if ghost != null:
 		ghost.queue_free()

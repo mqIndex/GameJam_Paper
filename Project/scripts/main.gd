@@ -4,6 +4,7 @@ const UF = preload("res://scripts/views/ui_factory.gd")
 const Card = preload("res://scripts/card.gd")
 const Event = preload("res://scripts/event.gd")
 const CardChoiceDialog = preload("res://scripts/views/card_choice_dialog.gd")
+const TutorialOverlay = preload("res://scripts/views/tutorial_overlay.gd")
 
 @onready var log_text: RichTextLabel = $LogText
 @onready var bg: ColorRect = $BG
@@ -33,6 +34,7 @@ var _opponent_popup_title: Label = null
 var _opponent_popup_body: Label = null
 var _opponent_popup_tween: Tween = null
 var _subtitle_banner: Label = null
+var _tutorial_overlay: Control = null
 
 const MIN_WINDOW_SIZE: Vector2 = Vector2(960.0, 540.0)
 const OUTER_PAD: float = 8.0
@@ -68,10 +70,16 @@ func _ready() -> void:
 	_build_opponent_popup()
 	_build_subtitle_banner()
 	_apply_bg_texture()
+	_setup_tutorial_overlay()
 	Game.opponent_entered.connect(_on_opponent_entered_popup)
+	Game.shop_entered.connect(_on_shop_entered_for_tutorial)
 	$PlayerPanel.pile_clicked.connect(_on_pile_clicked)
 	$TurnPanel.pile_clicked.connect(_on_pile_clicked)
+	var tutorial_should_start: bool = Game.should_start_tutorial()
+	Game.set_tutorial_active(tutorial_should_start)
 	Game.new_level()
+	if tutorial_should_start and _tutorial_overlay != null:
+		_tutorial_overlay.call_deferred("start")
 	_start_bgm()
 
 
@@ -242,7 +250,7 @@ func _on_opponent_entered_popup(_opponent_id: String) -> void:
 	if opp == null:
 		return
 	_opponent_popup_title.text = "庄家入场 · %s" % opp.display_name
-	_opponent_popup_body.text = "做空 %d 股 @ ¥%.2f\n平仓线 ¥%.2f  现金 ¥%s" % [
+	_opponent_popup_body.text = "做空 %d 股 @ ¥%.2f\n爆仓线 ¥%.2f  现金 ¥%s" % [
 		opp.short_position,
 		opp.entry_avg_price,
 		opp.liquidation_price,
@@ -280,6 +288,24 @@ func _position_opponent_popup() -> void:
 	)
 
 
+func _setup_tutorial_overlay() -> void:
+	_tutorial_overlay = TutorialOverlay.new()
+	_tutorial_overlay.name = "TutorialOverlay"
+	_tutorial_overlay.z_index = 260
+	_tutorial_overlay.visible = false
+	add_child(_tutorial_overlay)
+	_set_full_rect(_tutorial_overlay)
+	if _tutorial_overlay.has_method("setup"):
+		_tutorial_overlay.setup(self)
+
+
+func _on_shop_entered_for_tutorial(_day: int) -> void:
+	if _tutorial_overlay == null:
+		return
+	if Game.should_start_shop_tutorial() and _tutorial_overlay.has_method("start_shop"):
+		_tutorial_overlay.call_deferred("start_shop")
+
+
 # 启动 BGM (循环, -6dB)
 func _start_bgm() -> void:
 	var stream: AudioStream = load("res://assets/bgm/Measured Inflection.mp3") as AudioStream
@@ -311,6 +337,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			if $ShopOverlay != null and $ShopOverlay.visible:
 				return
 			if $EndDialog != null and $EndDialog.visible:
+				return
+			if Game.tutorial_active:
 				return
 			if Game.is_level_over:
 				return
@@ -352,6 +380,7 @@ func _relayout() -> void:
 	_set_full_rect(bg)
 	_set_full_rect(shop_overlay)
 	_set_full_rect(deck_preview_popup)
+	_set_full_rect(_tutorial_overlay)
 
 	var content_w: float = view_size.x - OUTER_PAD * 2.0
 	var top_y: float = OUTER_PAD

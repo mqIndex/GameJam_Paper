@@ -154,7 +154,7 @@ func recalc_margin(current_price: float) -> void:
 		return
 	var r: float = current_price / entry_avg_price - 1.0
 	required_margin = float(short_position) * entry_avg_price * max(0.5, r)
-	# 平仓线 = 当 cash + safety_pool 全部用尽时的股价
+	# 爆仓线 = 当 cash + safety_pool 全部用尽时的股价
 	# 公式: short_position * entry_avg_price * r_max = cash + safety_pool
 	# => r_max = (cash + safety_pool) / (short_position * entry_avg_price)
 	# => liq = entry_avg_price * (1 + r_max) = entry_avg_price + (cash + safety_pool) / short_position
@@ -184,7 +184,7 @@ func is_liquidated(current_price: float) -> bool:
 	return shortfall >= cash
 
 
-# 危险度 0~1, UI 用. 1 表示触及平仓线即将强平
+# 危险度 0~1, UI 用. 1 表示触及爆仓线即将强平
 func get_danger_pct(current_price: float) -> float:
 	if liquidation_price <= 0.0:
 		return 0.0

@@ -91,7 +91,9 @@ signal talents_changed                           # 天赋购买/重置后刷新
 signal phase_changed(phase: int)
 signal candle_committed(turn_global: int)        # 回合 K 入库
 signal intraday_updated                          # 分时新点
+signal danmaku_requested(messages: Array, intensity: int)
 signal level_finished(victory: bool, final_assets: float)
+signal card_play_blocked(reason: String)
 signal log_message(msg: String)
 # 选择类卡: 派发后 emit 一个 request 信号, UI 弹窗收集玩家选择, 回调 game_state.apply_*
 signal event_preview_requested(events: Array)             # 三选一突发事件 (Array of Event)
@@ -110,6 +112,7 @@ signal opponent_bubble(text: String)
 # ===== 局内状态 =====
 var cash: float = 100000.0
 var shares: int = 0
+var avg_cost_price: float = 0.0
 var price: float = 100.0
 var bull: int = 50                              # 上涨情绪
 var bear: int = 50                              # 下跌情绪 (= EMOTION_TOTAL - bull)
@@ -122,6 +125,10 @@ var hand: Array = []
 var draw_pile: Array = []
 var discard_pile: Array = []                    # 等待区 (类似杀戮尖塔), 抽牌堆空时洗回
 var is_level_over: bool = false
+var tutorial_active: bool = false
+var tutorial_completed: bool = false
+var shop_tutorial_active: bool = false
+var shop_tutorial_completed: bool = false
 
 # ===== 突发事件状态 =====
 var current_event: Event = null                          # 当前生效事件 (null = 无)
@@ -151,6 +158,37 @@ var cur_low: float = 0.0
 func _ready() -> void:
 	_apply_balance_from_cfg()
 	_effect_system = CardEffectSystem.new(self)
+
+
+func should_start_tutorial() -> bool:
+	return current_level_index == 0 and not tutorial_completed
+
+
+func should_start_shop_tutorial() -> bool:
+	return phase == Phase.SHOP and day == 1 and tutorial_completed and not shop_tutorial_completed and not shop_tutorial_active
+
+
+func set_tutorial_active(active: bool) -> void:
+	tutorial_active = active
+
+
+func finish_tutorial() -> void:
+	tutorial_active = false
+	tutorial_completed = true
+	emit_signal("state_changed")
+
+
+func begin_shop_tutorial() -> void:
+	shop_tutorial_active = true
+	tutorial_active = true
+	emit_signal("state_changed")
+
+
+func finish_shop_tutorial() -> void:
+	shop_tutorial_active = false
+	shop_tutorial_completed = true
+	tutorial_active = false
+	emit_signal("state_changed")
 
 
 # 从 /root/Cfg.balance 把数值刷到本节点的同名 var; 不存在的键保留代码默认.
@@ -195,6 +233,7 @@ func _apply_balance_from_cfg() -> void:
 func new_level() -> void:
 	cash = START_CASH
 	shares = 0
+	avg_cost_price = 0.0
 	price = INITIAL_PRICE
 	bull = INITIAL_BULL
 	bear = EMOTION_TOTAL - INITIAL_BULL
@@ -233,35 +272,12 @@ func new_level() -> void:
 
 # ----- 出牌 -----
 func play_card(index: int) -> bool:
-	if is_level_over: return false
-	if phase != Phase.PLAY:
-		_log("非行动阶段，无法出牌")
-		return false
-	if index < 0 or index >= hand.size():
+	var block_reason: String = get_card_play_block_reason(index)
+	if block_reason != "":
+		_log(block_reason)
+		emit_signal("card_play_blocked", block_reason)
 		return false
 	var c: Card = hand[index]
-	if action_points < c.cost:
-		_log("行动力不足，无法打出「%s」" % c.name)
-		return false
-	# 资源前置检查 (策划: 不满足直接拒绝, 不扣 AP, 不进弃牌堆)
-	if not _has_resources_for(c):
-		return false
-	# 突发事件: 重点监控 - 每回合最多 N 张技能牌
-	if c.is_skill() and event_modifiers.has("skill_cap_per_turn"):
-		var cap: int = int(event_modifiers["skill_cap_per_turn"])
-		if skills_played_this_turn >= cap:
-			_log("[重点监控] 本回合技能牌已达上限 %d" % cap)
-			return false
-	# 突发事件: ban 卡
-	if banned_effect_ids.has(c.effect_id):
-		_log("[突发事件] 此卡当前被禁用: %s" % c.name)
-		return false
-	# 平衡: 每日使用上限 (daily_limit)
-	if c.daily_limit > 0:
-		var used: int = int(daily_play_count.get(c.effect_id, 0))
-		if used >= c.daily_limit:
-			_log("「%s」今日已使用 %d 次, 达到上限" % [c.name, c.daily_limit])
-			return false
 	action_points -= c.cost
 	hand.remove_at(index)
 	if c.daily_limit > 0:
@@ -300,10 +316,63 @@ func play_card(index: int) -> bool:
 		c.daily_exiled = true
 		_log("  [封存] 「%s」当日不再洗回牌堆" % c.name)
 	_log("打出「%s」: %s" % [c.name, c.description])
+	_emit_card_danmaku(c)
 	emit_signal("intraday_updated")
 	emit_signal("hand_changed")
 	emit_signal("state_changed")
 	return true
+
+
+func get_card_play_block_reason(index: int) -> String:
+	if is_level_over:
+		return "本局已经结束，不能再出牌。"
+	if phase != Phase.PLAY:
+		return "当前不是行动阶段，不能出牌。"
+	if index < 0 or index >= hand.size():
+		return "这张牌已经不在手牌中。"
+	return _card_play_block_reason(hand[index])
+
+
+func _card_play_block_reason(c: Card) -> String:
+	if c == null:
+		return "这张牌数据异常，不能打出。"
+	if action_points < c.cost:
+		return "行动力不足：打出「%s」需要 %d 点，当前只有 %d 点。" % [c.name, c.cost, action_points]
+	var resource_reason: String = _resource_block_reason(c)
+	if resource_reason != "":
+		return resource_reason
+	if c.is_skill() and event_modifiers.has("skill_cap_per_turn"):
+		var cap: int = int(event_modifiers["skill_cap_per_turn"])
+		if skills_played_this_turn >= cap:
+			return "重点监控：本回合技能牌已达上限 %d 张。" % cap
+	if banned_effect_ids.has(c.effect_id):
+		return "突发事件限制：「%s」当前被禁用。" % c.name
+	if c.daily_limit > 0:
+		var used: int = int(daily_play_count.get(c.effect_id, 0))
+		if used >= c.daily_limit:
+			return "「%s」今日已使用 %d 次，达到上限。" % [c.name, c.daily_limit]
+	return ""
+
+
+func _emit_card_danmaku(c: Card) -> void:
+	if not tutorial_active:
+		return
+	var messages: Array = []
+	var intensity: int = 1
+	match c.effect_id:
+		"buy_basic", "buy_plus", "small_buy":
+			messages = ["有人进场了！", "涨了涨了！", "买盘来了！"]
+		"hype_basic", "hype_plus", "troll_swarm":
+			messages = ["要起飞了！", "冲冲冲！", "大V发话了！", "热度起来了！"]
+			intensity = 2
+		"sell_basic", "sell_plus", "small_sell":
+			messages = ["有人跑了？", "获利了结很正常", "先落袋一部分"]
+		"panic_basic", "crash_basic", "reward_blade":
+			messages = ["坏消息来了！", "别踩踏！", "有点慌"]
+			intensity = 2
+		_:
+			return
+	emit_signal("danmaku_requested", messages, intensity)
 
 
 # ----- 跳过本回合剩余出牌, 直接结算 -----
@@ -331,8 +400,16 @@ func _dispatch_effect(effect_id: String) -> void:
 #   SELL + sell_pct > 0     → 要求 shares  >= 1
 # SKILL/EVENT 不受此检查
 func _has_resources_for(c: Card) -> bool:
-	if not (c.is_buy() or c.is_sell()):
-		return true
+	var reason: String = _resource_block_reason(c)
+	if reason != "":
+		_log(reason)
+		return false
+	return true
+
+
+func _resource_block_reason(c: Card) -> String:
+	if c == null or not (c.is_buy() or c.is_sell()):
+		return ""
 	var cfg = get_node_or_null("/root/Cfg")
 	var tpl: Variant = null if cfg == null else cfg.get_card_template(c.effect_id)
 	var ts: int = 0
@@ -345,14 +422,16 @@ func _has_resources_for(c: Card) -> bool:
 	if c.is_buy():
 		var need_cash: float = (float(ts) * price) if ts > 0 else (price if bp > 0.0 else 0.0)
 		if need_cash > 0.0 and cash < need_cash:
-			_log("现金不足, 无法打出「%s」(需要 ≥ ¥%s)" % [c.name, _fmt_money(need_cash)])
-			return false
+			return "现金不足：打出「%s」需要至少 ¥%s，当前现金 ¥%s。" % [
+				c.name, _fmt_money(need_cash), _fmt_money(cash)
+			]
 	else: # is_sell
 		var need_shares: int = ts if ts > 0 else (1 if sp > 0.0 else 0)
 		if need_shares > 0 and shares < need_shares:
-			_log("持仓不足, 无法打出「%s」(需要 ≥ %d 股)" % [c.name, need_shares])
-			return false
-	return true
+			return "持仓不足：打出「%s」需要至少 %d 股，当前持仓 %d 股。" % [
+				c.name, need_shares, shares
+			]
+	return ""
 
 
 # ===========================================================
@@ -613,6 +692,7 @@ func _buy_with_cash(spend: float, trade_price_pct: float = 0.0) -> void:
 		_log("  资金过少, 无法成交 1 股")
 		return
 	var cost: float = float(n) * price
+	_update_avg_cost_on_buy(n, cost)
 	cash -= cost
 	shares += n
 	_log("  买入 %d 股 @ ¥%.2f, 花费 ¥%s" % [n, price, _fmt_money(cost)])
@@ -629,11 +709,24 @@ func _buy_shares(n: int, trade_price_pct: float = 0.0) -> void:
 	if cost > cash:
 		_log("  现金不足, 无法成交 %d 股 @ ¥%.2f" % [n, price])
 		return
+	_update_avg_cost_on_buy(n, cost)
 	cash -= cost
 	shares += n
 	_log("  买入 %d 股 @ ¥%.2f, 花费 ¥%s" % [n, price, _fmt_money(cost)])
 	if trade_price_pct != 0.0:
 		apply_price_change(trade_price_pct)
+
+
+func _update_avg_cost_on_buy(n: int, cost: float) -> void:
+	if n <= 0 or cost <= 0.0:
+		return
+	var old_shares: int = shares
+	var new_shares: int = old_shares + n
+	if new_shares <= 0:
+		avg_cost_price = 0.0
+		return
+	var old_cost: float = avg_cost_price * float(old_shares)
+	avg_cost_price = (old_cost + cost) / float(new_shares)
 
 
 func _sell_shares(n: int, trade_price_pct: float = 0.0) -> void:
@@ -644,6 +737,8 @@ func _sell_shares(n: int, trade_price_pct: float = 0.0) -> void:
 	var income: float = float(n) * price
 	shares -= n
 	cash += income
+	if shares <= 0:
+		avg_cost_price = 0.0
 	_log("  卖出 %d 股 @ ¥%.2f, 收入 ¥%s" % [n, price, _fmt_money(income)])
 	if trade_price_pct != 0.0:
 		apply_price_change(trade_price_pct)
@@ -678,6 +773,49 @@ func draw_cards(n: int) -> int:
 	if got > 0:
 		emit_signal("hand_changed")
 	return got
+
+
+func tutorial_ensure_card_in_hand(effect_id: String) -> bool:
+	if effect_id == "" or is_level_over:
+		return false
+	for c in hand:
+		if c.effect_id == effect_id:
+			emit_signal("hand_changed")
+			return true
+	if hand.size() >= HAND_LIMIT:
+		return false
+	var card: Card = _take_card_by_effect_from(draw_pile, effect_id)
+	if card == null:
+		card = _take_card_by_effect_from(discard_pile, effect_id)
+	if card == null:
+		card = CardDatabase.make_by_effect(effect_id, "tutorial_%s_%d" % [effect_id, Time.get_ticks_msec()])
+	if card == null:
+		return false
+	hand.append(card)
+	_log("  [教学] 发给你「%s」" % card.name)
+	emit_signal("hand_changed")
+	emit_signal("state_changed")
+	return true
+
+
+func tutorial_set_min_action_points(min_points: int) -> void:
+	if phase != Phase.PLAY or is_level_over:
+		return
+	var target: int = max(0, min_points)
+	if action_points >= target:
+		return
+	action_points = target
+	emit_signal("hand_changed")
+	emit_signal("state_changed")
+
+
+func _take_card_by_effect_from(pile: Array, effect_id: String) -> Card:
+	for i in range(pile.size()):
+		var c: Card = pile[i]
+		if c.effect_id == effect_id:
+			pile.remove_at(i)
+			return c
+	return null
 
 
 # 整局第一回合保底: 先种 1 买 + 1 卖 + 1 技能 (策划 7.2.8)
@@ -772,7 +910,7 @@ func _start_turn() -> void:
 	emit_signal("hand_changed")
 	emit_signal("state_changed")
 	# 突发事件刷新: 每天第 1 / 第 5 回合开盘抽牌后
-	if turn_in_day == 1 or turn_in_day == 5:
+	if (turn_in_day == 1 or turn_in_day == 5) and not tutorial_active:
 		_trigger_random_event()
 
 
@@ -1016,6 +1154,7 @@ func _settle_level() -> void:
 	# 落清算金额; 持仓清零便于 UI 显示
 	cash = final_assets
 	shares = 0
+	avg_cost_price = 0.0
 	var victory: bool = final_assets >= VICTORY_TARGET
 	if victory:
 		_log("[胜利] 达到目标 ¥%s" % _fmt_money(VICTORY_TARGET))
@@ -1083,6 +1222,10 @@ func emotion_state() -> String:
 
 func get_holding_value() -> float:
 	return float(shares) * price
+
+
+func get_average_cost_price() -> float:
+	return avg_cost_price if shares > 0 else 0.0
 
 
 func get_total_assets() -> float:
@@ -1351,7 +1494,7 @@ func _check_opponent_spawn() -> void:
 
 func _spawn_opponent() -> void:
 	_opponent_state.spawn(price)
-	_log("[庄家] %s 入场！做空 %d 股 @ ¥%.2f, 平仓线 ¥%.2f, 现金 ¥%s" % [
+	_log("[庄家] %s 入场！做空 %d 股 @ ¥%.2f, 爆仓线 ¥%.2f, 现金 ¥%s" % [
 		_opponent_state.display_name, _opponent_state.short_position,
 		_opponent_state.entry_avg_price, _opponent_state.liquidation_price,
 		_fmt_money(_opponent_state.cash)])
@@ -1444,7 +1587,7 @@ func _apply_opponent_action(decision: Dictionary) -> void:
 				var old_liq := _opponent_state.liquidation_price
 				_opponent_state.cover(m)
 				event_label = "平仓"
-				_log("[庄家] %s 主动减仓 %d 股, 平仓线 ¥%.1f → ¥%.1f" % [
+				_log("[庄家] %s 主动减仓 %d 股, 爆仓线 ¥%.1f → ¥%.1f" % [
 					_opponent_state.display_name, m, old_liq, _opponent_state.liquidation_price])
 			"pump_trap":
 				var y: float = float(params.get("Y", _opponent_state.pump_trap_y_pct))
