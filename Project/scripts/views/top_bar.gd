@@ -6,6 +6,7 @@ extends Control
 
 const UF = preload("res://scripts/views/ui_factory.gd")
 const Event = preload("res://scripts/event.gd")
+const EmotionMarker = preload("res://scripts/views/emotion_marker.gd")
 
 @onready var left_bar: Panel = $LeftBar
 @onready var mid_bar: Panel = $MidBar
@@ -39,7 +40,9 @@ var _tip_effect: RichTextLabel = null
 var _emotion_border: ColorRect = null
 var _emotion_bg: ColorRect = null
 var _emotion_fill: ColorRect = null
-var _emotion_marker: ColorRect = null
+var _emotion_marker: Control = null      # EmotionMarker (Control + _draw)
+var _emotion_marker_arrow: Polygon2D = null  # 兼容字段, 已弃用 (由 EmotionMarker 内部画)
+var _emotion_segments: Array[ColorRect] = []
 var _emotion_tick_labels: Array[Label] = []
 
 # 天赋图标缓存 (slot_id → Panel)
@@ -47,6 +50,20 @@ var _talent_icon_nodes: Dictionary = {}
 
 const EMOTION_BAR_HEIGHT: float = 14.0
 const EMOTION_TICK_COUNT: int = 11  # 0/10/.../100
+# 11 段色阶 (参考图: 左红→中金→右暗灰)
+const EMOTION_SEGMENT_COLORS: Array[Color] = [
+	Color("#d13434"),  # 0  极度悲观 红
+	Color("#d44a2a"),
+	Color("#d56a20"),
+	Color("#dc8a1c"),
+	Color("#e2a51a"),
+	Color("#e6b218"),  # 5  中位 金
+	Color("#cf9e1c"),
+	Color("#a07a2a"),
+	Color("#6a5b3a"),
+	Color("#4d4742"),
+	Color("#3a3540"),  # 10 极度乐观/冷静 暗灰
+]
 
 
 func _ready() -> void:
@@ -98,19 +115,25 @@ func _decorate_emotion_icon() -> void:
 func _build_emotion_bar() -> void:
 	if _emotion_border != null:
 		return
-	_emotion_border = _new_rect(UF.COL_GOLD, emotion_bar_slot)
+	# 外框 (兼容字段, 隐藏; 参考图无金色外框)
+	_emotion_border = _new_rect(Color(0, 0, 0, 0), emotion_bar_slot)
+	_emotion_border.visible = false
+	# 内底深色
 	_emotion_bg = _new_rect(Color("#1a1320"), emotion_bar_slot)
-	# 渐变填充由代码每帧按值更新颜色; 这里建一个 fill 并加几段静态色块作"刻度色阶"
+	# 11 段静态色块 (左红→中金→右暗灰)
+	for i in range(EMOTION_SEGMENT_COLORS.size()):
+		var seg := ColorRect.new()
+		seg.color = EMOTION_SEGMENT_COLORS[i]
+		seg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		emotion_bar_slot.add_child(seg)
+		_emotion_segments.append(seg)
+	# 旧 fill 字段保留隐藏 (不再用大块彩色覆盖底部色阶)
 	_emotion_fill = _new_rect(UF.COL_UP, emotion_bar_slot)
-	# Marker 三角形(用 ColorRect 模拟竖线)
-	_emotion_marker = _new_rect(Color.WHITE, emotion_bar_slot)
-	# 刻度小竖线: 在 bar 上方/内, 11 段
-	for i in range(EMOTION_TICK_COUNT):
-		var tick := ColorRect.new()
-		tick.color = Color(1, 1, 1, 0.3)
-		tick.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		emotion_bar_slot.add_child(tick)
-		_emotion_tick_labels.append(_label_tick(tick))
+	_emotion_fill.visible = false
+	# Marker (Control + _draw 画 1px 白竖线 + 顶部小三角)
+	_emotion_marker = EmotionMarker.new()
+	emotion_bar_slot.add_child(_emotion_marker)
+	# 旧 11 段细竖线刻度已删除 (用 11 段色块底色替代)
 
 
 func _label_tick(_tick: ColorRect) -> Label:
@@ -156,27 +179,22 @@ func _layout_emotion_bar() -> void:
 		return
 	var bar_h: float = EMOTION_BAR_HEIGHT
 	var bar_y: float = max(0.0, (slot_size.y - bar_h) * 0.5)
-	# 外框
-	_emotion_border.position = Vector2(0, bar_y)
-	_emotion_border.size = Vector2(slot_size.x, bar_h)
-	# 内底
-	_emotion_bg.position = Vector2(1, bar_y + 1)
-	_emotion_bg.size = Vector2(max(0.0, slot_size.x - 2), bar_h - 2)
-	# Tick 刻度竖线 (在 bar 内, 等分)
-	var inner_x: float = 1.0
-	var inner_w: float = max(0.0, slot_size.x - 2.0)
-	for i in range(_emotion_tick_labels.size()):
-		var idx: int = i
-		var t: Node = emotion_bar_slot.get_child(min(emotion_bar_slot.get_child_count() - 1, 3 + idx))
-		if t is ColorRect:
-			var tx: float = inner_x + inner_w * float(idx) / float(EMOTION_TICK_COUNT - 1) - 0.5
-			(t as ColorRect).position = Vector2(tx, bar_y + 1.0)
-			(t as ColorRect).size = Vector2(1.0, bar_h - 2.0)
+	# 内底 (深色)
+	_emotion_bg.position = Vector2(0, bar_y)
+	_emotion_bg.size = Vector2(slot_size.x, bar_h)
+	# 11 段静态色块: 等分宽度, 段间留 1px 间隙 (像素感)
+	var seg_gap: float = 1.0
+	var total_gap: float = seg_gap * float(_emotion_segments.size() - 1)
+	var seg_w: float = max(2.0, (slot_size.x - total_gap) / float(_emotion_segments.size()))
+	for i in range(_emotion_segments.size()):
+		var sx: float = float(i) * (seg_w + seg_gap)
+		_emotion_segments[i].position = Vector2(sx, bar_y + 1.0)
+		_emotion_segments[i].size = Vector2(seg_w, bar_h - 2.0)
 	_refresh_emotion_bar()
 
 
 func _refresh_emotion_bar() -> void:
-	if _emotion_fill == null or _emotion_bg == null:
+	if _emotion_bg == null:
 		return
 	var bull: int = max(int(Game.bull), 0)
 	var bear: int = max(int(Game.bear), 0)
@@ -184,22 +202,10 @@ func _refresh_emotion_bar() -> void:
 	var ratio: float = float(bull) / float(total)  # 0..1
 	var bg_pos: Vector2 = _emotion_bg.position
 	var bg_size: Vector2 = _emotion_bg.size
-	_emotion_fill.position = bg_pos
-	_emotion_fill.size = Vector2(bg_size.x * ratio, bg_size.y)
-	# 颜色按情绪渐变: 低=红, 中=金, 高=绿
-	var col: Color
-	if ratio < 0.4:
-		col = UF.COL_DOWN
-	elif ratio < 0.6:
-		col = UF.COL_GOLD
-	else:
-		col = UF.COL_UP
-	_emotion_fill.color = col
-	# Marker (白色竖线)
+	# Marker (Control 自绘竖线 + 三角)
 	if _emotion_marker != null:
-		var mx: float = bg_pos.x + bg_size.x * ratio - 1.0
-		_emotion_marker.position = Vector2(mx, bg_pos.y - 3.0)
-		_emotion_marker.size = Vector2(2.0, bg_size.y + 6.0)
+		var mx: float = bg_pos.x + bg_size.x * ratio
+		_emotion_marker.update_marker(mx, bg_pos.y, bg_size.y)
 
 
 func _refresh() -> void:
