@@ -330,6 +330,14 @@ func _build_ui() -> void:
 	_arrow.size = Vector2(18.0, 14.0)
 	add_child(_arrow)
 
+	# 点击空白前进: 把 scrim / 对话框 / intro 面板的 gui_input 全部连到统一 handler
+	_full_scrim.gui_input.connect(_on_overlay_input)
+	for scrim in _scrims:
+		(scrim as ColorRect).gui_input.connect(_on_overlay_input)
+	_dialog.gui_input.connect(_on_overlay_input)
+	_player_dialog.gui_input.connect(_on_overlay_input)
+	_intro_panel.gui_input.connect(_on_overlay_input)
+
 
 func _box_style(border: Color, margin: float) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
@@ -618,6 +626,7 @@ func _show_intro_step(step: Dictionary) -> void:
 	_clear_card_highlight()
 	_intro_panel.visible = true
 	_intro_button.text = String(step.get("button", "知道了"))
+	_intro_button.visible = false
 	call_deferred("_update_layout")
 
 
@@ -666,16 +675,14 @@ func _enter_step() -> void:
 	_prompt_text.text = String(step.get("prompt", ""))
 	var button_text: String = String(step.get("button", "下一步"))
 	if _is_step_shop_guide(step):
-		var force_click: bool = bool(step.get("force_click", false))
-		var dialog_next: bool = bool(step.get("dialog_next", false))
-		_next_button.visible = not force_click
-		_next_button.text = button_text if dialog_next else "知道了"
+		_next_button.visible = false
+		_next_button.text = button_text
 		_prompt.visible = false
 		_arrow.visible = false
 		_clear_card_highlight()
 		_update_shop_button_text()
 	else:
-		_next_button.visible = button_text != ""
+		_next_button.visible = false
 		_next_button.text = button_text
 		_prompt.visible = String(step.get("prompt", "")) != ""
 		_arrow.visible = _prompt.visible
@@ -684,16 +691,32 @@ func _enter_step() -> void:
 		_restart_highlight_pulse()
 
 
+func _on_overlay_input(event: InputEvent) -> void:
+	if not _active:
+		return
+	if not (event is InputEventMouseButton):
+		return
+	var mb: InputEventMouseButton = event as InputEventMouseButton
+	if not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
+		return
+	_try_advance_by_click()
+
+
+func _try_advance_by_click() -> void:
+	if _step_index < 0 or _step_index >= _steps.size():
+		return
+	var step: Dictionary = _steps[_step_index]
+	if String(step.get("wait", "")) != "":
+		return
+	if bool(step.get("force_click", false)):
+		return
+	_on_next_pressed()
+
+
 func _on_next_pressed() -> void:
 	if not _active:
 		return
 	var step: Dictionary = _steps[_step_index]
-	if _is_step_shop_guide(step):
-		if bool(step.get("dialog_next", false)):
-			_go_next()
-			return
-		_close_shop_dialog()
-		return
 	if bool(step.get("finish", false)):
 		_finish()
 	else:
@@ -913,9 +936,9 @@ func _layout_embedded_shop_guide() -> void:
 	_player_dialog.visible = false
 	_intro_panel.visible = false
 	_dialog.visible = true
-	_next_button.visible = not force_click
+	_next_button.visible = false
 	var button_text: String = String(step.get("button", "知道了"))
-	_next_button.text = button_text if dialog_next else "知道了"
+	_next_button.text = button_text
 
 	var target_ctrl := _current_target_control()
 	var target_rect := _current_target_rect(target_ctrl)
