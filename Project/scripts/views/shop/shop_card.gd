@@ -13,6 +13,7 @@ signal card_hovered(is_hovering: bool)
 @onready var lbl_desc: Label = $CardVisual/VBox/LblDesc
 @onready var lbl_price: Label = $LblPrice
 @onready var btn_action: Button = $BtnAction
+@onready var icon_tex: TextureRect = get_node_or_null("CardVisual/VBox/IconSlot/Icon")
 
 const HOVER_SCALE: float = 1.22
 const TWEEN_DURATION: float = 0.15
@@ -57,6 +58,7 @@ func setup(card: Card, price: int, action_text: String, action_color: Color, can
 	btn_action.disabled = not can_afford
 	btn_action.visible = show_action
 	lbl_price.visible = show_action
+	_apply_card_icon(card)
 
 
 # 天赋卡: 复用同一张视觉, 但 cost 行显示「天赋」标签, 颜色统一用 highlight 金色
@@ -87,6 +89,7 @@ func setup_talent(talent: Talent, can_afford: bool, action_text: String = "购�
 	btn_action.disabled = not can_afford
 	btn_action.visible = show_action
 	lbl_price.visible = show_action
+	_clear_icon()
 
 
 func _apply_visual_style(col: Color) -> void:
@@ -121,3 +124,31 @@ func _tween_scale(target: Vector2) -> void:
 		_tween.kill()
 	_tween = create_tween()
 	_tween.tween_property(card_visual, "scale", target, TWEEN_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+
+
+# 加载卡牌图标 (复用手牌的 UF.card_icon_path_for 解析); 找不到时隐藏 Icon
+func _apply_card_icon(card: Card) -> void:
+	if icon_tex == null:
+		icon_tex = get_node_or_null("CardVisual/VBox/IconSlot/Icon")
+	if icon_tex == null:
+		return
+	var path: String = UF.card_icon_path_for(card.name, card.image_path)
+	if path == "":
+		icon_tex.texture = null
+		icon_tex.visible = false
+		return
+	var tex = load(path)
+	if tex is Texture2D:
+		icon_tex.texture = tex as Texture2D
+		icon_tex.visible = true
+	else:
+		icon_tex.texture = null
+		icon_tex.visible = false
+
+
+func _clear_icon() -> void:
+	if icon_tex == null:
+		icon_tex = get_node_or_null("CardVisual/VBox/IconSlot/Icon")
+	if icon_tex != null:
+		icon_tex.texture = null
+		icon_tex.visible = false

@@ -27,7 +27,7 @@ var TURNS_PER_DAY: int = 10
 var START_CASH: float = 100000.0
 var VICTORY_TARGET: float = 120000.0          # 第一关
 var INITIAL_PRICE: float = 100.0
-var SETTLE_DISCOUNT: float = 0.5              # 周五未卖筹码强制折价
+var DAY_CLOSE_DISCOUNT: float = 0.8           # 每日尾盘强制清仓折价 (尾盘价 × 80%)
 var FIRST_TURN_DRAW: int = 6                  # 每回合开局摸牌数 (改版后每个回合都重抽; 整局首回合先 seed 1 买 1 卖 1 技能再补到这个数)
 var TURN_DRAW: int = 6                        # 兼容旧 balance.json: 现已与 FIRST_TURN_DRAW 等价; 不再单独使用
 var HAND_LIMIT: int = 10
@@ -371,7 +371,7 @@ func _apply_balance_from_cfg() -> void:
 	if b.has("START_CASH"): START_CASH = float(b["START_CASH"])
 	if b.has("VICTORY_TARGET"): VICTORY_TARGET = float(b["VICTORY_TARGET"])
 	if b.has("INITIAL_PRICE"): INITIAL_PRICE = float(b["INITIAL_PRICE"])
-	if b.has("SETTLE_DISCOUNT"): SETTLE_DISCOUNT = float(b["SETTLE_DISCOUNT"])
+	if b.has("DAILY_SETTLE_DISCOUNT"): DAY_CLOSE_DISCOUNT = float(b["DAILY_SETTLE_DISCOUNT"])
 	if b.has("FIRST_TURN_DRAW"): FIRST_TURN_DRAW = int(b["FIRST_TURN_DRAW"])
 	if b.has("TURN_DRAW"): TURN_DRAW = int(b["TURN_DRAW"])
 	if b.has("HAND_LIMIT"): HAND_LIMIT = int(b["HAND_LIMIT"])
@@ -1206,6 +1206,17 @@ func _settle_turn() -> void:
 func _end_day() -> void:
 	# 一天 10 回合打完
 	_log("==== 第 %d 天 收盘 ¥%.2f ====" % [day, price])
+	# 尾盘强制清仓: 剩余筹码 × 当日收盘价 × 80% 折算成现金 (与教学话术一致: 当天出不掉只能八折贱卖)
+	var forced_shares: int = shares
+	var forced_proceeds: float = 0.0
+	if forced_shares > 0:
+		forced_proceeds = float(forced_shares) * price * DAY_CLOSE_DISCOUNT
+		cash += forced_proceeds
+		_log("  尾盘强制清仓: %d 股 × ¥%.2f × %.0f%% = ¥%s" % [
+			forced_shares, price, DAY_CLOSE_DISCOUNT * 100.0,
+			_fmt_money(forced_proceeds)])
+		shares = 0
+		avg_cost_price = 0.0
 	# 当日结算摘要
 	day_close_summary = {
 		"day": day,
@@ -1217,6 +1228,9 @@ func _end_day() -> void:
 		"shares": shares,
 		"holding_value": get_holding_value(),
 		"cash": cash,
+		"forced_liquidation_shares": forced_shares,
+		"forced_liquidation_proceeds": forced_proceeds,
+		"forced_discount": DAY_CLOSE_DISCOUNT,
 	}
 	emit_signal("day_ended", day)
 	if day >= DAYS_PER_LEVEL:
@@ -1351,14 +1365,15 @@ func leave_shop_to_next_day() -> void:
 
 
 func _settle_level() -> void:
-	# 周五结算: 未卖筹码 × 当前股价 × 50% 强制折算
-	var liquidation: float = float(shares) * price * SETTLE_DISCOUNT
+	# 关卡结算: 第 5 天尾盘已经走过 _end_day 的 80% 强制清仓, 这里 shares 应已为 0;
+	# 极端兜底: 如果还有持仓, 按当前价 100% 折算 (不再额外打折)
+	var liquidation: float = float(shares) * price
 	var final_assets: float = cash + liquidation
 	is_level_over = true
 	phase = Phase.OVER
 	_log("==== 关卡结算 ====")
-	_log("现金 ¥%s + 持仓折价 (¥%.2f × %d × %.0f%%) = ¥%s" % [
-		_fmt_money(cash), price, shares, SETTLE_DISCOUNT * 100.0,
+	_log("现金 ¥%s + 持仓 (¥%.2f × %d) = ¥%s" % [
+		_fmt_money(cash), price, shares,
 		_fmt_money(final_assets)
 	])
 	# 落清算金额; 持仓清零便于 UI 显示

@@ -400,7 +400,7 @@ func _draw_daily_candles(r: Rect2) -> void:
 		UF.COL_TEXT_DIM, 1.0, 4.0, true)
 	_draw_right_axis_label(draw_x, draw_y, draw_w, draw_h, base_y, "开 ¥%.2f" % day_base, UF.COL_TEXT_DIM, 11)
 	if avg_cost_line > 0.0:
-		_draw_horizontal_price_line(draw_x, draw_y, draw_w, draw_h, p_min, p_max, avg_cost_line, "成本 ¥%.2f" % avg_cost_line, UF.COL_BLUE)
+		_draw_horizontal_price_line(draw_x, draw_y, draw_w, draw_h, p_min, p_max, avg_cost_line, "成本 ¥%.2f" % avg_cost_line, Color("#fae1b9"))
 	if liquidation_line > 0.0:
 		_draw_horizontal_price_line(draw_x, draw_y, draw_w, draw_h, p_min, p_max, liquidation_line, "爆仓 ¥%.1f" % liquidation_line, UF.COL_DOWN)
 

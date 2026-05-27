@@ -1,12 +1,12 @@
 [gd_scene format=3 uid="uid://63mxpljw8fxt"]
 
 [ext_resource type="Script" uid="uid://d1blbpqbkg6ok" path="res://scripts/main.gd" id="1_main"]
-[ext_resource type="PackedScene" uid="uid://bf1y7frlys8o1" path="res://scenes/ui/top_bar.tscn" id="2_top_bar"]
+[ext_resource type="PackedScene" path="res://scenes/ui/top_bar.tscn" id="2_top_bar"]
 [ext_resource type="PackedScene" uid="uid://bown1hmc4qvnx" path="res://scenes/ui/enemy_hp_bar.tscn" id="3_enemy_hp_bar"]
 [ext_resource type="PackedScene" uid="uid://csmfjxrx51het" path="res://scenes/ui/chart_panel.tscn" id="4_chart"]
-[ext_resource type="PackedScene" path="res://scenes/ui/data_panel.tscn" id="5_data"]
+[ext_resource type="PackedScene" uid="uid://biieas1ndb020" path="res://scenes/ui/data_panel.tscn" id="5_data"]
 [ext_resource type="PackedScene" path="res://scenes/ui/action_bar.tscn" id="6_action"]
-[ext_resource type="PackedScene" uid="uid://dnwopclkbknh0" path="res://scenes/ui/enemy_panel.tscn" id="7_enemy"]
+[ext_resource type="PackedScene" path="res://scenes/ui/enemy_panel.tscn" id="7_enemy"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hand_panel.tscn" id="8_hand"]
 [ext_resource type="PackedScene" path="res://scenes/ui/turn_panel.tscn" id="9_turn"]
 [ext_resource type="PackedScene" path="res://scenes/ui/player_panel.tscn" id="10_player"]
@@ -31,7 +31,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.024, 0.031, 0.051, 1)
+color = Color(0.011764706, 0.05882353, 0.16078432, 1)
 
 [node name="TopBar" parent="." unique_id=26865201 instance=ExtResource("2_top_bar")]
 layout_mode = 0

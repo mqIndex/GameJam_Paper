@@ -73,7 +73,8 @@ func _refresh_header() -> void:
 		var pnl: float = s["day_pnl"]
 		var pnl_str: String = "%s¥%s" % ["+" if pnl >= 0 else "-", UF.fmt_money(abs(pnl))]
 		var price_pct: float = s["price_change_pct"]
-		lbl_summary.text = (
+		var forced_shares: int = int(s.get("forced_liquidation_shares", 0))
+		var summary: String = (
 			"开盘 ¥%.2f → 收盘 ¥%.2f (%+.2f%%)  ·  持仓 %d 股, 市值 ¥%s\n" +
 			"现金 ¥%s  ·  总资产 ¥%s  ·  今日盈亏 %s"
 		) % [
@@ -82,6 +83,14 @@ func _refresh_header() -> void:
 			UF.fmt_money(s["cash"]), UF.fmt_money(s["total_assets"]),
 			pnl_str
 		]
+		if forced_shares > 0:
+			var discount: float = float(s.get("forced_discount", 0.8))
+			var proceeds: float = float(s.get("forced_liquidation_proceeds", 0.0))
+			summary += "\n尾盘强制清仓: %d 股 × ¥%.2f × %.0f%% = ¥%s" % [
+				forced_shares, float(s["close_price"]), discount * 100.0,
+				UF.fmt_money(proceeds)
+			]
+		lbl_summary.text = summary
 
 	if _tutorial_button_override != "":
 		btn_leave_shop.text = _tutorial_button_override
