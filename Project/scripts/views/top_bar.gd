@@ -49,18 +49,6 @@ var _emotion_tick_labels: Array[Label] = []
 # 天赋图标缓存 (slot_id → Panel)
 var _talent_icon_nodes: Dictionary = {}
 
-# 情绪图标 (根据 Game.bull 0-100 切换 5 张 png)
-var _emotion_icon_tex: TextureRect = null
-const EMOTION_ICON_PATHS: Array[String] = [
-	"res://assets/ui/enemy_hp_bar/00.png",   # 0-24
-	"res://assets/ui/enemy_hp_bar/25.png",   # 25-49
-	"res://assets/ui/enemy_hp_bar/50.png",   # 50-74
-	"res://assets/ui/enemy_hp_bar/75.png",   # 75-99
-	"res://assets/ui/enemy_hp_bar/100.png",  # 100
-]
-var _emotion_icon_textures: Array[Texture2D] = []
-var _emotion_icon_index: int = -1
-
 const EMOTION_BAR_HEIGHT: float = 14.0
 const EMOTION_TICK_COUNT: int = 11  # 0/10/.../100
 # 11 段色阶 (左暗灰→中金→右红, 与 marker ratio = bull/total 同向)
@@ -99,58 +87,30 @@ func _ready() -> void:
 
 
 func _decorate_emotion_icon() -> void:
-	if icon_emotion == null:
+	if icon_emotion == null or icon_emotion.has_node("LblIcon"):
 		return
-	# 预加载 5 张图标 (失败时退回 null)
-	if _emotion_icon_textures.is_empty():
-		for p in EMOTION_ICON_PATHS:
-			var tex: Texture2D = null
-			if ResourceLoader.exists(p):
-				tex = load(p) as Texture2D
-			_emotion_icon_textures.append(tex)
-	# 透明背景 (移除原红色圆角底)
-	var sb := StyleBoxEmpty.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = UF.COL_NEON_RED
+	sb.border_color = UF.COL_BG_DEEP
+	sb.border_width_left = 1
+	sb.border_width_right = 1
+	sb.border_width_top = 1
+	sb.border_width_bottom = 1
+	sb.corner_radius_top_left = 12
+	sb.corner_radius_top_right = 12
+	sb.corner_radius_bottom_left = 12
+	sb.corner_radius_bottom_right = 12
 	icon_emotion.add_theme_stylebox_override("panel", sb)
-	# 移除旧的 LblIcon (如果场景里残留)
-	if icon_emotion.has_node("LblIcon"):
-		var old := icon_emotion.get_node("LblIcon")
-		old.queue_free()
-	# 创建 TextureRect 铺满 Panel
-	if not icon_emotion.has_node("EmotionIcon"):
-		var tr := TextureRect.new()
-		tr.name = "EmotionIcon"
-		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		tr.anchor_right = 1.0
-		tr.anchor_bottom = 1.0
-		icon_emotion.add_child(tr)
-		_emotion_icon_tex = tr
-	else:
-		_emotion_icon_tex = icon_emotion.get_node("EmotionIcon") as TextureRect
-	_update_emotion_icon()
-
-
-# 根据 Game.bull (0..100) 选择对应图标:
-# 0-24 → 00.png, 25-49 → 25.png, 50-74 → 50.png, 75-99 → 75.png, 100 → 100.png
-func _emotion_icon_index_for(value: int) -> int:
-	if value >= 100: return 4
-	if value >= 75:  return 3
-	if value >= 50:  return 2
-	if value >= 25:  return 1
-	return 0
-
-
-func _update_emotion_icon() -> void:
-	if _emotion_icon_tex == null:
-		return
-	var v: int = clamp(int(Game.bull), 0, 100)
-	var idx: int = _emotion_icon_index_for(v)
-	if idx == _emotion_icon_index:
-		return
-	_emotion_icon_index = idx
-	if idx >= 0 and idx < _emotion_icon_textures.size():
-		_emotion_icon_tex.texture = _emotion_icon_textures[idx]
+	var l := Label.new()
+	l.name = "LblIcon"
+	l.text = "!"
+	l.add_theme_font_size_override("font_size", 14)
+	l.add_theme_color_override("font_color", UF.COL_BG_DEEP)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.anchor_right = 1.0
+	l.anchor_bottom = 1.0
+	icon_emotion.add_child(l)
 
 
 func _build_emotion_bar() -> void:
@@ -261,7 +221,6 @@ func _refresh() -> void:
 		lbl_bear.text = "%d 下跌" % Game.bear
 	lbl_emotion_state.text = Game.emotion_state()
 	_refresh_emotion_bar()
-	_update_emotion_icon()
 	_refresh_talent_icons()
 
 
