@@ -479,7 +479,7 @@ func _build_steps() -> void:
 		{
 			"action": "trigger_event",
 			"event_id": "black_swan",
-			"target_path": "TopBar/LeftBar/HBox/BtnEvent",
+			"target_path": "TopBar",
 			"dialog": "俗话说，天有不测风云。",
 			"prompt": "利空事件会直接改变市场环境。",
 			"button": "继续",
@@ -1105,21 +1105,36 @@ func _layout_embedded_shop_guide() -> void:
 func _pick_shop_dialog_rect(target_rect: Rect2, dialog_size: Vector2, force_near_target: bool) -> Rect2:
 	var center_x: float = (size.x - dialog_size.x) * 0.5
 	var center_y: float = size.y * 0.60 - dialog_size.y * 0.5
-	var candidates: Array = [
-		Rect2(Vector2(center_x, center_y), dialog_size),
-		Rect2(Vector2(center_x, 56.0), dialog_size),
-		Rect2(Vector2(center_x, size.y - dialog_size.y - 56.0), dialog_size),
-	]
+	var candidates: Array = []
+	var preferred_center := Vector2(size.x * 0.5, size.y * 0.60)
 	if target_rect.size.x > 0.0 and target_rect.size.y > 0.0:
-		var near_x: float = target_rect.get_center().x - dialog_size.x * 0.5
-		candidates.append(Rect2(Vector2(near_x, target_rect.end.y + 16.0), dialog_size))
-		candidates.append(Rect2(Vector2(near_x, target_rect.position.y - dialog_size.y - 16.0), dialog_size))
+		var near_x: float = clampf(
+			target_rect.get_center().x - dialog_size.x * 0.5,
+			16.0,
+			max(16.0, size.x - dialog_size.x - 16.0)
+		)
+		var below := Rect2(Vector2(near_x, target_rect.end.y + 16.0), dialog_size)
+		var above := Rect2(Vector2(near_x, target_rect.position.y - dialog_size.y - 16.0), dialog_size)
 		if force_near_target:
-			candidates.reverse()
+			candidates.append(below)
+			candidates.append(above)
+			candidates.append(Rect2(Vector2(center_x, size.y - dialog_size.y - 56.0), dialog_size))
+			candidates.append(Rect2(Vector2(center_x, 56.0), dialog_size))
+			preferred_center = Vector2(target_rect.get_center().x, target_rect.end.y + 16.0 + dialog_size.y * 0.5)
+		else:
+			candidates.append(Rect2(Vector2(center_x, center_y), dialog_size))
+			candidates.append(Rect2(Vector2(center_x, 56.0), dialog_size))
+			candidates.append(Rect2(Vector2(center_x, size.y - dialog_size.y - 56.0), dialog_size))
+			candidates.append(below)
+			candidates.append(above)
+	else:
+		candidates.append(Rect2(Vector2(center_x, center_y), dialog_size))
+		candidates.append(Rect2(Vector2(center_x, 56.0), dialog_size))
+		candidates.append(Rect2(Vector2(center_x, size.y - dialog_size.y - 56.0), dialog_size))
 	var avoid: Array = []
 	if target_rect.size.x > 0.0 and target_rect.size.y > 0.0:
 		avoid.append(target_rect)
-	return _pick_best_rect(candidates, avoid, Vector2(size.x * 0.5, size.y * 0.60))
+	return _pick_best_rect(candidates, avoid, preferred_center)
 
 
 func _layout_intro() -> void:

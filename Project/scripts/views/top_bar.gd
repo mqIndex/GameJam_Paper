@@ -1,6 +1,6 @@
 # TopBar — 拆分为 3 个独立 Bar
-# LeftBar: 第 N/M 天 + 第 X/Y 回合 + 突发事件按钮
-# MidBar: 市场情绪 (进度条 + 刻度) + 情绪状态文字
+# LeftBar: 第 N/M 天 + 第 X/Y 回合
+# MidBar: 市场情绪 (图标 + 进度条 + 状态文字)
 # RightBar: 已获取天赋小图标列表 + 暂停/播放/快进按钮
 extends Control
 
@@ -8,15 +8,31 @@ const UF = preload("res://scripts/views/ui_factory.gd")
 const Event = preload("res://scripts/event.gd")
 const EmotionMarker = preload("res://scripts/views/emotion_marker.gd")
 
+# 天赋 ID → logo 图片路径
+const TALENT_ICON_MAP: Dictionary = {
+	"cascade_combo": "res://data/talent/连携效应.png",
+	"influence":     "res://data/talent/影响力.png",
+}
+
+# 市场情绪图标: 5 级 (bull 0-24→00, 25-49→25, 50-74→50, 75-99→75, 100→100)
+const EMOTION_ICON_PATHS: Array[String] = [
+	"res://assets/ui/enemy_hp_bar/00.png",
+	"res://assets/ui/enemy_hp_bar/25.png",
+	"res://assets/ui/enemy_hp_bar/50.png",
+	"res://assets/ui/enemy_hp_bar/75.png",
+	"res://assets/ui/enemy_hp_bar/100.png",
+]
+var _emotion_icons: Array[CompressedTexture2D] = []
+var _last_emotion_icon_idx: int = -1
+
 @onready var left_bar: Panel = $LeftBar
 @onready var mid_bar: Panel = $MidBar
 @onready var right_bar: Panel = $RightBar
 
 @onready var lbl_day: Label = $LeftBar/HBox/LblDay
 @onready var lbl_turn: Label = $LeftBar/HBox/LblTurn
-@onready var btn_event: Button = $LeftBar/HBox/BtnEvent
 
-@onready var icon_emotion: Panel = $MidBar/HBox/IconEmotion
+@onready var icon_emotion: TextureRect = $MidBar/HBox/IconEmotion
 @onready var lbl_emotion_state: Label = $MidBar/HBox/LblEmotionState
 @onready var emotion_bar_slot: Control = $MidBar/HBox/EmotionBarSlot
 
@@ -28,14 +44,19 @@ const EmotionMarker = preload("res://scripts/views/emotion_marker.gd")
 @onready var lbl_bull: Label = $HBox/LblBull
 @onready var lbl_bear: Label = $HBox/LblBear
 
-# 突发事件 UI
+# 突发事件 tip / dialog (由 DataPanel 卡牌悬浮/点击调用)
 var _event_dialog: AcceptDialog = null
 var _event_msg: RichTextLabel = null
-var _event_image: TextureRect = null
 var _event_tip: PanelContainer = null
 var _tip_title: RichTextLabel = null
 var _tip_desc: RichTextLabel = null
 var _tip_effect: RichTextLabel = null
+
+# 市场情绪 hover tip (悬浮 MidBar 时展示)
+var _emotion_tip: PanelContainer = null
+var _emotion_tip_title: RichTextLabel = null
+var _emotion_tip_value: RichTextLabel = null
+var _emotion_tip_effect: RichTextLabel = null
 
 # 情绪进度条 (运行时构建)
 var _emotion_border: ColorRect = null
@@ -71,46 +92,51 @@ func _ready() -> void:
 	left_bar.add_theme_stylebox_override("panel", UF.panel_stylebox())
 	mid_bar.add_theme_stylebox_override("panel", UF.panel_stylebox())
 	right_bar.add_theme_stylebox_override("panel", UF.panel_stylebox())
-	_decorate_emotion_icon()
+	_load_emotion_icons()
 	_build_emotion_bar()
-	Game.state_changed.connect(_refresh)
-	Game.event_triggered.connect(_on_event_triggered)
 	_setup_event_dialog()
 	_setup_event_tip()
-	btn_event.pressed.connect(_on_btn_event_pressed)
-	btn_event.mouse_entered.connect(_on_btn_event_mouse_entered)
-	btn_event.mouse_exited.connect(_on_btn_event_mouse_exited)
+	_setup_emotion_tip()
+	mid_bar.mouse_filter = Control.MOUSE_FILTER_STOP
+	mid_bar.mouse_entered.connect(_on_emotion_mouse_entered)
+	mid_bar.mouse_exited.connect(_on_emotion_mouse_exited)
+	Game.state_changed.connect(_refresh)
+	Game.event_triggered.connect(_on_event_triggered)
 	resized.connect(_relayout_bars)
 	_relayout_bars()
-	_refresh_event_button()
 	_refresh()
 
 
-func _decorate_emotion_icon() -> void:
-	if icon_emotion == null or icon_emotion.has_node("LblIcon"):
+func _load_emotion_icons() -> void:
+	for path in EMOTION_ICON_PATHS:
+		var tex := load(path) as CompressedTexture2D
+		if tex != null:
+			_emotion_icons.append(tex)
+		else:
+			push_warning("TopBar: 无法加载情绪图标 %s" % path)
+	# 设定初始图标
+	if _emotion_icons.size() > 0:
+		icon_emotion.texture = _emotion_icons[0]
+
+
+func _refresh_emotion_icon() -> void:
+	if _emotion_icons.is_empty():
 		return
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = UF.COL_NEON_RED
-	sb.border_color = UF.COL_BG_DEEP
-	sb.border_width_left = 1
-	sb.border_width_right = 1
-	sb.border_width_top = 1
-	sb.border_width_bottom = 1
-	sb.corner_radius_top_left = 12
-	sb.corner_radius_top_right = 12
-	sb.corner_radius_bottom_left = 12
-	sb.corner_radius_bottom_right = 12
-	icon_emotion.add_theme_stylebox_override("panel", sb)
-	var l := Label.new()
-	l.name = "LblIcon"
-	l.text = "!"
-	l.add_theme_font_size_override("font_size", 14)
-	l.add_theme_color_override("font_color", UF.COL_BG_DEEP)
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	l.anchor_right = 1.0
-	l.anchor_bottom = 1.0
-	icon_emotion.add_child(l)
+	var bull: int = max(int(Game.bull), 0)
+	var idx: int
+	if bull >= 100:
+		idx = 4
+	elif bull >= 75:
+		idx = 3
+	elif bull >= 50:
+		idx = 2
+	elif bull >= 25:
+		idx = 1
+	else:
+		idx = 0
+	if idx != _last_emotion_icon_idx:
+		_last_emotion_icon_idx = idx
+		icon_emotion.texture = _emotion_icons[idx]
 
 
 func _build_emotion_bar() -> void:
@@ -121,7 +147,7 @@ func _build_emotion_bar() -> void:
 	_emotion_border.visible = false
 	# 内底深色
 	_emotion_bg = _new_rect(Color("#1a1320"), emotion_bar_slot)
-	# 11 段静态色块 (左红→中金→右暗灰)
+	# 11 段静态色块 (左暗灰→中金→右红)
 	for i in range(EMOTION_SEGMENT_COLORS.size()):
 		var seg := ColorRect.new()
 		seg.color = EMOTION_SEGMENT_COLORS[i]
@@ -220,6 +246,7 @@ func _refresh() -> void:
 	if lbl_bear != null:
 		lbl_bear.text = "%d 下跌" % Game.bear
 	lbl_emotion_state.text = Game.emotion_state()
+	_refresh_emotion_icon()
 	_refresh_emotion_bar()
 	_refresh_talent_icons()
 
@@ -251,39 +278,51 @@ func _refresh_talent_icons() -> void:
 		_talent_icon_nodes[tid] = icon
 
 
-func _make_talent_icon(t) -> Panel:
-	var p := Panel.new()
+func _make_talent_icon(t) -> TextureRect:
+	var icon_path: String = TALENT_ICON_MAP.get(t.id, "")
+	var p := TextureRect.new()
 	p.custom_minimum_size = Vector2(24, 24)
 	p.tooltip_text = "%s\n%s" % [t.name, t.description]
-	var sb := StyleBoxFlat.new()
-	# 按 effect_id hash 出一个颜色; 暂时统一霓虹紫 + 边
-	sb.bg_color = Color(UF.COL_NEON_PURPLE.r * 0.4, UF.COL_NEON_PURPLE.g * 0.4, UF.COL_NEON_PURPLE.b * 0.55, 1.0)
-	sb.border_color = UF.COL_NEON_PURPLE
-	sb.border_width_left = 1
-	sb.border_width_right = 1
-	sb.border_width_top = 1
-	sb.border_width_bottom = 1
-	sb.corner_radius_top_left = 3
-	sb.corner_radius_top_right = 3
-	sb.corner_radius_bottom_left = 3
-	sb.corner_radius_bottom_right = 3
-	p.add_theme_stylebox_override("panel", sb)
-	# 中央显示天赋名首字 (待美术补图标时换 TextureRect)
-	var l := Label.new()
-	l.text = (t.name as String).substr(0, 1) if t.name != "" else "?"
-	l.add_theme_font_size_override("font_size", 12)
-	l.add_theme_color_override("font_color", UF.COL_TEXT)
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	l.anchor_right = 1.0
-	l.anchor_bottom = 1.0
-	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	p.add_child(l)
+	p.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	p.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	if icon_path != "":
+		var tex = load(icon_path)
+		if tex is Texture2D:
+			p.texture = tex as Texture2D
+		else:
+			push_warning("TopBar: 无法加载天赋 logo %s" % icon_path)
+	else:
+		# 无 logo 的天赋: 仍然用文字首字 fallback
+		var placeholder := Panel.new()
+		placeholder.custom_minimum_size = Vector2(24, 24)
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(UF.COL_NEON_PURPLE.r * 0.4, UF.COL_NEON_PURPLE.g * 0.4, UF.COL_NEON_PURPLE.b * 0.55, 1.0)
+		sb.border_color = UF.COL_NEON_PURPLE
+		sb.border_width_left = 1
+		sb.border_width_right = 1
+		sb.border_width_top = 1
+		sb.border_width_bottom = 1
+		sb.corner_radius_top_left = 3
+		sb.corner_radius_top_right = 3
+		sb.corner_radius_bottom_left = 3
+		sb.corner_radius_bottom_right = 3
+		placeholder.add_theme_stylebox_override("panel", sb)
+		var l := Label.new()
+		l.text = (t.name as String).substr(0, 1) if t.name != "" else "?"
+		l.add_theme_font_size_override("font_size", 12)
+		l.add_theme_color_override("font_color", UF.COL_TEXT)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		l.anchor_right = 1.0
+		l.anchor_bottom = 1.0
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		placeholder.add_child(l)
+		p.add_child(placeholder)
 	return p
 
 
-# ============== 突发事件 UI ==============
-# 事件配图已迁移到 DataPanel.MascotSlot 显示, 此弹窗只保留文字描述
+# ============== 突发事件 tip / dialog (由 DataPanel 调用) ==============
+
 func _setup_event_dialog() -> void:
 	_event_dialog = AcceptDialog.new()
 	_event_dialog.exclusive = false
@@ -302,11 +341,6 @@ func _setup_event_dialog() -> void:
 	_event_msg.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_event_msg.add_theme_font_size_override("normal_font_size", 14)
 	_event_dialog.add_child(_event_msg)
-
-
-# 兼容空实现: 图片显示已迁移到 DataPanel.MascotSlot, 此处保留方法防外部调用报错
-func _apply_event_image(_image_path: String) -> void:
-	pass
 
 
 func _setup_event_tip() -> void:
@@ -343,7 +377,6 @@ func _make_rich(font_size: int) -> RichTextLabel:
 
 
 func _on_event_triggered(ev) -> void:
-	_refresh_event_button()
 	if ev == null:
 		return
 	if Game.tutorial_active:
@@ -362,59 +395,26 @@ func _on_event_triggered(ev) -> void:
 			cat_text = "中性"
 			cat_color = UF.COL_GOLD
 	_event_dialog.title = "突发事件 · %s" % cat_text
-	_apply_event_image(ev_obj.image_path)
 	_event_msg.text = "[color=#%s][b]%s[/b][/color]\n\n%s\n\n[color=#ffd166]%s[/color]" % [
 		cat_color.to_html(false), ev_obj.name, ev_obj.desc, ev_obj.effect_desc
 	]
 	_event_dialog.popup_centered()
 
 
-func _refresh_event_button() -> void:
-	var ev: Event = Game.current_event
-	if ev == null:
-		btn_event.text = "突发事件"
-		btn_event.add_theme_color_override("font_color", UF.COL_TEXT_DIM)
-		return
-	var col: Color = UF.COL_GOLD
-	match ev.category_str():
-		"good": col = UF.COL_RED
-		"bad":  col = UF.COL_GREEN
-		_:      col = UF.COL_GOLD
-	btn_event.text = ev.name
-	btn_event.add_theme_color_override("font_color", col)
-
-
-func _on_btn_event_pressed() -> void:
-	if Game.tutorial_active:
-		return
-	show_current_event_dialog()
-
-
-# 公开方法: 外部 (如 DataPanel 的事件图片点击) 复用此弹窗显示当前事件详情
+# 公开方法: DataPanel 卡牌点击 → 弹出事件详情弹窗
 func show_current_event_dialog() -> void:
 	var ev: Event = Game.current_event
 	if ev == null:
 		return
 	_event_dialog.title = "突发事件 · %s" % _category_name(ev)
 	var col := _category_color(ev)
-	_apply_event_image(ev.image_path)
 	_event_msg.text = "[color=#%s][b]%s[/b][/color]\n\n%s\n\n[color=#ffd166]%s[/color]" % [
 		col.to_html(false), ev.name, ev.desc, ev.effect_desc
 	]
 	_event_dialog.popup_centered()
 
 
-func _on_btn_event_mouse_entered() -> void:
-	if Game.tutorial_active:
-		return
-	show_event_tip_for(btn_event)
-
-
-func _on_btn_event_mouse_exited() -> void:
-	hide_event_tip()
-
-
-# 公开方法: 让外部 (如 DataPanel 的事件图片) 复用此 tip
+# 公开方法: DataPanel 卡牌悬浮 → 显示事件 tip
 func show_event_tip_for(anchor: Control) -> void:
 	if _event_tip == null or anchor == null:
 		return
@@ -423,6 +423,7 @@ func show_event_tip_for(anchor: Control) -> void:
 	_position_tip_under(anchor)
 
 
+# 公开方法: DataPanel 卡牌离开 → 隐藏事件 tip
 func hide_event_tip() -> void:
 	if _event_tip != null:
 		_event_tip.visible = false
@@ -462,3 +463,77 @@ func _category_name(ev: Event) -> String:
 		"good": return "利好"
 		"bad":  return "利空"
 		_:      return "中性"
+
+
+# ============== 市场情绪 hover tip ==============
+
+func _setup_emotion_tip() -> void:
+	_emotion_tip = PanelContainer.new()
+	_emotion_tip.top_level = true
+	_emotion_tip.z_index = 100
+	_emotion_tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_emotion_tip.visible = false
+	_emotion_tip.custom_minimum_size = Vector2(260, 0)
+	_emotion_tip.add_theme_stylebox_override("panel", UF.panel_stylebox(UF.COL_GOLD))
+	add_child(_emotion_tip)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	_emotion_tip.add_child(vbox)
+	_emotion_tip_title  = _make_rich(16)
+	_emotion_tip_value  = _make_rich(12)
+	_emotion_tip_effect = _make_rich(12)
+	vbox.add_child(_emotion_tip_title)
+	vbox.add_child(_emotion_tip_value)
+	vbox.add_child(_emotion_tip_effect)
+
+
+func _on_emotion_mouse_entered() -> void:
+	if _emotion_tip == null:
+		return
+	_update_emotion_tip_text()
+	_emotion_tip.visible = true
+	_position_emotion_tip()
+
+
+func _on_emotion_mouse_exited() -> void:
+	if _emotion_tip != null:
+		_emotion_tip.visible = false
+
+
+func _update_emotion_tip_text() -> void:
+	var bull: int = clampi(int(Game.bull), 0, 100)
+	var bear: int = max(0, 100 - bull)
+	var state_text: String = Game.emotion_state()
+	var trend_text: String = ""
+	var trend_col: Color = UF.COL_GOLD
+	# 容易涨 / 容易跌 / 平稳: 与 _emotion_modifier_for_price 的阈值对齐
+	if bull >= 70:
+		trend_text = "容易上涨"
+		trend_col = UF.COL_RED
+	elif bull >= 50:
+		trend_text = "略易上涨"
+		trend_col = UF.COL_RED
+	elif bull >= 30:
+		trend_text = "略易下跌"
+		trend_col = UF.COL_GREEN
+	else:
+		trend_text = "容易下跌"
+		trend_col = UF.COL_GREEN
+	if bull >= 45 and bull <= 55:
+		trend_text = "走势平稳"
+		trend_col = UF.COL_GOLD
+	_emotion_tip_title.text = "[color=#%s][b]市场情绪 · %s[/b][/color]" % [
+		UF.COL_GOLD.to_html(false), state_text
+	]
+	_emotion_tip_value.text = "[color=#ffffff]上涨 %d   ·   下跌 %d[/color]" % [bull, bear]
+	_emotion_tip_effect.text = "[color=#%s]%s[/color]" % [trend_col.to_html(false), trend_text]
+
+
+func _position_emotion_tip() -> void:
+	if _emotion_tip == null or mid_bar == null:
+		return
+	var rect := mid_bar.get_global_rect()
+	_emotion_tip.reset_size()
+	var tip_w: float = max(_emotion_tip.size.x, _emotion_tip.custom_minimum_size.x)
+	var pos := Vector2(rect.position.x + (rect.size.x - tip_w) * 0.5, rect.position.y + rect.size.y + 4)
+	_emotion_tip.global_position = pos

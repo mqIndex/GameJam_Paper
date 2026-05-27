@@ -45,11 +45,7 @@ text = "第 1 / 10 回合"
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="BtnEvent" type="Button" parent="LeftBar/HBox" unique_id=2086711685]
-custom_minimum_size = Vector2(86, 24)
-layout_mode = 2
-theme_override_font_sizes/font_size = 11
-text = "突发事件"
+
 
 [node name="MidBar" type="Panel" parent="." unique_id=1810699976]
 layout_mode = 0
@@ -67,9 +63,11 @@ offset_right = -10.0
 offset_bottom = -4.0
 theme_override_constants/separation = 8
 
-[node name="IconEmotion" type="Panel" parent="MidBar/HBox" unique_id=2123064930]
+[node name="IconEmotion" type="TextureRect" parent="MidBar/HBox" unique_id=2123064930]
 custom_minimum_size = Vector2(24, 24)
 layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
 
 [node name="LblEmotionTitle" type="Label" parent="MidBar/HBox" unique_id=437249893]
 layout_mode = 2
