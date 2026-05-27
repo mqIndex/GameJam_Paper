@@ -1,0 +1,275 @@
+[gd_scene format=3 uid="uid://bykifblxx3yc7"]
+
+[ext_resource type="Script" uid="uid://b8su0iii6cj35" path="res://scripts/views/tutorial_overlay.gd" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://b5fe7tuxul7o8" path="res://assets/baoshu_avatar_UpperHalf.png" id="2_avatar"]
+[ext_resource type="Script" uid="uid://b21pkh7dmyr0c" path="res://scripts/views/tutorial_arrow.gd" id="3_arrow"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_highlight"]
+bg_color = Color(1, 0.74, 0.24, 0.08)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.74, 0.24, 0.98)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_intro"]
+bg_color = Color(0.05, 0.03, 0.02, 0.95)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(1, 0.784314, 0.341176, 0.95)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+shadow_color = Color(1, 0.784314, 0.341176, 0.28)
+shadow_size = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_dialog"]
+content_margin_left = 14.0
+content_margin_top = 10.08
+content_margin_right = 14.0
+content_margin_bottom = 10.08
+bg_color = Color(0.04, 0.07, 0.13, 0.86)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.784314, 0.341176, 0.74)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_player"]
+content_margin_left = 12.0
+content_margin_top = 8.64
+content_margin_right = 12.0
+content_margin_bottom = 8.64
+bg_color = Color(0.04, 0.07, 0.13, 0.86)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.066667, 0.541176, 0.698039, 0.74)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_prompt"]
+content_margin_left = 10.0
+content_margin_top = 7.2
+content_margin_right = 10.0
+content_margin_bottom = 7.2
+bg_color = Color(0.04, 0.07, 0.13, 0.86)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.54902, 0.258824, 0.74)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[node name="TutorialOverlay" type="Control" unique_id=255029522]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_script")
+
+[node name="FullScrim" type="ColorRect" parent="." unique_id=1406294003]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.58)
+
+[node name="ScrimTop" type="ColorRect" parent="." unique_id=1488901493]
+layout_mode = 0
+color = Color(0, 0, 0, 0.58)
+
+[node name="ScrimBottom" type="ColorRect" parent="." unique_id=440939202]
+layout_mode = 0
+color = Color(0, 0, 0, 0.58)
+
+[node name="ScrimLeft" type="ColorRect" parent="." unique_id=1833246126]
+layout_mode = 0
+color = Color(0, 0, 0, 0.58)
+
+[node name="ScrimRight" type="ColorRect" parent="." unique_id=133362397]
+layout_mode = 0
+color = Color(0, 0, 0, 0.58)
+
+[node name="Highlight" type="Panel" parent="." unique_id=1241303585]
+z_index = 3
+layout_mode = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_highlight")
+
+[node name="IntroPanel" type="PanelContainer" parent="." unique_id=1241085159]
+z_index = 8
+layout_mode = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_intro")
+
+[node name="Margin" type="MarginContainer" parent="IntroPanel" unique_id=1169343618]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 16
+
+[node name="Root" type="HBoxContainer" parent="IntroPanel/Margin" unique_id=1275460246]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Left" type="VBoxContainer" parent="IntroPanel/Margin/Root" unique_id=1439461340]
+custom_minimum_size = Vector2(210, 0)
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Portrait" type="TextureRect" parent="IntroPanel/Margin/Root/Left" unique_id=1939223665]
+custom_minimum_size = Vector2(210, 280)
+layout_mode = 2
+texture = ExtResource("2_avatar")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="LblIntroName" type="Label" parent="IntroPanel/Margin/Root/Left" unique_id=980959598]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.784314, 0.341176, 1)
+theme_override_font_sizes/font_size = 22
+text = "宝叔"
+horizontal_alignment = 1
+
+[node name="TextBox" type="VBoxContainer" parent="IntroPanel/Margin/Root" unique_id=1681815265]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 14
+
+[node name="LblIntroTitle" type="Label" parent="IntroPanel/Margin/Root/TextBox" unique_id=37545435]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.784314, 0.341176, 1)
+theme_override_font_sizes/font_size = 28
+text = "人物介绍"
+
+[node name="LblIntroBody" type="Label" parent="IntroPanel/Margin/Root/TextBox" unique_id=852412997]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.960784, 0.960784, 0.960784, 1)
+theme_override_font_sizes/font_size = 21
+text = "资深操盘手，擅长制造利好、点燃情绪、收割韭菜。
+
+业内人称「宝老师」，散户一般叫他：「狗庄」。
+
+现在，他是你的组长。"
+autowrap_mode = 3
+
+[node name="BtnIntro" type="Button" parent="IntroPanel/Margin/Root/TextBox" unique_id=545868840]
+custom_minimum_size = Vector2(220, 48)
+layout_mode = 2
+size_flags_horizontal = 8
+theme_override_colors/font_color = Color(1, 0.54902, 0.258824, 1)
+theme_override_font_sizes/font_size = 20
+text = "知道了"
+
+[node name="Dialog" type="PanelContainer" parent="." unique_id=2074789597]
+z_index = 5
+layout_mode = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_dialog")
+
+[node name="Row" type="HBoxContainer" parent="Dialog" unique_id=1312269018]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Avatar" type="TextureRect" parent="Dialog/Row" unique_id=1100825738]
+custom_minimum_size = Vector2(76, 76)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("2_avatar")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="TextBox" type="VBoxContainer" parent="Dialog/Row" unique_id=537394845]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 5
+
+[node name="LblName" type="Label" parent="Dialog/Row/TextBox" unique_id=1184224344]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.784314, 0.341176, 1)
+theme_override_font_sizes/font_size = 14
+text = "宝叔"
+
+[node name="LblDialog" type="Label" parent="Dialog/Row/TextBox" unique_id=989308556]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.960784, 0.960784, 0.960784, 1)
+theme_override_font_sizes/font_size = 14
+autowrap_mode = 3
+
+[node name="BtnNext" type="Button" parent="Dialog/Row/TextBox" unique_id=1372665237]
+custom_minimum_size = Vector2(96, 30)
+layout_mode = 2
+size_flags_horizontal = 8
+theme_override_colors/font_color = Color(1, 0.784314, 0.341176, 1)
+theme_override_font_sizes/font_size = 13
+text = "下一步"
+
+[node name="PlayerDialog" type="PanelContainer" parent="." unique_id=1207768880]
+visible = false
+z_index = 5
+layout_mode = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_player")
+
+[node name="VBox" type="VBoxContainer" parent="PlayerDialog" unique_id=1661664962]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="LblPlayerName" type="Label" parent="PlayerDialog/VBox" unique_id=610866116]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.066667, 0.541176, 0.698039, 1)
+theme_override_font_sizes/font_size = 13
+text = "你"
+
+[node name="LblPlayerDialog" type="Label" parent="PlayerDialog/VBox" unique_id=1475999306]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.960784, 0.960784, 0.960784, 1)
+theme_override_font_sizes/font_size = 13
+autowrap_mode = 3
+
+[node name="Prompt" type="PanelContainer" parent="." unique_id=485762253]
+z_index = 6
+layout_mode = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_prompt")
+
+[node name="LblPrompt" type="Label" parent="Prompt" unique_id=966515839]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.960784, 0.960784, 0.960784, 1)
+theme_override_font_sizes/font_size = 13
+autowrap_mode = 3
+
+[node name="Arrow" type="Control" parent="." unique_id=1922306843]
+z_index = 6
+custom_minimum_size = Vector2(18, 14)
+anchors_preset = 0
+offset_right = 18.0
+offset_bottom = 14.0
+mouse_filter = 2
+script = ExtResource("3_arrow")

@@ -15,15 +15,17 @@ const SpeechArrow = preload("res://scripts/views/speech_arrow.gd")
 @onready var bubble_label: Label = $VBox/BubbleLabel
 @onready var avatar: Control = $VBox/AvatarSlot/Avatar
 
-const BUBBLE_DURATION: float = 3.0
-const BUBBLE_W: float = 156.0
-const BUBBLE_ARROW_SIZE: Vector2 = Vector2(16.0, 9.0)
-const BUBBLE_COLOR: Color = Color(0, 0, 0, 0.85)
+const BUBBLE_DURATION: float = 3.4
+const BUBBLE_W: float = 224.0
+const BUBBLE_ARROW_SIZE: Vector2 = Vector2(24.0, 13.0)
+const BUBBLE_COLOR: Color = Color(0.03, 0.0, 0.02, 0.94)
+const BUBBLE_BORDER_COLOR: Color = Color(1.0, 0.22, 0.34, 0.92)
 
 var _bubble_timer: float = 0.0
 var _bubble_panel: PanelContainer = null
 var _bubble_text: Label = null
 var _bubble_arrow: Control = null
+var _bubble_tween: Tween = null
 
 
 func _ready() -> void:
@@ -71,7 +73,7 @@ func _process(delta: float) -> void:
 	if _bubble_timer > 0.0:
 		_bubble_timer -= delta
 		if _bubble_timer <= 0.0:
-			_set_bubble_visible(false)
+			_hide_bubble()
 		else:
 			_position_bubble()
 
@@ -118,7 +120,8 @@ func _show_bubble(text: String) -> void:
 	_bubble_text.text = text
 	_set_bubble_visible(true)
 	_bubble_timer = BUBBLE_DURATION
-	call_deferred("_position_bubble")
+	_position_bubble()
+	_play_bubble_enter()
 
 
 func _build_bubble_overlay() -> void:
@@ -132,24 +135,26 @@ func _build_bubble_overlay() -> void:
 	_bubble_panel.custom_minimum_size = Vector2(BUBBLE_W, 0.0)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = BUBBLE_COLOR
-	sb.border_width_left = 1
-	sb.border_width_top = 1
-	sb.border_width_right = 1
-	sb.border_width_bottom = 1
-	sb.border_color = Color(1, 1, 1, 0.3)
-	sb.corner_radius_top_left = 4
-	sb.corner_radius_top_right = 4
-	sb.corner_radius_bottom_left = 4
-	sb.corner_radius_bottom_right = 4
-	sb.content_margin_left = 8.0
-	sb.content_margin_top = 6.0
-	sb.content_margin_right = 8.0
-	sb.content_margin_bottom = 6.0
+	sb.border_width_left = 2
+	sb.border_width_top = 2
+	sb.border_width_right = 2
+	sb.border_width_bottom = 2
+	sb.border_color = BUBBLE_BORDER_COLOR
+	sb.corner_radius_top_left = 5
+	sb.corner_radius_top_right = 5
+	sb.corner_radius_bottom_left = 5
+	sb.corner_radius_bottom_right = 5
+	sb.content_margin_left = 13.0
+	sb.content_margin_top = 10.0
+	sb.content_margin_right = 13.0
+	sb.content_margin_bottom = 10.0
+	sb.shadow_color = Color(BUBBLE_BORDER_COLOR.r, BUBBLE_BORDER_COLOR.g, BUBBLE_BORDER_COLOR.b, 0.34)
+	sb.shadow_size = 8
 	_bubble_panel.add_theme_stylebox_override("panel", sb)
 	_bubble_text = Label.new()
-	_bubble_text.custom_minimum_size = Vector2(BUBBLE_W - 16.0, 0.0)
+	_bubble_text.custom_minimum_size = Vector2(BUBBLE_W - 26.0, 0.0)
 	_bubble_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_bubble_text.add_theme_font_size_override("font_size", 11)
+	_bubble_text.add_theme_font_size_override("font_size", 14)
 	_bubble_text.add_theme_color_override("font_color", Color.WHITE)
 	_bubble_panel.add_child(_bubble_text)
 	add_child(_bubble_panel)
@@ -162,6 +167,7 @@ func _build_bubble_overlay() -> void:
 	_bubble_arrow.custom_minimum_size = BUBBLE_ARROW_SIZE
 	_bubble_arrow.size = BUBBLE_ARROW_SIZE
 	_bubble_arrow.fill_color = BUBBLE_COLOR
+	_bubble_arrow.modulate = Color(1, 1, 1, 0)
 	add_child(_bubble_arrow)
 
 
@@ -171,10 +177,11 @@ func _position_bubble() -> void:
 	var avatar_rect := avatar.get_global_rect()
 	var panel_min := _bubble_panel.get_combined_minimum_size()
 	_bubble_panel.size = Vector2(BUBBLE_W, panel_min.y)
+	_bubble_panel.pivot_offset = _bubble_panel.size * 0.5
 	var viewport_rect := get_viewport_rect()
 	var x: float = avatar_rect.get_center().x - _bubble_panel.size.x * 0.5
 	x = clamp(x, 8.0, max(8.0, viewport_rect.size.x - _bubble_panel.size.x - 8.0))
-	var y: float = avatar_rect.position.y - _bubble_panel.size.y - BUBBLE_ARROW_SIZE.y - 6.0
+	var y: float = avatar_rect.position.y - _bubble_panel.size.y - BUBBLE_ARROW_SIZE.y - 9.0
 	y = max(8.0, y)
 	_bubble_panel.global_position = Vector2(x, y)
 	var arrow_x: float = avatar_rect.get_center().x - BUBBLE_ARROW_SIZE.x * 0.5
@@ -182,6 +189,32 @@ func _position_bubble() -> void:
 	_bubble_arrow.size = BUBBLE_ARROW_SIZE
 	_bubble_arrow.global_position = Vector2(arrow_x, y + _bubble_panel.size.y - 1.0)
 	_bubble_arrow.queue_redraw()
+
+
+func _play_bubble_enter() -> void:
+	if _bubble_tween != null and _bubble_tween.is_valid():
+		_bubble_tween.kill()
+	_bubble_panel.modulate = Color(1, 1, 1, 0)
+	_bubble_panel.scale = Vector2(0.86, 0.86)
+	_bubble_arrow.modulate = Color(1, 1, 1, 0)
+	_bubble_tween = create_tween()
+	_bubble_tween.set_parallel(true)
+	_bubble_tween.tween_property(_bubble_panel, "modulate", Color(1, 1, 1, 1), 0.12)
+	_bubble_tween.tween_property(_bubble_panel, "scale", Vector2(1.08, 1.08), 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_bubble_tween.tween_property(_bubble_arrow, "modulate", Color(1, 1, 1, 1), 0.12)
+	_bubble_tween.chain().tween_property(_bubble_panel, "scale", Vector2.ONE, 0.10).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+
+func _hide_bubble() -> void:
+	if _bubble_panel == null or not _bubble_panel.visible:
+		return
+	if _bubble_tween != null and _bubble_tween.is_valid():
+		_bubble_tween.kill()
+	_bubble_tween = create_tween()
+	_bubble_tween.set_parallel(true)
+	_bubble_tween.tween_property(_bubble_panel, "modulate", Color(1, 1, 1, 0), 0.18)
+	_bubble_tween.tween_property(_bubble_arrow, "modulate", Color(1, 1, 1, 0), 0.18)
+	_bubble_tween.chain().tween_callback(func(): _set_bubble_visible(false))
 
 
 func _set_bubble_visible(v: bool) -> void:

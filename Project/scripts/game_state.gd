@@ -92,6 +92,7 @@ signal phase_changed(phase: int)
 signal candle_committed(turn_global: int)        # 回合 K 入库
 signal intraday_updated                          # 分时新点
 signal danmaku_requested(messages: Array, intensity: int)
+signal level_started(level_index: int)
 signal level_finished(victory: bool, final_assets: float)
 signal card_play_blocked(reason: String)
 signal log_message(msg: String)
@@ -129,6 +130,15 @@ var tutorial_active: bool = false
 var tutorial_completed: bool = false
 var shop_tutorial_active: bool = false
 var shop_tutorial_completed: bool = false
+var tutorial_goal_intro_completed: bool = false
+var formal_intro_completed: bool = false
+var opponent_tutorial_completed: bool = false
+var opponent_reward_tutorial_completed: bool = false
+
+var _tutorial_start_cash: float = 100000.0
+var _tutorial_victory_target: float = 120000.0
+var _formal_start_cash: float = 200000.0
+var _formal_victory_target: float = 250000.0
 
 # ===== 突发事件状态 =====
 var current_event: Event = null                          # 当前生效事件 (null = 无)
@@ -176,6 +186,42 @@ func finish_tutorial() -> void:
 	tutorial_active = false
 	tutorial_completed = true
 	emit_signal("state_changed")
+
+
+func begin_context_tutorial() -> void:
+	tutorial_active = true
+	emit_signal("state_changed")
+
+
+func finish_context_tutorial() -> void:
+	tutorial_active = false
+	emit_signal("state_changed")
+
+
+func tutorial_finish_guidance() -> void:
+	shop_tutorial_active = false
+	shop_tutorial_completed = true
+	finish_context_tutorial()
+
+
+func finish_goal_intro() -> void:
+	tutorial_goal_intro_completed = true
+	finish_context_tutorial()
+
+
+func finish_formal_intro() -> void:
+	formal_intro_completed = true
+	finish_context_tutorial()
+
+
+func finish_opponent_tutorial() -> void:
+	opponent_tutorial_completed = true
+	finish_context_tutorial()
+
+
+func finish_opponent_reward_tutorial() -> void:
+	opponent_reward_tutorial_completed = true
+	finish_context_tutorial()
 
 
 func begin_shop_tutorial() -> void:
@@ -248,13 +294,31 @@ func tutorial_ensure_talent_offer(talent_id: String) -> bool:
 
 
 func tutorial_finish_and_continue_level() -> void:
-	shop_tutorial_active = false
-	shop_tutorial_completed = true
-	finish_tutorial()
+	tutorial_finish_guidance()
 
 
 func tutorial_finish_and_start_formal_level() -> void:
-	tutorial_finish_and_continue_level()
+	start_formal_level_from_tutorial()
+
+
+func start_formal_level_from_tutorial() -> void:
+	var carry: Array = _tutorial_carryover_effect_ids()
+	tutorial_active = false
+	shop_tutorial_active = false
+	shop_tutorial_completed = true
+	tutorial_completed = true
+	current_level_index = 1
+	new_level(carry)
+
+
+func restart_tutorial_level() -> void:
+	current_level_index = 0
+	tutorial_completed = false
+	shop_tutorial_completed = false
+	shop_tutorial_active = false
+	tutorial_goal_intro_completed = false
+	tutorial_active = true
+	new_level()
 
 
 func _tutorial_carryover_effect_ids() -> Array:
@@ -275,6 +339,19 @@ func _effect_counts(cards: Array) -> Dictionary:
 			continue
 		counts[c.effect_id] = int(counts.get(c.effect_id, 0)) + 1
 	return counts
+
+
+func is_tutorial_level() -> bool:
+	return current_level_index == 0
+
+
+func _configure_current_level_params() -> void:
+	if is_tutorial_level():
+		START_CASH = _tutorial_start_cash
+		VICTORY_TARGET = _tutorial_victory_target
+	else:
+		START_CASH = _formal_start_cash
+		VICTORY_TARGET = _formal_victory_target
 
 
 # 从 /root/Cfg.balance 把数值刷到本节点的同名 var; 不存在的键保留代码默认.
@@ -314,9 +391,12 @@ func _apply_balance_from_cfg() -> void:
 			LEVEL_OPPONENT_ID = arr
 	if b.has("OPPONENT_DEFEAT_EMOTION_BONUS"): OPPONENT_DEFEAT_EMOTION_BONUS = int(b["OPPONENT_DEFEAT_EMOTION_BONUS"])
 	if b.has("TIGHT_CASH_MULTIPLIER"): TIGHT_CASH_MULTIPLIER = int(b["TIGHT_CASH_MULTIPLIER"])
+	_tutorial_start_cash = START_CASH
+	_tutorial_victory_target = VICTORY_TARGET
 
 
 func new_level(carried_effect_ids: Array = []) -> void:
+	_configure_current_level_params()
 	cash = START_CASH
 	shares = 0
 	avg_cost_price = 0.0
@@ -360,6 +440,7 @@ func new_level(carried_effect_ids: Array = []) -> void:
 	_log("新一关开始 - 资金 ¥%s, 目标 ¥%s, 5 天 × 10 回合" % [_fmt_money(START_CASH), _fmt_money(VICTORY_TARGET)])
 	emit_signal("state_changed")
 	_start_day()
+	emit_signal("level_started", current_level_index)
 
 
 # ----- 出牌 -----
@@ -1005,7 +1086,7 @@ func _start_turn() -> void:
 	emit_signal("hand_changed")
 	emit_signal("state_changed")
 	# 突发事件刷新: 每天第 1 / 第 5 回合开盘抽牌后
-	if (turn_in_day == 1 or turn_in_day == 5) and not tutorial_active:
+	if (turn_in_day == 1 or turn_in_day == 5) and not tutorial_active and not is_tutorial_level():
 		_trigger_random_event()
 
 
@@ -1253,8 +1334,17 @@ func _settle_level() -> void:
 	var victory: bool = final_assets >= VICTORY_TARGET
 	if victory:
 		_log("[胜利] 达到目标 ¥%s" % _fmt_money(VICTORY_TARGET))
+		if is_tutorial_level():
+			_log("[宝叔] 干得不错，年轻人大有前途")
 	else:
 		_log("[失败] 未达目标 ¥%s" % _fmt_money(VICTORY_TARGET))
+		if is_tutorial_level():
+			_log("[宝叔] 山高路远，江湖再见")
+	if is_tutorial_level():
+		tutorial_active = false
+		shop_tutorial_active = false
+		shop_tutorial_completed = true
+		tutorial_completed = true
 	emit_signal("phase_changed", phase)
 	emit_signal("state_changed")
 	emit_signal("level_finished", victory, final_assets)
@@ -1558,8 +1648,12 @@ func _apply_ap_chaos() -> void:
 # ===========================================================
 func _init_opponent() -> void:
 	_opponent_brain = OpponentBrain.new()
-	if current_level_index < LEVEL_OPPONENT_ID.size():
-		var boss_id: String = LEVEL_OPPONENT_ID[current_level_index]
+	if is_tutorial_level():
+		_opponent_state = null
+		return
+	var opponent_index: int = current_level_index - 1
+	if opponent_index >= 0 and opponent_index < LEVEL_OPPONENT_ID.size():
+		var boss_id: String = LEVEL_OPPONENT_ID[opponent_index]
 		_opponent_state = OpponentDatabase.make(boss_id)
 	else:
 		_opponent_state = null
@@ -1568,10 +1662,11 @@ func _init_opponent() -> void:
 func _check_opponent_spawn() -> void:
 	if _opponent_state == null:
 		return
-	if _opponent_state.defeated_this_level or _opponent_state.present:
+	if is_tutorial_level():
 		return
-	# 教学保护期: 第1关第1和2天不触发
-	if current_level_index == 0 and (day == 1 or day == 2):
+	if not formal_intro_completed:
+		return
+	if _opponent_state.defeated_this_level or _opponent_state.present:
 		return
 	# 基础概率 (按天数递增)
 	var base_table: Dictionary = {1: 0.12, 2: 0.24, 3: 0.40, 4: 0.60, 5: 0.80}

@@ -346,6 +346,8 @@ func _on_event_triggered(ev) -> void:
 	_refresh_event_button()
 	if ev == null:
 		return
+	if Game.tutorial_active:
+		return
 	var ev_obj: Event = ev as Event
 	var cat_text := "中性"
 	var cat_color := UF.COL_GOLD
@@ -383,6 +385,8 @@ func _refresh_event_button() -> void:
 
 
 func _on_btn_event_pressed() -> void:
+	if Game.tutorial_active:
+		return
 	show_current_event_dialog()
 
 
@@ -401,6 +405,8 @@ func show_current_event_dialog() -> void:
 
 
 func _on_btn_event_mouse_entered() -> void:
+	if Game.tutorial_active:
+		return
 	show_event_tip_for(btn_event)
 
 

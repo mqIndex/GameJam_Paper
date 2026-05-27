@@ -2,7 +2,6 @@ extends Control
 
 const UF = preload("res://scripts/views/ui_factory.gd")
 
-const AVATAR_PATH: String = "res://assets/baoshu_avatar_UpperHalf.png"
 const SCRIM_COLOR: Color = Color(0.0, 0.0, 0.0, 0.58)
 const PANEL_COLOR: Color = Color(0.04, 0.07, 0.13, 0.86)
 const HIGHLIGHT_PAD: float = 8.0
@@ -10,28 +9,9 @@ const DIALOG_H: float = 126.0
 const PLAYER_DIALOG_H: float = 70.0
 const SHOP_DIALOG_H: float = 140.0
 const PROMPT_H: float = 64.0
-
-class TutorialArrow:
-	extends Control
-
-	var fill_color: Color = Color(0.04, 0.07, 0.13, 0.86)
-	var points_down: bool = true
-
-	func _draw() -> void:
-		var pts: PackedVector2Array
-		if points_down:
-			pts = PackedVector2Array([
-				Vector2(0.0, 0.0),
-				Vector2(size.x, 0.0),
-				Vector2(size.x * 0.5, size.y),
-			])
-		else:
-			pts = PackedVector2Array([
-				Vector2(size.x * 0.5, 0.0),
-				Vector2(0.0, size.y),
-				Vector2(size.x, size.y),
-			])
-		draw_colored_polygon(pts, fill_color)
+const ENTER_SCENE_TEXTURE: Texture2D = preload("res://assets/EnterSecen.png")
+const BAOSHU_AVATAR_TEXTURE: Texture2D = preload("res://assets/baoshu_avatar_UpperHalf.png")
+const INTRO_TYPEWRITER_CHARS_PER_SECOND: float = 18.0
 
 
 var _main: Control = null
@@ -51,6 +31,10 @@ var _full_scrim: ColorRect = null
 var _scrims: Array = []
 var _highlight: Panel = null
 var _intro_panel: PanelContainer = null
+var _intro_portrait: TextureRect = null
+var _intro_name_label: Label = null
+var _intro_title_label: Label = null
+var _intro_body_label: Label = null
 var _intro_button: Button = null
 var _dialog: PanelContainer = null
 var _avatar: TextureRect = null
@@ -60,8 +44,10 @@ var _player_dialog: PanelContainer = null
 var _player_dialog_text: Label = null
 var _prompt: PanelContainer = null
 var _prompt_text: Label = null
-var _arrow: TutorialArrow = null
+var _arrow = null
 var _next_button: Button = null
+var _intro_text_tween: Tween = null
+var _intro_typewriter_done: bool = true
 
 
 func setup(main_node: Control) -> void:
@@ -71,7 +57,7 @@ func setup(main_node: Control) -> void:
 func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	_build_ui()
+	_bind_ui()
 	_build_steps()
 	Game.state_changed.connect(_on_game_changed)
 	Game.hand_changed.connect(_on_game_changed)
@@ -91,6 +77,66 @@ func start() -> void:
 	_build_steps()
 	if _full_scrim != null:
 		_full_scrim.color = SCRIM_COLOR
+	_set_scrim_blocks_input(true)
+	_active = true
+	visible = true
+	_step_index = -1
+	_go_next()
+
+
+func start_goal_intro() -> void:
+	if _active:
+		return
+	_mode = "goal"
+	_embedded_shop_active = false
+	_build_goal_steps()
+	if Game.has_method("begin_context_tutorial"):
+		Game.call("begin_context_tutorial")
+	_set_scrim_blocks_input(true)
+	_active = true
+	visible = true
+	_step_index = -1
+	_go_next()
+
+
+func start_formal_intro() -> void:
+	if _active:
+		return
+	_mode = "formal"
+	_embedded_shop_active = false
+	_build_formal_intro_steps()
+	if Game.has_method("begin_context_tutorial"):
+		Game.call("begin_context_tutorial")
+	_set_scrim_blocks_input(true)
+	_active = true
+	visible = true
+	_step_index = -1
+	_go_next()
+
+
+func start_opponent_intro() -> void:
+	if _active:
+		return
+	_mode = "opponent"
+	_embedded_shop_active = false
+	_build_opponent_intro_steps()
+	if Game.has_method("begin_context_tutorial"):
+		Game.call("begin_context_tutorial")
+	_set_scrim_blocks_input(true)
+	_active = true
+	visible = true
+	_step_index = -1
+	_go_next()
+
+
+func start_opponent_reward_intro() -> void:
+	if _active:
+		return
+	_mode = "opponent_reward"
+	_embedded_shop_active = false
+	_build_opponent_reward_steps()
+	if Game.has_method("begin_context_tutorial"):
+		Game.call("begin_context_tutorial")
 	_set_scrim_blocks_input(true)
 	_active = true
 	visible = true
@@ -126,7 +172,10 @@ func handle_shop_continue() -> bool:
 		var step: Dictionary = _steps[_step_index]
 		if not _is_step_shop_guide(step):
 			return true
-		if bool(step.get("dialog_next", false)) or bool(step.get("force_click", false)):
+		if bool(step.get("dialog_next", false)):
+			_go_next()
+			return true
+		if bool(step.get("force_click", false)):
 			return true
 		var wait_for: String = String(step.get("wait", ""))
 		if wait_for != "":
@@ -149,194 +198,79 @@ func _set_scrim_blocks_input(blocks: bool) -> void:
 		(scrim as ColorRect).mouse_filter = filter
 
 
-func _build_ui() -> void:
-	_full_scrim = ColorRect.new()
+func _bind_ui() -> void:
+	_full_scrim = $FullScrim
+	_scrims = [$ScrimTop, $ScrimBottom, $ScrimLeft, $ScrimRight]
+	_highlight = $Highlight
+	_intro_panel = $IntroPanel
+	_intro_portrait = $IntroPanel/Margin/Root/Left/Portrait
+	_intro_name_label = $IntroPanel/Margin/Root/Left/LblIntroName
+	_intro_title_label = $IntroPanel/Margin/Root/TextBox/LblIntroTitle
+	_intro_body_label = $IntroPanel/Margin/Root/TextBox/LblIntroBody
+	_intro_button = $IntroPanel/Margin/Root/TextBox/BtnIntro
+	_dialog = $Dialog
+	_avatar = $Dialog/Row/Avatar
+	_name_label = $Dialog/Row/TextBox/LblName
+	_dialog_text = $Dialog/Row/TextBox/LblDialog
+	_next_button = $Dialog/Row/TextBox/BtnNext
+	_player_dialog = $PlayerDialog
+	_player_dialog_text = $PlayerDialog/VBox/LblPlayerDialog
+	_prompt = $Prompt
+	_prompt_text = $Prompt/LblPrompt
+	_arrow = $Arrow
+
 	_full_scrim.color = SCRIM_COLOR
-	_full_scrim.mouse_filter = MOUSE_FILTER_STOP
-	add_child(_full_scrim)
-
-	for i in range(4):
-		var scrim := ColorRect.new()
-		scrim.color = SCRIM_COLOR
-		scrim.mouse_filter = MOUSE_FILTER_STOP
-		add_child(scrim)
-		_scrims.append(scrim)
-
-	_highlight = Panel.new()
-	_highlight.mouse_filter = MOUSE_FILTER_IGNORE
-	_highlight.z_index = 3
-	var hsb := StyleBoxFlat.new()
-	hsb.bg_color = Color(1.0, 0.74, 0.24, 0.08)
-	hsb.border_color = Color(1.0, 0.74, 0.24, 0.98)
-	hsb.border_width_left = 2
-	hsb.border_width_top = 2
-	hsb.border_width_right = 2
-	hsb.border_width_bottom = 2
-	hsb.corner_radius_top_left = 5
-	hsb.corner_radius_top_right = 5
-	hsb.corner_radius_bottom_left = 5
-	hsb.corner_radius_bottom_right = 5
-	_highlight.add_theme_stylebox_override("panel", hsb)
-	add_child(_highlight)
-
-	_intro_panel = PanelContainer.new()
-	_intro_panel.visible = false
-	_intro_panel.mouse_filter = MOUSE_FILTER_STOP
-	_intro_panel.z_index = 8
-	_intro_panel.add_theme_stylebox_override("panel", _intro_style())
-	add_child(_intro_panel)
-
-	var intro_margin := MarginContainer.new()
-	intro_margin.add_theme_constant_override("margin_left", 18)
-	intro_margin.add_theme_constant_override("margin_top", 16)
-	intro_margin.add_theme_constant_override("margin_right", 18)
-	intro_margin.add_theme_constant_override("margin_bottom", 16)
-	_intro_panel.add_child(intro_margin)
-
-	var intro_root := HBoxContainer.new()
-	intro_root.add_theme_constant_override("separation", 18)
-	intro_margin.add_child(intro_root)
-
-	var intro_left := VBoxContainer.new()
-	intro_left.custom_minimum_size = Vector2(210.0, 0.0)
-	intro_left.add_theme_constant_override("separation", 8)
-	intro_root.add_child(intro_left)
-
-	var intro_portrait := TextureRect.new()
-	intro_portrait.custom_minimum_size = Vector2(210.0, 280.0)
-	intro_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	intro_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	intro_portrait.texture = _load_avatar_texture()
-	intro_left.add_child(intro_portrait)
-
-	var intro_name := Label.new()
-	intro_name.text = "宝叔"
-	intro_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	intro_name.add_theme_font_size_override("font_size", 22)
-	intro_name.add_theme_color_override("font_color", UF.COL_GOLD)
-	intro_left.add_child(intro_name)
-
-	var intro_text_box := VBoxContainer.new()
-	intro_text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	intro_text_box.add_theme_constant_override("separation", 14)
-	intro_root.add_child(intro_text_box)
-
-	var intro_title := Label.new()
-	intro_title.text = "人物介绍"
-	intro_title.add_theme_font_size_override("font_size", 28)
-	intro_title.add_theme_color_override("font_color", UF.COL_GOLD)
-	intro_text_box.add_child(intro_title)
-
-	var intro_body := Label.new()
-	intro_body.text = "资深操盘手，擅长制造利好、点燃情绪、收割韭菜。\n\n业内人称「宝老师」，散户一般叫他：「狗庄」。\n\n现在，他是你的组长。"
-	intro_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	intro_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	intro_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	intro_body.add_theme_font_size_override("font_size", 21)
-	intro_body.add_theme_color_override("font_color", UF.COL_TEXT)
-	intro_text_box.add_child(intro_body)
-
-	_intro_button = UF.button("知道了", UF.COL_HIGHLIGHT, 20)
-	_intro_button.custom_minimum_size = Vector2(220.0, 48.0)
-	_intro_button.size_flags_horizontal = Control.SIZE_SHRINK_END
-	_intro_button.pressed.connect(_on_next_pressed)
-	intro_text_box.add_child(_intro_button)
-
-	_dialog = PanelContainer.new()
-	_dialog.mouse_filter = MOUSE_FILTER_STOP
-	_dialog.z_index = 5
 	_dialog.add_theme_stylebox_override("panel", _box_style(UF.COL_GOLD, 14.0))
-	add_child(_dialog)
-
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
-	_dialog.add_child(row)
-
-	_avatar = TextureRect.new()
-	_avatar.custom_minimum_size = Vector2(76.0, 76.0)
-	_avatar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_avatar.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	var tex := _load_avatar_texture()
-	if tex != null:
-		_avatar.texture = tex
-	row.add_child(_avatar)
-
-	var text_box := VBoxContainer.new()
-	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text_box.add_theme_constant_override("separation", 5)
-	row.add_child(text_box)
-
-	_name_label = Label.new()
-	_name_label.text = "宝叔"
-	_name_label.add_theme_font_size_override("font_size", 14)
-	_name_label.add_theme_color_override("font_color", UF.COL_GOLD)
-	text_box.add_child(_name_label)
-
-	_dialog_text = Label.new()
-	_dialog_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_dialog_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_dialog_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_dialog_text.add_theme_font_size_override("font_size", 14)
-	_dialog_text.add_theme_color_override("font_color", UF.COL_TEXT)
-	text_box.add_child(_dialog_text)
-
-	_next_button = UF.button("下一步", UF.COL_GOLD, 13)
-	_next_button.custom_minimum_size = Vector2(96.0, 30.0)
-	_next_button.size_flags_horizontal = Control.SIZE_SHRINK_END
-	_next_button.pressed.connect(_on_next_pressed)
-	text_box.add_child(_next_button)
-
-	_player_dialog = PanelContainer.new()
-	_player_dialog.visible = false
-	_player_dialog.mouse_filter = MOUSE_FILTER_STOP
-	_player_dialog.z_index = 5
 	_player_dialog.add_theme_stylebox_override("panel", _box_style(UF.COL_BLUE, 12.0))
-	add_child(_player_dialog)
-
-	var player_box := VBoxContainer.new()
-	player_box.add_theme_constant_override("separation", 4)
-	_player_dialog.add_child(player_box)
-
-	var player_name := Label.new()
-	player_name.text = "你"
-	player_name.add_theme_font_size_override("font_size", 13)
-	player_name.add_theme_color_override("font_color", UF.COL_BLUE)
-	player_box.add_child(player_name)
-
-	_player_dialog_text = Label.new()
-	_player_dialog_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_player_dialog_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_player_dialog_text.add_theme_font_size_override("font_size", 13)
-	_player_dialog_text.add_theme_color_override("font_color", UF.COL_TEXT)
-	player_box.add_child(_player_dialog_text)
-
-	_prompt = PanelContainer.new()
-	_prompt.mouse_filter = MOUSE_FILTER_IGNORE
-	_prompt.z_index = 6
 	_prompt.add_theme_stylebox_override("panel", _box_style(UF.COL_HIGHLIGHT, 10.0))
-	add_child(_prompt)
+	_style_button(_intro_button, UF.COL_HIGHLIGHT, 20)
+	_style_button(_next_button, UF.COL_GOLD, 13)
 
-	_prompt_text = Label.new()
-	_prompt_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_prompt_text.add_theme_font_size_override("font_size", 13)
-	_prompt_text.add_theme_color_override("font_color", UF.COL_TEXT)
-	_prompt.add_child(_prompt_text)
+	if not _intro_button.pressed.is_connected(_on_next_pressed):
+		_intro_button.pressed.connect(_on_next_pressed)
+	if not _next_button.pressed.is_connected(_on_next_pressed):
+		_next_button.pressed.connect(_on_next_pressed)
+	_connect_overlay_input()
 
-	_arrow = TutorialArrow.new()
-	_arrow.mouse_filter = MOUSE_FILTER_IGNORE
-	_arrow.z_index = 6
-	_arrow.custom_minimum_size = Vector2(18.0, 14.0)
-	_arrow.size = Vector2(18.0, 14.0)
-	add_child(_arrow)
 
-	# 点击空白前进: 把 scrim / 对话框 / intro 面板的 gui_input 全部连到统一 handler
-	_full_scrim.gui_input.connect(_on_overlay_input)
+func _connect_overlay_input() -> void:
+	var input_nodes: Array = [_full_scrim, _dialog, _player_dialog, _intro_panel]
 	for scrim in _scrims:
-		(scrim as ColorRect).gui_input.connect(_on_overlay_input)
-	_dialog.gui_input.connect(_on_overlay_input)
-	_player_dialog.gui_input.connect(_on_overlay_input)
-	_intro_panel.gui_input.connect(_on_overlay_input)
+		input_nodes.append(scrim)
+	for node in input_nodes:
+		var ctrl := node as Control
+		if ctrl == null:
+			continue
+		if not ctrl.gui_input.is_connected(_on_overlay_input):
+			ctrl.gui_input.connect(_on_overlay_input)
+
+
+func _style_button(button: Button, color: Color, font_size: int) -> void:
+	if button == null:
+		return
+	button.add_theme_font_size_override("font_size", font_size)
+	button.add_theme_color_override("font_color", color)
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = UF.COL_PANEL
+	normal.border_color = color
+	normal.border_width_left = 2
+	normal.border_width_top = 2
+	normal.border_width_right = 2
+	normal.border_width_bottom = 2
+	normal.corner_radius_top_left = 2
+	normal.corner_radius_top_right = 2
+	normal.corner_radius_bottom_left = 2
+	normal.corner_radius_bottom_right = 2
+	button.add_theme_stylebox_override("normal", normal)
+	var hover := normal.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(color.r, color.g, color.b, 0.18)
+	button.add_theme_stylebox_override("hover", hover)
+	var pressed := normal.duplicate() as StyleBoxFlat
+	pressed.bg_color = Color(color.r, color.g, color.b, 0.32)
+	button.add_theme_stylebox_override("pressed", pressed)
+	var disabled := normal.duplicate() as StyleBoxFlat
+	disabled.border_color = UF.COL_AP_OFF
+	button.add_theme_stylebox_override("disabled", disabled)
 
 
 func _box_style(border: Color, margin: float) -> StyleBoxFlat:
@@ -358,34 +292,24 @@ func _box_style(border: Color, margin: float) -> StyleBoxFlat:
 	return sb
 
 
-func _intro_style() -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.05, 0.03, 0.02, 0.95)
-	sb.border_color = Color(UF.COL_GOLD.r, UF.COL_GOLD.g, UF.COL_GOLD.b, 0.95)
-	sb.border_width_left = 3
-	sb.border_width_top = 3
-	sb.border_width_right = 3
-	sb.border_width_bottom = 3
-	sb.corner_radius_top_left = 4
-	sb.corner_radius_top_right = 4
-	sb.corner_radius_bottom_left = 4
-	sb.corner_radius_bottom_right = 4
-	sb.shadow_color = Color(UF.COL_GOLD.r, UF.COL_GOLD.g, UF.COL_GOLD.b, 0.28)
-	sb.shadow_size = 8
-	return sb
-
-
-func _load_avatar_texture() -> Texture2D:
-	if not ResourceLoader.exists(AVATAR_PATH, "Texture2D"):
-		push_warning("Tutorial avatar is waiting for Godot import: %s" % AVATAR_PATH)
-		return null
-	return load(AVATAR_PATH) as Texture2D
-
-
 func _build_steps() -> void:
 	_steps = [
 		{
 			"intro": true,
+			"intro_texture": ENTER_SCENE_TEXTURE,
+			"intro_name": "",
+			"intro_title": "",
+			"intro_body": "一个平凡无奇的交易日\n刚刚毕业的你加入了一家神秘的“短线席位”金融机构",
+			"typewriter": true,
+			"button": "继续",
+		},
+		{
+			"intro": true,
+			"intro_texture": BAOSHU_AVATAR_TEXTURE,
+			"intro_name": "宝叔",
+			"intro_title": "人物介绍",
+			"intro_body": "资深操盘手，擅长制造利好、点燃情绪、收割韭菜。\n\n业内人称「宝老师」，散户一般叫他：「狗庄」。\n\n现在，他是你的组长。",
+			"typewriter": true,
 			"button": "知道了",
 		},
 		{
@@ -394,43 +318,47 @@ func _build_steps() -> void:
 		},
 		{
 			"dialog": "下面开始你第一天的交易，我来教你怎么在市场里赚钱。",
+			"button": "继续",
+		},
+		{
+			"dialog": "目前先做这只股票，盈维达，公司蒸蒸日上，有无限的想象空间。",
 			"button": "开始交易",
 		},
 		{
 			"target_path": "PlayerPanel/VBox/LblCash",
-			"dialog": "这是你的本金，也是你的命根子。牌打得再漂亮，现金断了就没法继续。",
+			"dialog": "这是你的本金，牌打得再漂亮，现金没了，你就没钱继续操作了。",
 			"prompt": "资金：当前可直接使用的现金。",
 		},
 		{
 			"target_path": "DataPanel/VBox/StatsGrid/CellShares",
-			"dialog": "这是你手里的筹码。手里没货，后面涨得再凶也跟你没关系。",
+			"dialog": "这是你手里的筹码，你可以把它理解成你买到的货。手里没货，后面价格涨飞了，也跟你没关系。",
 			"prompt": "筹码：你当前持有的股票数量。",
 		},
 		{
 			"target_paths": ["TopBar/MidBar/HBox/IconEmotion", "TopBar/MidBar/HBox/LblEmotionTitle", "TopBar/MidBar/HBox/EmotionBarSlot", "TopBar/MidBar/HBox/LblEmotionState"],
-			"dialog": "这根是市场情绪。情绪越火热，买盘和利好越容易把股价往上推；情绪越冷淡，卖压和坏消息造成的下跌也会更重。",
-			"prompt": "市场情绪：火热会放大上涨，冷淡会放大下跌。",
+			"dialog": "这是市场情绪。简单说，就是大家现在想不想买。情绪热的时候，大家都想冲，价格更容易涨。情绪冷的时候，大家都想跑，价格更容易跌。",
+			"prompt": "市场热度：火热会放大上涨，冷淡会放大下跌。",
 		},
 		{
 			"dialog": "知道怎么靠股票赚钱吗？",
-			"player_dialog": "靠技术分析？",
+			"player_dialog": "看价格图猜涨跌？",
 		},
 		{
-			"dialog": "不，靠别人犯傻。\n记住，股票本身不值钱。\n有人愿意更贵买，它才值钱。",
+			"dialog": "不，靠别人犯傻。价格图本质只是成交价格的记录表。\n记住，股票本身不值钱。\n有人愿意更贵买，它才值钱。",
 		},
 		{
 			"target_effect": "buy_basic",
 			"wait": "buy",
-			"dialog": "先买点货，手里没东西，涨了也跟你没关系。",
+			"dialog": "先买点货。手里没有筹码，后面涨了你也赚不到。",
 			"prompt": "点击这张【买入】，用现金买入筹码。",
 			"button": "",
 		},
 		{
 			"dialog": "接下来教你市场最核心的东西：情绪。",
-			"player_dialog": "基本面呢？",
+			"player_dialog": "不看公司好不好吗？",
 		},
 		{
-			"dialog": "那是给套牢的人看的。",
+			"dialog": "那是被套住以后，用来安慰自己的。",
 		},
 		{
 			"target_effect": "hype_basic",
@@ -446,21 +374,21 @@ func _build_steps() -> void:
 		},
 		{
 			"speaker": "player",
-			"dialog": "等等。\n拉升和买入是分开的？",
+			"dialog": "等等。\n买入和把价格炒上去，不是一回事？",
 		},
 		{
-			"dialog": "废话。\n买入是拿筹码，拉升是做气氛，机构有的是手段。",
+			"dialog": "当然不是。\n买入，是你自己先拿货。\n拉升，是让市场觉得这东西要涨。\n你有货，别人也想买，价格才推得动。",
 		},
 		{
 			"target_effect": "inflow_capital",
 			"wait": "price_up",
-			"dialog": "现在给市场一点真金白银的刺激。",
+			"dialog": "现在给市场一点真金白银的刺激。\n打出【游资进场】，让价格冲一段。",
 			"prompt": "打出【游资进场】，让股价快速冲一段。",
 			"button": "",
 		},
 		{
 			"target_path": "ChartPanel",
-			"dialog": "看到没有？情绪铺好了，资金一进场，价格就会被推得更猛。",
+			"dialog": "看见没？先把气氛炒热，再让资金进场。这样价格就更容易冲上去。",
 			"prompt": "分时图会记录这次拉升。",
 		},
 		{
@@ -471,14 +399,14 @@ func _build_steps() -> void:
 			"button": "",
 		},
 		{
-			"dialog": "利好最大的作用，是方便出货。",
+			"dialog": "好消息最大的作用，就是让更多人愿意接你的货。",
 		},
 		{
-			"dialog": "我们做游资短线，使用的是杠杆资金，重要的是当天进、当天出。如果当天你出不掉货，我们只能八折贱卖。",
+			"dialog": "我们今天用的是公司的钱。\n公司的钱不能拖太久，拖得越久，风险越大。\n所以今天买的货，最好今天卖掉。\n如果当天你出不掉货，我们只能 8 折贱卖。",
 			"player_dialog": "为啥啊，我辛辛苦苦拉的股价。",
 		},
 		{
-			"dialog": "速度出货，是交易的法则。",
+			"dialog": "市场不等人。\n涨上去的时候不卖，跌下来就只能说：不要怕，是技术性调整。",
 		},
 		{
 			"action": "enter_shop",
@@ -535,11 +463,11 @@ func _build_steps() -> void:
 			"shop_guide": true,
 			"dialog_next": true,
 			"dialog": "这能让你的买卖节奏更加顺畅。",
-			"button": "结束商店",
+			"button": "进入第二天",
 		},
 		{
 			"action": "leave_shop_for_event",
-			"dialog": "盘后准备完了，第二天市场不会等你。",
+			"dialog": "准备好了就走。第二天开盘，市场可不会等你。",
 			"button": "继续",
 		},
 		{
@@ -551,7 +479,7 @@ func _build_steps() -> void:
 			"button": "继续",
 		},
 		{
-			"dialog": "所以今天开盘大跌，一碗大面，昨天跑了吧？",
+			"dialog": "所以今天开盘大跌，昨天跑的对吧？",
 			"player_dialog": "所以呢？",
 		},
 		{
@@ -561,6 +489,89 @@ func _build_steps() -> void:
 		{
 			"dialog": "今天的思路是先打压股价，低位买入，然后拉高出货，记得尾盘跑路。",
 			"button": "继续交易",
+			"finish": true,
+		},
+	]
+
+
+func _build_goal_steps() -> void:
+	_steps = [
+		{
+			"dialog": "公司是有绩效要求的。",
+			"button": "继续",
+		},
+		{
+			"target_path": "PlayerTargetBar",
+			"dialog": "开局你的账户有 10 万元，本周你刚入职，新人标准，周五需要达到 12 万元的目标。",
+			"prompt": "新人目标：周五收盘总资产达到 ¥120,000。",
+			"button": "继续",
+		},
+		{
+			"dialog": "那我们只能，江湖再见。",
+			"player_dialog": "如果达不到呢？",
+			"button": "继续交易",
+			"finish": true,
+		},
+	]
+
+
+func _build_formal_intro_steps() -> void:
+	_steps = [
+		{
+			"dialog": "年轻人，上周是不是很轻松？",
+			"player_dialog": "还，还行。",
+			"button": "继续",
+		},
+		{
+			"target_path": "PlayerTargetBar",
+			"dialog": "这周你的账户有 20 万元，周五 25 万指标。",
+			"prompt": "正式关目标：周五收盘总资产达到 ¥250,000。",
+			"button": "继续",
+		},
+		{
+			"dialog": "本次你要做的品种是消费公司 PP 玛特，这个票不止我们一家机构。",
+			"button": "继续",
+		},
+		{
+			"dialog": "如果出现其他对手，希望你做好心理准备。",
+			"button": "开始正式交易",
+			"finish": true,
+		},
+	]
+
+
+func _build_opponent_intro_steps() -> void:
+	_steps = [
+		{
+			"target_path": "EnemyPanel",
+			"dialog": "做空对手出现了。他们主要靠砸低股价来获利，这是把双刃剑。",
+			"prompt": "对手会干预股价，也可能帮你把价格砸到低位。",
+			"button": "继续",
+		},
+		{
+			"dialog": "他们既会干预我们拉升股价的节奏，也可以被我们利用：等他们砸低股价，你买点便宜股票，然后拉升卖出。",
+			"player_dialog": "那现在怎么办？",
+			"button": "继续",
+		},
+		{
+			"target_path": "EnemyHpBar",
+			"dialog": "如果你看不惯他们，可以看他们的平仓线。把股价拉升到平仓线，他们受不了亏损就走了。",
+			"prompt": "平仓线：股价越接近这里，对手越危险。",
+			"button": "知道了",
+			"finish": true,
+		},
+	]
+
+
+func _build_opponent_reward_steps() -> void:
+	_steps = [
+		{
+			"dialog": "表现不错，我果然没看错你。",
+			"button": "继续",
+		},
+		{
+			"dialog": "盘后市场有一张稀有卡，作为你打败对手的奖励，记得去看看。",
+			"button": "知道了",
 			"finish": true,
 		},
 	]
@@ -613,6 +624,7 @@ func _apply_step_action(step: Dictionary) -> void:
 
 
 func _show_intro_step(step: Dictionary) -> void:
+	_stop_intro_typewriter()
 	_full_scrim.color = SCRIM_COLOR
 	_full_scrim.visible = true
 	_full_scrim.mouse_filter = MOUSE_FILTER_STOP
@@ -624,10 +636,58 @@ func _show_intro_step(step: Dictionary) -> void:
 	_prompt.visible = false
 	_arrow.visible = false
 	_clear_card_highlight()
+	_configure_intro_panel(step)
 	_intro_panel.visible = true
 	_intro_button.text = String(step.get("button", "知道了"))
-	_intro_button.visible = false
+	_intro_button.visible = not bool(step.get("typewriter", false))
+	if bool(step.get("typewriter", false)):
+		_start_intro_typewriter(String(step.get("intro_body", "")))
 	call_deferred("_update_layout")
+
+
+func _configure_intro_panel(step: Dictionary) -> void:
+	var intro_texture := step.get("intro_texture", BAOSHU_AVATAR_TEXTURE) as Texture2D
+	if intro_texture != null:
+		_intro_portrait.texture = intro_texture
+	var intro_name: String = String(step.get("intro_name", "宝叔"))
+	_intro_name_label.text = intro_name
+	_intro_name_label.visible = intro_name != ""
+	var intro_title: String = String(step.get("intro_title", "人物介绍"))
+	_intro_title_label.text = intro_title
+	_intro_title_label.visible = intro_title != ""
+	_intro_body_label.text = String(step.get("intro_body", ""))
+	_intro_body_label.visible_characters = -1
+
+
+func _start_intro_typewriter(full_text: String) -> void:
+	_intro_typewriter_done = false
+	_intro_body_label.visible_characters = 0
+	var duration: float = max(0.6, float(full_text.length()) / INTRO_TYPEWRITER_CHARS_PER_SECOND)
+	_intro_text_tween = create_tween()
+	_intro_text_tween.tween_property(_intro_body_label, "visible_characters", full_text.length(), duration)
+	_intro_text_tween.finished.connect(_on_intro_typewriter_finished)
+
+
+func _on_intro_typewriter_finished() -> void:
+	_intro_text_tween = null
+	_complete_intro_typewriter(false)
+
+
+func _complete_intro_typewriter(cancel_tween: bool = true) -> void:
+	if cancel_tween:
+		_stop_intro_typewriter()
+	_intro_typewriter_done = true
+	if _intro_body_label != null:
+		_intro_body_label.visible_characters = -1
+	if _intro_button != null:
+		_intro_button.visible = true
+
+
+func _stop_intro_typewriter() -> void:
+	if _intro_text_tween != null and _intro_text_tween.is_valid():
+		_intro_text_tween.kill()
+	_intro_text_tween = null
+	_intro_typewriter_done = true
 
 
 func _is_step_shop_guide(step: Dictionary) -> bool:
@@ -675,15 +735,15 @@ func _enter_step() -> void:
 	_prompt_text.text = String(step.get("prompt", ""))
 	var button_text: String = String(step.get("button", "下一步"))
 	if _is_step_shop_guide(step):
-		_next_button.visible = false
 		_next_button.text = button_text
+		_next_button.visible = _should_show_shop_dialog_button(step)
 		_prompt.visible = false
 		_arrow.visible = false
 		_clear_card_highlight()
 		_update_shop_button_text()
 	else:
-		_next_button.visible = false
 		_next_button.text = button_text
+		_next_button.visible = _should_show_next_button(step)
 		_prompt.visible = String(step.get("prompt", "")) != ""
 		_arrow.visible = _prompt.visible
 	call_deferred("_update_layout")
@@ -706,17 +766,60 @@ func _try_advance_by_click() -> void:
 	if _step_index < 0 or _step_index >= _steps.size():
 		return
 	var step: Dictionary = _steps[_step_index]
+	if _try_complete_intro_typewriter(step):
+		return
+	if _should_dismiss_shop_guide_on_blank_click(step):
+		_close_shop_dialog()
+		return
+
+
+func _should_show_next_button(step: Dictionary) -> bool:
 	if String(step.get("wait", "")) != "":
-		return
+		return false
 	if bool(step.get("force_click", false)):
-		return
-	_on_next_pressed()
+		return false
+	return String(step.get("button", "下一步")) != ""
+
+
+func _should_show_shop_dialog_button(step: Dictionary) -> bool:
+	if not bool(step.get("dialog_next", false)):
+		return false
+	if String(step.get("wait", "")) != "":
+		return false
+	if bool(step.get("force_click", false)):
+		return false
+	return String(step.get("button", "下一步")) != ""
+
+
+func _try_complete_intro_typewriter(step: Dictionary) -> bool:
+	if not bool(step.get("intro", false)):
+		return false
+	if not bool(step.get("typewriter", false)):
+		return false
+	if _intro_typewriter_done:
+		return false
+	_complete_intro_typewriter()
+	return true
+
+
+func _should_dismiss_shop_guide_on_blank_click(step: Dictionary) -> bool:
+	if not _is_step_shop_guide(step):
+		return false
+	if bool(step.get("dialog_next", false)):
+		return false
+	if bool(step.get("force_click", false)):
+		return false
+	if String(step.get("wait", "")) != "":
+		return false
+	return true
 
 
 func _on_next_pressed() -> void:
 	if not _active:
 		return
 	var step: Dictionary = _steps[_step_index]
+	if _try_complete_intro_typewriter(step):
+		return
 	if bool(step.get("finish", false)):
 		_finish()
 	else:
@@ -732,6 +835,7 @@ func _finish() -> void:
 	if _mode == "shop":
 		_finish_shop()
 		return
+	var finished_mode: String = _mode
 	_active = false
 	visible = false
 	_clear_card_highlight()
@@ -740,10 +844,27 @@ func _finish() -> void:
 	var shop := _shop_overlay()
 	if shop != null and shop.has_method("clear_tutorial_button_override"):
 		shop.call("clear_tutorial_button_override")
-	if Game.has_method("tutorial_finish_and_continue_level"):
-		Game.call("tutorial_finish_and_continue_level")
-	else:
-		Game.finish_tutorial()
+	match finished_mode:
+		"level":
+			if Game.has_method("tutorial_finish_guidance"):
+				Game.call("tutorial_finish_guidance")
+			else:
+				Game.set_tutorial_active(false)
+		"goal":
+			if Game.has_method("finish_goal_intro"):
+				Game.call("finish_goal_intro")
+		"formal":
+			if Game.has_method("finish_formal_intro"):
+				Game.call("finish_formal_intro")
+		"opponent":
+			if Game.has_method("finish_opponent_tutorial"):
+				Game.call("finish_opponent_tutorial")
+		"opponent_reward":
+			if Game.has_method("finish_opponent_reward_tutorial"):
+				Game.call("finish_opponent_reward_tutorial")
+		_:
+			if Game.has_method("finish_context_tutorial"):
+				Game.call("finish_context_tutorial")
 
 
 func _finish_shop() -> void:
@@ -795,11 +916,17 @@ func _update_shop_button_text() -> void:
 	var text := "继续"
 	if _step_index >= 0 and _step_index < _steps.size():
 		var step: Dictionary = _steps[_step_index]
+		if bool(step.get("force_click", false)) or String(step.get("wait", "")) != "":
+			shop.call("set_tutorial_button_override", "")
+			return
+		if bool(step.get("dialog_next", false)):
+			shop.call("set_tutorial_button_override", "")
+			return
 		var step_button: String = String(step.get("button", ""))
 		if step_button != "":
 			text = step_button
 	if _step_index >= _steps.size() - 1:
-		text = "关闭商店，进入下一天 →"
+		text = "进入第二天"
 	shop.call("set_tutorial_button_override", text)
 
 
@@ -892,7 +1019,7 @@ func _update_layout() -> void:
 		_highlight.size = target_rect.size
 	var prompt_rect := _position_prompt(target_rect)
 	var dialog_rect := _position_dialog(target_rect, prompt_rect)
-	_position_player_dialog(dialog_rect)
+	_position_player_dialog(dialog_rect, target_rect, prompt_rect)
 
 
 func _layout_shop_dialog() -> void:
@@ -936,9 +1063,9 @@ func _layout_embedded_shop_guide() -> void:
 	_player_dialog.visible = false
 	_intro_panel.visible = false
 	_dialog.visible = true
-	_next_button.visible = false
 	var button_text: String = String(step.get("button", "知道了"))
 	_next_button.text = button_text
+	_next_button.visible = _should_show_shop_dialog_button(step)
 
 	var target_ctrl := _current_target_control()
 	var target_rect := _current_target_rect(target_ctrl)
@@ -966,18 +1093,27 @@ func _layout_embedded_shop_guide() -> void:
 	var w: float = min(620.0, max(360.0, size.x - 72.0))
 	var h: float = SHOP_DIALOG_H
 	_dialog.size = Vector2(w, h)
-	if force_click and target_rect.size.x > 0.0 and target_rect.size.y > 0.0:
-		var x: float = clampf(target_rect.get_center().x - w * 0.5, 36.0, max(36.0, size.x - w - 36.0))
-		var below_y: float = target_rect.end.y + 16.0
-		var above_y: float = target_rect.position.y - h - 16.0
-		var y: float = below_y if below_y + h <= size.y - 48.0 else above_y
-		y = clampf(y, 48.0, max(48.0, size.y - h - 48.0))
-		_dialog.position = Vector2(x, y)
-	else:
-		_dialog.position = Vector2(
-			(size.x - w) * 0.5,
-			clampf(size.y * 0.60 - h * 0.5, 56.0, max(56.0, size.y - h - 56.0))
-		)
+	_dialog.position = _pick_shop_dialog_rect(target_rect, Vector2(w, h), force_click).position
+
+
+func _pick_shop_dialog_rect(target_rect: Rect2, dialog_size: Vector2, force_near_target: bool) -> Rect2:
+	var center_x: float = (size.x - dialog_size.x) * 0.5
+	var center_y: float = size.y * 0.60 - dialog_size.y * 0.5
+	var candidates: Array = [
+		Rect2(Vector2(center_x, center_y), dialog_size),
+		Rect2(Vector2(center_x, 56.0), dialog_size),
+		Rect2(Vector2(center_x, size.y - dialog_size.y - 56.0), dialog_size),
+	]
+	if target_rect.size.x > 0.0 and target_rect.size.y > 0.0:
+		var near_x: float = target_rect.get_center().x - dialog_size.x * 0.5
+		candidates.append(Rect2(Vector2(near_x, target_rect.end.y + 16.0), dialog_size))
+		candidates.append(Rect2(Vector2(near_x, target_rect.position.y - dialog_size.y - 16.0), dialog_size))
+		if force_near_target:
+			candidates.reverse()
+	var avoid: Array = []
+	if target_rect.size.x > 0.0 and target_rect.size.y > 0.0:
+		avoid.append(target_rect)
+	return _pick_best_rect(candidates, avoid, Vector2(size.x * 0.5, size.y * 0.60))
 
 
 func _layout_intro() -> void:
@@ -1065,17 +1201,27 @@ func _position_dialog(target_rect: Rect2, prompt_rect: Rect2 = Rect2()) -> Rect2
 	return best
 
 
-func _position_player_dialog(dialog_rect: Rect2) -> void:
+func _position_player_dialog(dialog_rect: Rect2, target_rect: Rect2 = Rect2(), prompt_rect: Rect2 = Rect2()) -> void:
 	if _player_dialog == null or not _player_dialog.visible:
 		return
 	var w: float = min(500.0, max(280.0, dialog_rect.size.x - 36.0))
-	_player_dialog.size = Vector2(w, PLAYER_DIALOG_H)
-	var x: float = clampf(dialog_rect.position.x + dialog_rect.size.x - w - 22.0, 16.0, max(16.0, size.x - w - 16.0))
-	var y: float = dialog_rect.end.y + 8.0
-	if y + PLAYER_DIALOG_H > size.y - 16.0:
-		y = dialog_rect.position.y - PLAYER_DIALOG_H - 8.0
-	y = clampf(y, 16.0, max(16.0, size.y - PLAYER_DIALOG_H - 16.0))
-	_player_dialog.position = Vector2(x, y)
+	var player_size := Vector2(w, PLAYER_DIALOG_H)
+	_player_dialog.size = player_size
+	var right_x: float = dialog_rect.position.x + dialog_rect.size.x - w - 22.0
+	var left_x: float = dialog_rect.position.x + 22.0
+	var candidates: Array = [
+		Rect2(Vector2(right_x, dialog_rect.end.y + 8.0), player_size),
+		Rect2(Vector2(right_x, dialog_rect.position.y - PLAYER_DIALOG_H - 8.0), player_size),
+		Rect2(Vector2(left_x, dialog_rect.end.y + 8.0), player_size),
+		Rect2(Vector2(left_x, dialog_rect.position.y - PLAYER_DIALOG_H - 8.0), player_size),
+	]
+	var avoid: Array = [dialog_rect]
+	if target_rect.size.x > 0.0 and target_rect.size.y > 0.0:
+		avoid.append(target_rect)
+	if prompt_rect.size.x > 0.0 and prompt_rect.size.y > 0.0:
+		avoid.append(prompt_rect)
+	var best: Rect2 = _pick_best_rect(candidates, avoid, size * 0.5)
+	_player_dialog.position = best.position
 
 
 func _position_prompt(target_rect: Rect2) -> Rect2:
@@ -1116,6 +1262,25 @@ func _pick_prompt_rect(target_rect: Rect2, prompt_size: Vector2) -> Dictionary:
 		if score < best_score:
 			best_score = score
 			best = candidate
+	return best
+
+
+func _pick_best_rect(candidates: Array, avoid_rects: Array, preferred_center: Vector2) -> Rect2:
+	var best: Rect2 = Rect2()
+	var best_score: float = INF
+	for candidate in candidates:
+		var r: Rect2 = candidate
+		r.position.x = clampf(r.position.x, 12.0, max(12.0, size.x - r.size.x - 12.0))
+		r.position.y = clampf(r.position.y, 12.0, max(12.0, size.y - r.size.y - 12.0))
+		var score: float = r.get_center().distance_to(preferred_center) * 0.12
+		for avoid in avoid_rects:
+			var ar: Rect2 = avoid
+			if ar.size.x <= 0.0 or ar.size.y <= 0.0:
+				continue
+			score += _overlap_area(r, ar) * 18.0
+		if score < best_score:
+			best_score = score
+			best = r
 	return best
 
 

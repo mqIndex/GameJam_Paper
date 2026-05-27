@@ -4,7 +4,7 @@ const UF = preload("res://scripts/views/ui_factory.gd")
 const Card = preload("res://scripts/card.gd")
 const Event = preload("res://scripts/event.gd")
 const CardChoiceDialog = preload("res://scripts/views/card_choice_dialog.gd")
-const TutorialOverlay = preload("res://scripts/views/tutorial_overlay.gd")
+const TutorialOverlayScene = preload("res://scenes/ui/tutorial_overlay.tscn")
 
 @onready var log_text: RichTextLabel = $LogText
 @onready var bg: ColorRect = $BG
@@ -72,7 +72,10 @@ func _ready() -> void:
 	_apply_bg_texture()
 	_setup_tutorial_overlay()
 	Game.opponent_entered.connect(_on_opponent_entered_popup)
+	Game.opponent_defeated.connect(_on_opponent_defeated_for_tutorial)
 	Game.shop_entered.connect(_on_shop_entered_for_tutorial)
+	Game.day_started.connect(_on_day_started_for_tutorial)
+	Game.level_started.connect(_on_level_started_for_tutorial)
 	$PlayerPanel.pile_clicked.connect(_on_pile_clicked)
 	$TurnPanel.pile_clicked.connect(_on_pile_clicked)
 	var skip_tutorial: bool = _has_cmdline_flag("--skip-tutorial")
@@ -279,6 +282,9 @@ func _on_opponent_entered_popup(_opponent_id: String) -> void:
 	_opponent_popup_tween.tween_interval(OPPONENT_POPUP_DURATION)
 	_opponent_popup_tween.tween_property(_opponent_popup, "modulate", Color(1, 1, 1, 0), 0.28)
 	_opponent_popup_tween.tween_callback(_hide_opponent_popup)
+	if Game.current_level_index > 0 and not Game.opponent_tutorial_completed and _tutorial_overlay != null:
+		if _tutorial_overlay.has_method("start_opponent_intro"):
+			_tutorial_overlay.call_deferred("start_opponent_intro")
 
 
 func _hide_opponent_popup() -> void:
@@ -302,11 +308,13 @@ func _position_opponent_popup() -> void:
 
 
 func _setup_tutorial_overlay() -> void:
-	_tutorial_overlay = TutorialOverlay.new()
-	_tutorial_overlay.name = "TutorialOverlay"
+	_tutorial_overlay = get_node_or_null("TutorialOverlay") as Control
+	if _tutorial_overlay == null:
+		_tutorial_overlay = TutorialOverlayScene.instantiate() as Control
+		_tutorial_overlay.name = "TutorialOverlay"
+		add_child(_tutorial_overlay)
 	_tutorial_overlay.z_index = 260
 	_tutorial_overlay.visible = false
-	add_child(_tutorial_overlay)
 	_set_full_rect(_tutorial_overlay)
 	if _tutorial_overlay.has_method("setup"):
 		_tutorial_overlay.setup(self)
@@ -317,6 +325,30 @@ func _on_shop_entered_for_tutorial(_day: int) -> void:
 		return
 	if Game.should_start_shop_tutorial() and _tutorial_overlay.has_method("start_shop"):
 		_tutorial_overlay.call_deferred("start_shop")
+
+
+func _on_day_started_for_tutorial(day_index: int) -> void:
+	if _tutorial_overlay == null:
+		return
+	if Game.current_level_index == 0 and day_index == 3 and not Game.tutorial_goal_intro_completed:
+		if _tutorial_overlay.has_method("start_goal_intro"):
+			_tutorial_overlay.call_deferred("start_goal_intro")
+
+
+func _on_level_started_for_tutorial(level_index: int) -> void:
+	if _tutorial_overlay == null:
+		return
+	if level_index > 0 and not Game.formal_intro_completed:
+		if _tutorial_overlay.has_method("start_formal_intro"):
+			_tutorial_overlay.call_deferred("start_formal_intro")
+
+
+func _on_opponent_defeated_for_tutorial(_opponent_id: String, _reward_card_id: String) -> void:
+	if _tutorial_overlay == null:
+		return
+	if Game.current_level_index > 0 and not Game.opponent_reward_tutorial_completed:
+		if _tutorial_overlay.has_method("start_opponent_reward_intro"):
+			_tutorial_overlay.call_deferred("start_opponent_reward_intro")
 
 
 # 启动 BGM (循环, -6dB)

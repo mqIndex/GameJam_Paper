@@ -51,7 +51,7 @@ func _on_leave_shop_pressed() -> void:
 func set_tutorial_button_override(text: String) -> void:
 	_tutorial_button_override = text
 	btn_leave_shop.text = text
-	btn_leave_shop.visible = false
+	btn_leave_shop.visible = text != ""
 
 
 func clear_tutorial_button_override() -> void:
