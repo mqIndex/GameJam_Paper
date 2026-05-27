@@ -160,6 +160,9 @@ var intraday_candles: Array = []                # 当前回合分时 K 事件序
 var cur_open: float = 0.0
 var cur_high: float = 0.0
 var cur_low: float = 0.0
+var _turn_undo_snapshot: Dictionary = {}
+var _turn_undo_used: bool = false
+var _turn_has_played_cards: bool = false
 
 
 # ===========================================================
@@ -490,6 +493,34 @@ func play_card(index: int) -> bool:
 		_log("  [封存] 「%s」当日不再洗回牌堆" % c.name)
 	_log("打出「%s」: %s" % [c.name, c.description])
 	_emit_card_danmaku(c)
+	_turn_has_played_cards = true
+	emit_signal("intraday_updated")
+	emit_signal("hand_changed")
+	emit_signal("state_changed")
+	return true
+
+
+func can_undo_current_turn() -> bool:
+	if is_level_over or phase != Phase.PLAY:
+		return false
+	if _turn_undo_used or not _turn_has_played_cards:
+		return false
+	return not _turn_undo_snapshot.is_empty()
+
+
+func is_turn_undo_used() -> bool:
+	return _turn_undo_used
+
+
+func undo_current_turn() -> bool:
+	if not can_undo_current_turn():
+		return false
+	_restore_turn_undo_snapshot()
+	_turn_undo_used = true
+	_turn_has_played_cards = false
+	_log("[撤回] 已撤回本回合打出的牌")
+	emit_signal("event_triggered", current_event)
+	emit_signal("opponent_state_changed")
 	emit_signal("intraday_updated")
 	emit_signal("hand_changed")
 	emit_signal("state_changed")
@@ -1035,6 +1066,7 @@ func _start_day() -> void:
 func _start_turn() -> void:
 	# 化整为零产物: 上回合留下的临时卡, 在新回合开始时全部消失 (不入弃牌堆)
 	_strip_transient_cards()
+	_reset_turn_undo()
 	turn_in_day += 1
 	turn_global += 1
 	action_points = ACTION_POINTS_PER_TURN
@@ -1088,6 +1120,8 @@ func _start_turn() -> void:
 	# 突发事件刷新: 每天第 1 / 第 5 回合开盘抽牌后
 	if (turn_in_day == 1 or turn_in_day == 5) and not tutorial_active and not is_tutorial_level():
 		_trigger_random_event()
+	_capture_turn_undo_snapshot()
+	emit_signal("state_changed")
 
 
 func _settle_turn() -> void:
@@ -1420,6 +1454,127 @@ func get_total_assets() -> float:
 # ===========================================================
 # 内部辅助
 # ===========================================================
+func _reset_turn_undo() -> void:
+	_turn_undo_snapshot.clear()
+	_turn_undo_used = false
+	_turn_has_played_cards = false
+
+
+func _capture_turn_undo_snapshot() -> void:
+	_turn_undo_snapshot = {
+		"cash": cash,
+		"shares": shares,
+		"avg_cost_price": avg_cost_price,
+		"price": price,
+		"bull": bull,
+		"bear": bear,
+		"action_points": action_points,
+		"hand": _clone_card_array(hand),
+		"draw_pile": _clone_card_array(draw_pile),
+		"discard_pile": _clone_card_array(discard_pile),
+		"skills_played_this_turn": skills_played_this_turn,
+		"turn_emotion_mul": turn_emotion_mul,
+		"combo_buy_count": combo_buy_count,
+		"combo_sell_count": combo_sell_count,
+		"daily_play_count": daily_play_count.duplicate(true),
+		"pending_event_id": pending_event_id,
+		"current_event": current_event,
+		"event_modifiers": event_modifiers.duplicate(true),
+		"event_modifier_dur": event_modifier_dur,
+		"banned_effect_ids": banned_effect_ids.duplicate(),
+		"triggered_event_ids_this_level": triggered_event_ids_this_level.duplicate(true),
+		"liquidity_buffed_cards": _clone_card_array(liquidity_buffed_cards),
+		"cur_open": cur_open,
+		"cur_high": cur_high,
+		"cur_low": cur_low,
+		"intraday_ticks": intraday_ticks.duplicate(),
+		"intraday_candles": intraday_candles.duplicate(true),
+		"opponent_state": _snapshot_opponent_state(),
+	}
+
+
+func _restore_turn_undo_snapshot() -> void:
+	var s: Dictionary = _turn_undo_snapshot
+	cash = float(s["cash"])
+	shares = int(s["shares"])
+	avg_cost_price = float(s["avg_cost_price"])
+	price = float(s["price"])
+	bull = int(s["bull"])
+	bear = int(s["bear"])
+	action_points = int(s["action_points"])
+	hand = _clone_card_array(s["hand"])
+	draw_pile = _clone_card_array(s["draw_pile"])
+	discard_pile = _clone_card_array(s["discard_pile"])
+	skills_played_this_turn = int(s["skills_played_this_turn"])
+	turn_emotion_mul = float(s["turn_emotion_mul"])
+	combo_buy_count = int(s["combo_buy_count"])
+	combo_sell_count = int(s["combo_sell_count"])
+	daily_play_count = (s["daily_play_count"] as Dictionary).duplicate(true)
+	pending_event_id = String(s["pending_event_id"])
+	current_event = s["current_event"] as Event
+	event_modifiers = (s["event_modifiers"] as Dictionary).duplicate(true)
+	event_modifier_dur = int(s["event_modifier_dur"])
+	banned_effect_ids = (s["banned_effect_ids"] as Array).duplicate()
+	triggered_event_ids_this_level = (s["triggered_event_ids_this_level"] as Dictionary).duplicate(true)
+	liquidity_buffed_cards = _clone_card_array(s["liquidity_buffed_cards"])
+	cur_open = float(s["cur_open"])
+	cur_high = float(s["cur_high"])
+	cur_low = float(s["cur_low"])
+	intraday_ticks.clear()
+	for v in s["intraday_ticks"]:
+		intraday_ticks.append(float(v))
+	intraday_candles = (s["intraday_candles"] as Array).duplicate(true)
+	_restore_opponent_state(s["opponent_state"])
+
+
+func _clone_card_array(cards: Array) -> Array:
+	var out: Array = []
+	for card in cards:
+		out.append(_clone_card(card as Card))
+	return out
+
+
+func _clone_card(card: Card) -> Card:
+	if card == null:
+		return null
+	var copy := Card.new(card.id, card.name, card.kind, card.cost, card.description, card.effect_id, card.image_path, card.transient)
+	copy.shop_price = card.shop_price
+	copy.daily_limit = card.daily_limit
+	copy.daily_exile = card.daily_exile
+	copy.daily_exiled = card.daily_exiled
+	return copy
+
+
+func _snapshot_opponent_state() -> Dictionary:
+	if _opponent_state == null:
+		return {}
+	return {
+		"short_position": _opponent_state.short_position,
+		"entry_avg_price": _opponent_state.entry_avg_price,
+		"safety_pool": _opponent_state.safety_pool,
+		"cash": _opponent_state.cash,
+		"required_margin": _opponent_state.required_margin,
+		"liquidation_price": _opponent_state.liquidation_price,
+		"present": _opponent_state.present,
+		"defeated_this_level": _opponent_state.defeated_this_level,
+		"_last_branch": _opponent_state._last_branch,
+	}
+
+
+func _restore_opponent_state(data: Dictionary) -> void:
+	if data.is_empty() or _opponent_state == null:
+		return
+	_opponent_state.short_position = int(data["short_position"])
+	_opponent_state.entry_avg_price = float(data["entry_avg_price"])
+	_opponent_state.safety_pool = float(data["safety_pool"])
+	_opponent_state.cash = float(data["cash"])
+	_opponent_state.required_margin = float(data["required_margin"])
+	_opponent_state.liquidation_price = float(data["liquidation_price"])
+	_opponent_state.present = bool(data["present"])
+	_opponent_state.defeated_this_level = bool(data["defeated_this_level"])
+	_opponent_state._last_branch = String(data["_last_branch"])
+
+
 func _track_price() -> void:
 	intraday_ticks.append(price)
 	if price > cur_high: cur_high = price

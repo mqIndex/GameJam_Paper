@@ -340,6 +340,12 @@ func _build_steps() -> void:
 			"prompt": "市场热度：火热会放大上涨，冷淡会放大下跌。",
 		},
 		{
+			"target_path": "TurnPanel/VBox/BtnUndoTurn",
+			"dialog": "如果这一回合点错牌，可以点这里撤回本回合已经打出的牌。\n每回合只能用一次，回合结束后就不能撤回了。",
+			"prompt": "撤回：回到本回合出牌前的状态。",
+			"button": "继续",
+		},
+		{
 			"dialog": "知道怎么靠股票赚钱吗？",
 			"player_dialog": "看价格图猜涨跌？",
 		},
