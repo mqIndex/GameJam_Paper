@@ -75,12 +75,25 @@ func _ready() -> void:
 	Game.shop_entered.connect(_on_shop_entered_for_tutorial)
 	$PlayerPanel.pile_clicked.connect(_on_pile_clicked)
 	$TurnPanel.pile_clicked.connect(_on_pile_clicked)
-	var tutorial_should_start: bool = Game.should_start_tutorial()
+	var skip_tutorial: bool = _has_cmdline_flag("--skip-tutorial")
+	if skip_tutorial:
+		Game.finish_tutorial()
+	var tutorial_should_start: bool = (not skip_tutorial) and Game.should_start_tutorial()
 	Game.set_tutorial_active(tutorial_should_start)
 	Game.new_level()
 	if tutorial_should_start and _tutorial_overlay != null:
 		_tutorial_overlay.call_deferred("start")
 	_start_bgm()
+
+
+func _has_cmdline_flag(flag: String) -> bool:
+	for arg in OS.get_cmdline_args():
+		if String(arg) == flag:
+			return true
+	for arg in OS.get_cmdline_user_args():
+		if String(arg) == flag:
+			return true
+	return false
 
 
 # 选择类卡 UI: 接 game_state 4 个 request_* 信号 → 弹 dialog → 回调 game_state apply_*

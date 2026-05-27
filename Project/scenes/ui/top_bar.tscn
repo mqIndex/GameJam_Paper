@@ -1,21 +1,22 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://bf1y7frlys8o1"]
 
-[ext_resource type="Script" path="res://scripts/views/top_bar.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://cgfv38wbtx0q" path="res://scripts/views/top_bar.gd" id="1_script"]
 
-[node name="TopBar" type="Control"]
+[node name="TopBar" type="Control" unique_id=1377025645]
+layout_mode = 3
+anchors_preset = 0
 offset_right = 1264.0
 offset_bottom = 36.0
-script = ExtResource("1_script")
 mouse_filter = 2
+script = ExtResource("1_script")
 
-[node name="LeftBar" type="Panel" parent="."]
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 320.0
+[node name="LeftBar" type="Panel" parent="." unique_id=1668162973]
+layout_mode = 0
+offset_right = 329.0
 offset_bottom = 36.0
 
-[node name="HBox" type="HBoxContainer" parent="LeftBar"]
-anchors_preset = 15
+[node name="HBox" type="HBoxContainer" parent="LeftBar" unique_id=1448898726]
+layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 12.0
@@ -24,36 +25,40 @@ offset_right = -12.0
 offset_bottom = -6.0
 theme_override_constants/separation = 10
 
-[node name="LblDay" type="Label" parent="LeftBar/HBox"]
+[node name="LblDay" type="Label" parent="LeftBar/HBox" unique_id=1185138006]
+layout_mode = 2
 theme_override_font_sizes/font_size = 13
 text = "第 1 / 5 天 (周一)"
 
-[node name="Sep1" type="Label" parent="LeftBar/HBox"]
-theme_override_font_sizes/font_size = 16
+[node name="Sep1" type="Label" parent="LeftBar/HBox" unique_id=1615937944]
+layout_mode = 2
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+theme_override_font_sizes/font_size = 16
 text = "|"
 
-[node name="LblTurn" type="Label" parent="LeftBar/HBox"]
+[node name="LblTurn" type="Label" parent="LeftBar/HBox" unique_id=1553935961]
+layout_mode = 2
 theme_override_font_sizes/font_size = 13
 text = "第 1 / 10 回合"
 
-[node name="Spacer1" type="Control" parent="LeftBar/HBox"]
+[node name="Spacer1" type="Control" parent="LeftBar/HBox" unique_id=239884834]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="BtnEvent" type="Button" parent="LeftBar/HBox"]
+[node name="BtnEvent" type="Button" parent="LeftBar/HBox" unique_id=2086711685]
 custom_minimum_size = Vector2(86, 24)
+layout_mode = 2
 theme_override_font_sizes/font_size = 11
 text = "突发事件"
 
-[node name="MidBar" type="Panel" parent="."]
-offset_left = 328.0
-offset_top = 0.0
-offset_right = 720.0
+[node name="MidBar" type="Panel" parent="." unique_id=1810699976]
+layout_mode = 0
+offset_left = 332.0
+offset_right = 724.0
 offset_bottom = 36.0
 
-[node name="HBox" type="HBoxContainer" parent="MidBar"]
-anchors_preset = 15
+[node name="HBox" type="HBoxContainer" parent="MidBar" unique_id=437644154]
+layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 10.0
@@ -62,36 +67,39 @@ offset_right = -10.0
 offset_bottom = -4.0
 theme_override_constants/separation = 8
 
-[node name="IconEmotion" type="Panel" parent="MidBar/HBox"]
+[node name="IconEmotion" type="Panel" parent="MidBar/HBox" unique_id=2123064930]
 custom_minimum_size = Vector2(24, 24)
+layout_mode = 2
 
-[node name="LblEmotionTitle" type="Label" parent="MidBar/HBox"]
-theme_override_font_sizes/font_size = 11
+[node name="LblEmotionTitle" type="Label" parent="MidBar/HBox" unique_id=437249893]
+layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
+theme_override_font_sizes/font_size = 11
 text = "市场情绪"
 vertical_alignment = 1
 
-[node name="EmotionBarSlot" type="Control" parent="MidBar/HBox"]
+[node name="EmotionBarSlot" type="Control" parent="MidBar/HBox" unique_id=1632655731]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="LblEmotionState" type="Label" parent="MidBar/HBox"]
+[node name="LblEmotionState" type="Label" parent="MidBar/HBox" unique_id=1499766170]
 custom_minimum_size = Vector2(48, 0)
-theme_override_font_sizes/font_size = 11
+layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
+theme_override_font_sizes/font_size = 11
 text = "偏多"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="RightBar" type="Panel" parent="."]
+[node name="RightBar" type="Panel" parent="." unique_id=148970698]
+layout_mode = 0
 offset_left = 728.0
-offset_top = 0.0
 offset_right = 1264.0
 offset_bottom = 36.0
 
-[node name="HBox" type="HBoxContainer" parent="RightBar"]
-anchors_preset = 15
+[node name="HBox" type="HBoxContainer" parent="RightBar" unique_id=700216736]
+layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 10.0
@@ -100,40 +108,48 @@ offset_right = -10.0
 offset_bottom = -4.0
 theme_override_constants/separation = 8
 
-[node name="LblTalentTitle" type="Label" parent="RightBar/HBox"]
-theme_override_font_sizes/font_size = 11
+[node name="LblTalentTitle" type="Label" parent="RightBar/HBox" unique_id=1119754775]
+layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
+theme_override_font_sizes/font_size = 11
 text = "天赋"
 vertical_alignment = 1
 
-[node name="TalentIconsSlot" type="HBoxContainer" parent="RightBar/HBox"]
+[node name="TalentIconsSlot" type="HBoxContainer" parent="RightBar/HBox" unique_id=1751044638]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 4
 
-[node name="BtnPause" type="Button" parent="RightBar/HBox"]
+[node name="BtnPause" type="Button" parent="RightBar/HBox" unique_id=1500580332]
 custom_minimum_size = Vector2(28, 24)
+layout_mode = 2
 theme_override_font_sizes/font_size = 11
 text = "II"
 
-[node name="BtnPlay" type="Button" parent="RightBar/HBox"]
+[node name="BtnPlay" type="Button" parent="RightBar/HBox" unique_id=1924361546]
 custom_minimum_size = Vector2(28, 24)
+layout_mode = 2
 theme_override_font_sizes/font_size = 11
 text = ">"
 
-[node name="BtnFF" type="Button" parent="RightBar/HBox"]
+[node name="BtnFF" type="Button" parent="RightBar/HBox" unique_id=425774068]
 custom_minimum_size = Vector2(28, 24)
+layout_mode = 2
 theme_override_font_sizes/font_size = 11
 text = ">>"
 
-[node name="HBox" type="Control" parent="."]
+[node name="HBox" type="Control" parent="." unique_id=615060251]
 visible = false
+anchors_preset = 0
 
-[node name="LblPrice" type="Label" parent="HBox"]
+[node name="LblPrice" type="Label" parent="HBox" unique_id=30891559]
+layout_mode = 0
 text = "¥100.00"
 
-[node name="LblBull" type="Label" parent="HBox"]
+[node name="LblBull" type="Label" parent="HBox" unique_id=1482399929]
+layout_mode = 0
 text = "上涨 50"
 
-[node name="LblBear" type="Label" parent="HBox"]
+[node name="LblBear" type="Label" parent="HBox" unique_id=970618461]
+layout_mode = 0
 text = "50 下跌"

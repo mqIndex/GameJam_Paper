@@ -63,6 +63,14 @@ const FUND_PATCH_TOP: int = 128
 const FUND_PATCH_BOTTOM: int = 128
 const FUND_PATCH_SIDE: int = 64
 
+# 卡牌图标
+const PATH_CARDS_DIR: String = "res://data/Cards/"
+const CARDS_VISUAL_CSV: String = "res://data/Cards/Cards_Visual.csv"
+
+# CSV 缓存: 卡牌名 → 图片文件名 (去后缀的 basename); 懒加载, 仅尝试一次
+static var _card_visual_cache: Dictionary = {}
+static var _card_visual_loaded: bool = false
+
 
 static func try_load_texture(path: String) -> Texture2D:
 	if not ResourceLoader.exists(path):
@@ -71,6 +79,151 @@ static func try_load_texture(path: String) -> Texture2D:
 	if tex is Texture2D:
 		return tex as Texture2D
 	return null
+
+
+# ===== 卡牌 Icon 路径解析 =====
+# 数据驱动: 不在逻辑代码里按卡牌名写死映射, 全部从 Cards_Visual.csv 查询.
+# 优先级:
+#   1) explicit_path (例如 card.image_path, 若 cards.csv 后续填写)
+#   2) Cards_Visual.csv 中 "卡牌" 列 == card_name 行的 "资源1" (逗号分隔取第一个)
+#   3) fallback 同名: res://data/Cards/{card_name}.png
+# 最终找不到返回空字符串 "" (调用方应隐藏 Icon)
+static func card_icon_path_for(card_name: String, explicit_path: String = "") -> String:
+	if explicit_path != "" and ResourceLoader.exists(explicit_path):
+		return explicit_path
+	if not _card_visual_loaded:
+		_load_card_visual_csv()
+	var entry: Dictionary = _card_visual_cache.get(card_name, {})
+	var filename: String = String(entry.get("image", ""))
+	if filename != "":
+		var path: String = PATH_CARDS_DIR + filename
+		if ResourceLoader.exists(path):
+			return path
+	# fallback 同名
+	if card_name != "":
+		var same: String = PATH_CARDS_DIR + card_name + ".png"
+		if ResourceLoader.exists(same):
+			return same
+	return ""
+
+
+# 卡牌边框色: 来源 Cards_Visual.csv "颜色" 列, 格式 "中文色名+#RRGGBB hex" 如 "红色a54f4e"
+# 提取末尾 6 位十六进制; 解析失败返回 Color(0,0,0,0) (调用方应 fallback 到 kind_color)
+static func card_color_for(card_name: String) -> Color:
+	if not _card_visual_loaded:
+		_load_card_visual_csv()
+	var entry: Dictionary = _card_visual_cache.get(card_name, {})
+	var raw: String = String(entry.get("color", "")).strip_edges()
+	if raw == "":
+		return Color(0, 0, 0, 0)
+	# 优先 #RRGGBB 完整 hex
+	if raw.begins_with("#"):
+		return Color.html(raw)
+	# 末尾 6 字符若为十六进制视为 hex
+	if raw.length() >= 6:
+		var tail: String = raw.substr(raw.length() - 6, 6).to_lower()
+		if _is_hex6(tail):
+			return Color.html("#" + tail)
+	# 中文色名兜底 (Events theme_color 风格)
+	match raw:
+		"红", "红色": return Color("#ff5a4f")
+		"橙", "橙色": return Color("#ff9f2e")
+		"黄", "黄色", "金", "金色": return Color("#ffd166")
+		"绿", "绿色": return Color("#30d158")
+		"青", "青色": return Color("#38d9ff")
+		"蓝", "蓝色": return Color("#4aa3ff")
+		"紫", "紫色": return Color("#b06cff")
+		"灰", "灰色": return Color("#9aa4b2")
+	return Color(0, 0, 0, 0)
+
+
+static func _is_hex6(s: String) -> bool:
+	if s.length() != 6:
+		return false
+	for i in range(6):
+		var c: String = s.substr(i, 1)
+		if not ("0123456789abcdef".find(c) >= 0):
+			return false
+	return true
+
+
+static func _load_card_visual_csv() -> void:
+	_card_visual_loaded = true
+	if not FileAccess.file_exists(CARDS_VISUAL_CSV):
+		return
+	var f := FileAccess.open(CARDS_VISUAL_CSV, FileAccess.READ)
+	if f == null:
+		return
+	var text: String = f.get_as_text()
+	f.close()
+	# 剥 UTF-8 BOM
+	if text.length() >= 1 and text.unicode_at(0) == 0xFEFF:
+		text = text.substr(1)
+	var lines: PackedStringArray = text.split("\n")
+	var first: bool = true
+	for raw_line in lines:
+		var line: String = String(raw_line).strip_edges()
+		if line == "":
+			continue
+		if first:
+			first = false  # 跳过表头
+			continue
+		var cols: Array = _parse_csv_line_simple(line)
+		if cols.size() < 4:
+			continue
+		var card_name: String = String(cols[0]).strip_edges()
+		var resource_field: String = String(cols[2]).strip_edges()
+		var color_field: String = String(cols[3]).strip_edges()
+		var first_file: String = _pick_first_csv_value(resource_field)
+		if card_name != "":
+			_card_visual_cache[card_name] = {
+				"image": first_file,
+				"color": color_field,
+			}
+
+
+# 解析单行 CSV: 支持双引号包裹字段 (含字段内逗号) 与转义 ""
+static func _parse_csv_line_simple(line: String) -> Array:
+	var out: Array = []
+	var cur: String = ""
+	var in_quote: bool = false
+	var i: int = 0
+	while i < line.length():
+		var ch: String = line.substr(i, 1)
+		if in_quote:
+			if ch == "\"":
+				if i + 1 < line.length() and line.substr(i + 1, 1) == "\"":
+					cur += "\""
+					i += 2
+					continue
+				in_quote = false
+				i += 1
+				continue
+			cur += ch
+			i += 1
+		else:
+			if ch == ",":
+				out.append(cur)
+				cur = ""
+				i += 1
+			elif ch == "\"":
+				in_quote = true
+				i += 1
+			else:
+				cur += ch
+				i += 1
+	out.append(cur)
+	return out
+
+
+# 取逗号分隔字段中的第一个非空值 (如 "a.png,b.png" → "a.png")
+static func _pick_first_csv_value(field: String) -> String:
+	var parts: PackedStringArray = field.split(",")
+	for p in parts:
+		var s: String = String(p).strip_edges()
+		if s != "":
+			return s
+	return ""
 
 
 # 通用九宫格面板 StyleBoxTexture; 若纹理缺失, fallback 到 StyleBoxFlat

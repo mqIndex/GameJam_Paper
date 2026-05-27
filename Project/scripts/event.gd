@@ -15,6 +15,8 @@ var name: String = ""
 var category: int = Category.NEUTRAL
 var desc: String = ""                  # 文字描述 (弹窗 / 日志)
 var effect_desc: String = ""           # 效果文字 (弹窗显示)
+var image_path: String = ""            # 事件配图 res:// 路径 (空 = 无图)
+var theme_color: Color = Color(0.22, 0.85, 1.0, 1.0) # 事件图边框颜色
 
 # ---- 一次性效果 ----
 var delta_bull: int = 0                # 一次性情绪 ±N

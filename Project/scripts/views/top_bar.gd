@@ -31,6 +31,7 @@ const EmotionMarker = preload("res://scripts/views/emotion_marker.gd")
 # 突发事件 UI
 var _event_dialog: AcceptDialog = null
 var _event_msg: RichTextLabel = null
+var _event_image: TextureRect = null
 var _event_tip: PanelContainer = null
 var _tip_title: RichTextLabel = null
 var _tip_desc: RichTextLabel = null
@@ -281,7 +282,8 @@ func _make_talent_icon(t) -> Panel:
 	return p
 
 
-# ============== 突发事件 UI (原逻辑保留) ==============
+# ============== 突发事件 UI ==============
+# 事件配图已迁移到 DataPanel.MascotSlot 显示, 此弹窗只保留文字描述
 func _setup_event_dialog() -> void:
 	_event_dialog = AcceptDialog.new()
 	_event_dialog.exclusive = false
@@ -300,6 +302,11 @@ func _setup_event_dialog() -> void:
 	_event_msg.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_event_msg.add_theme_font_size_override("normal_font_size", 14)
 	_event_dialog.add_child(_event_msg)
+
+
+# 兼容空实现: 图片显示已迁移到 DataPanel.MascotSlot, 此处保留方法防外部调用报错
+func _apply_event_image(_image_path: String) -> void:
+	pass
 
 
 func _setup_event_tip() -> void:
@@ -353,6 +360,7 @@ func _on_event_triggered(ev) -> void:
 			cat_text = "中性"
 			cat_color = UF.COL_GOLD
 	_event_dialog.title = "突发事件 · %s" % cat_text
+	_apply_event_image(ev_obj.image_path)
 	_event_msg.text = "[color=#%s][b]%s[/b][/color]\n\n%s\n\n[color=#ffd166]%s[/color]" % [
 		cat_color.to_html(false), ev_obj.name, ev_obj.desc, ev_obj.effect_desc
 	]
@@ -375,11 +383,17 @@ func _refresh_event_button() -> void:
 
 
 func _on_btn_event_pressed() -> void:
+	show_current_event_dialog()
+
+
+# 公开方法: 外部 (如 DataPanel 的事件图片点击) 复用此弹窗显示当前事件详情
+func show_current_event_dialog() -> void:
 	var ev: Event = Game.current_event
 	if ev == null:
 		return
 	_event_dialog.title = "突发事件 · %s" % _category_name(ev)
 	var col := _category_color(ev)
+	_apply_event_image(ev.image_path)
 	_event_msg.text = "[color=#%s][b]%s[/b][/color]\n\n%s\n\n[color=#ffd166]%s[/color]" % [
 		col.to_html(false), ev.name, ev.desc, ev.effect_desc
 	]
@@ -387,13 +401,25 @@ func _on_btn_event_pressed() -> void:
 
 
 func _on_btn_event_mouse_entered() -> void:
-	_update_tip_text()
-	_event_tip.visible = true
-	_position_tip_under(btn_event)
+	show_event_tip_for(btn_event)
 
 
 func _on_btn_event_mouse_exited() -> void:
-	_event_tip.visible = false
+	hide_event_tip()
+
+
+# 公开方法: 让外部 (如 DataPanel 的事件图片) 复用此 tip
+func show_event_tip_for(anchor: Control) -> void:
+	if _event_tip == null or anchor == null:
+		return
+	_update_tip_text()
+	_event_tip.visible = true
+	_position_tip_under(anchor)
+
+
+func hide_event_tip() -> void:
+	if _event_tip != null:
+		_event_tip.visible = false
 
 
 func _update_tip_text() -> void:

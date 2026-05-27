@@ -6,6 +6,8 @@ const Card = preload("res://scripts/card.gd")
 @onready var lbl_name: Label = $VBox/LblName
 @onready var lbl_cost: Label = $VBox/LblCost
 @onready var lbl_desc: Label = $VBox/LblDesc
+@onready var icon_slot: CenterContainer = get_node_or_null("VBox/IconSlot")
+@onready var icon_tex: TextureRect = get_node_or_null("VBox/IconSlot/Icon")
 
 const HOVER_SCALE: float = 1.2
 const HOVER_DURATION: float = 0.18
@@ -51,58 +53,60 @@ func setup(card: Card, index: int) -> void:
 	lbl_desc.add_theme_font_size_override("font_size", UF.FS_BODY)
 	lbl_desc.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 	lbl_desc.add_theme_constant_override("outline_size", 2)
-	# 卡牌框: 优先贴图版 StyleBoxTexture; 缺失则 fallback 到彩色描边
-	var tex_sb := UF.texture_card_stylebox(card.kind)
-	if tex_sb != null:
-		add_theme_stylebox_override("normal", tex_sb)
-		var hover_sb := (tex_sb as StyleBoxTexture).duplicate() as StyleBoxTexture
-		hover_sb.modulate_color = Color(1.15, 1.15, 1.15, 1.0)
-		add_theme_stylebox_override("hover", hover_sb)
-		var pressed_sb := (tex_sb as StyleBoxTexture).duplicate() as StyleBoxTexture
-		pressed_sb.modulate_color = Color(0.85, 0.85, 0.85, 1.0)
-		add_theme_stylebox_override("pressed", pressed_sb)
-		add_theme_stylebox_override("hover_pressed", pressed_sb.duplicate())
-		add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-		var disabled_sb := (tex_sb as StyleBoxTexture).duplicate() as StyleBoxTexture
-		disabled_sb.modulate_color = Color(0.45, 0.45, 0.45, 0.85)
-		add_theme_stylebox_override("disabled", disabled_sb)
-	else:
-		# fallback: 整圈彩边 StyleBoxFlat
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = UF.COL_BG_DEEP
-		sb.border_color = col
-		sb.border_width_top = 3
-		sb.border_width_left = 3
-		sb.border_width_right = 3
-		sb.border_width_bottom = 3
-		sb.corner_radius_top_left = 2
-		sb.corner_radius_top_right = 2
-		sb.corner_radius_bottom_left = 2
-		sb.corner_radius_bottom_right = 2
-		sb.shadow_color = Color(col.r, col.g, col.b, 0.30)
-		sb.shadow_size = 3
-		sb.shadow_offset = Vector2.ZERO
-		add_theme_stylebox_override("normal", sb)
-		var hover_sb := sb.duplicate() as StyleBoxFlat
-		hover_sb.bg_color = UF.COL_PANEL_LIGHT
-		hover_sb.shadow_size = 5
-		add_theme_stylebox_override("hover", hover_sb)
-		var pressed_sb := sb.duplicate() as StyleBoxFlat
-		pressed_sb.bg_color = UF.COL_PANEL_LIGHT.lerp(col, 0.2)
-		add_theme_stylebox_override("pressed", pressed_sb)
-		var hover_pressed_sb := pressed_sb.duplicate() as StyleBoxFlat
-		hover_pressed_sb.bg_color = UF.COL_PANEL_LIGHT.lerp(col, 0.28)
-		add_theme_stylebox_override("hover_pressed", hover_pressed_sb)
-		add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-		var disabled_sb := sb.duplicate() as StyleBoxFlat
-		disabled_sb.border_color = UF.COL_AP_OFF
-		disabled_sb.bg_color = Color("#05070b")
-		disabled_sb.shadow_size = 0
-		add_theme_stylebox_override("disabled", disabled_sb)
+	# 卡牌框: 数据驱动纯色边框 (无底图, 透明底)
+	# 边框颜色优先来自 Cards_Visual.csv "颜色" 列, 缺失时 fallback 到 kind_color
+	var border_col: Color = UF.card_color_for(card.name)
+	if border_col.a <= 0.0:
+		border_col = col
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0, 0, 0, 0)  # 透明底, 不画底图
+	sb.border_color = border_col
+	sb.border_width_top = 3
+	sb.border_width_left = 3
+	sb.border_width_right = 3
+	sb.border_width_bottom = 3
+	sb.corner_radius_top_left = 4
+	sb.corner_radius_top_right = 4
+	sb.corner_radius_bottom_left = 4
+	sb.corner_radius_bottom_right = 4
+	add_theme_stylebox_override("normal", sb)
+	var hover_sb := sb.duplicate() as StyleBoxFlat
+	hover_sb.bg_color = Color(border_col.r, border_col.g, border_col.b, 0.10)
+	add_theme_stylebox_override("hover", hover_sb)
+	var pressed_sb := sb.duplicate() as StyleBoxFlat
+	pressed_sb.bg_color = Color(border_col.r, border_col.g, border_col.b, 0.18)
+	add_theme_stylebox_override("pressed", pressed_sb)
+	var hover_pressed_sb := pressed_sb.duplicate() as StyleBoxFlat
+	add_theme_stylebox_override("hover_pressed", hover_pressed_sb)
+	add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	var disabled_sb := sb.duplicate() as StyleBoxFlat
+	disabled_sb.border_color = UF.COL_AP_OFF
+	disabled_sb.bg_color = Color(0, 0, 0, 0)
+	add_theme_stylebox_override("disabled", disabled_sb)
 	disabled = false
 	refresh_play_block_reason()
 	if not pressed.is_connected(_on_pressed):
 		pressed.connect(_on_pressed)
+	_apply_icon(card)
+
+
+# 给卡牌 Icon 加载对应图标 (路径由 UF.card_icon_path_for 数据驱动解析);
+# 找不到时隐藏 Icon TextureRect, 不报错也不显示占位
+func _apply_icon(card: Card) -> void:
+	if icon_tex == null:
+		return
+	var path: String = UF.card_icon_path_for(card.name, card.image_path)
+	if path == "":
+		icon_tex.texture = null
+		icon_tex.visible = false
+		return
+	var tex = load(path)
+	if tex is Texture2D:
+		icon_tex.texture = tex as Texture2D
+		icon_tex.visible = true
+	else:
+		icon_tex.texture = null
+		icon_tex.visible = false
 
 
 func refresh_play_block_reason() -> String:
