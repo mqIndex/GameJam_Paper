@@ -21,24 +21,24 @@ theme_override_constants/separation = 8
 
 [node name="LblHint" type="Label" parent="Margin/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 15
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
 text = "天赋仅在第 1 天的盘后商店上架; 跨天保留, 不再刷新。"
 
 [node name="LblOwnedTitle" type="Label" parent="Margin/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 14
 theme_override_colors/font_color = Color(1, 0.682, 0.259, 1)
 text = "已拥有的天赋"
 
 [node name="OwnedGrid" type="HBoxContainer" parent="Margin/VBox"]
 layout_mode = 2
-theme_override_constants/separation = 2
+theme_override_constants/separation = 14
 alignment = 1
 
 [node name="LblOwnedEmpty" type="Label" parent="Margin/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 14
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
 horizontal_alignment = 1
 text = "(尚未拥有任何天赋)"
@@ -48,13 +48,13 @@ layout_mode = 2
 
 [node name="LblOfferTitle" type="Label" parent="Margin/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 14
 theme_override_colors/font_color = Color(1, 0.682, 0.259, 1)
 text = "可购买"
 
 [node name="Grid" type="HBoxContainer" parent="Margin/VBox"]
 layout_mode = 2
-theme_override_constants/separation = 2
+theme_override_constants/separation = 14
 alignment = 1
 
 [node name="LblOfferEmpty" type="Label" parent="Margin/VBox"]

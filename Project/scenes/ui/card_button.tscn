@@ -4,36 +4,36 @@
 [ext_resource type="Texture2D" path="res://icon.svg" id="2_icon"]
 
 [node name="CardButton" type="Button"]
-custom_minimum_size = Vector2(96, 148)
+custom_minimum_size = Vector2(108, 164)
 script = ExtResource("1_script")
 
 [node name="VBox" type="VBoxContainer" parent="."]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 5.0
-offset_top = 7.0
-offset_right = -5.0
-offset_bottom = -5.0
+offset_left = 7.0
+offset_top = 8.0
+offset_right = -7.0
+offset_bottom = -6.0
 mouse_filter = 2
-theme_override_constants/separation = 3
+theme_override_constants/separation = 4
 
 [node name="LblName" type="Label" parent="VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 16
 horizontal_alignment = 1
 
 [node name="LblCost" type="Label" parent="VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 13
 horizontal_alignment = 1
 
 [node name="IconSlot" type="CenterContainer" parent="VBox"]
-custom_minimum_size = Vector2(0, 40)
+custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 
 [node name="Icon" type="TextureRect" parent="VBox/IconSlot"]
-custom_minimum_size = Vector2(32, 32)
+custom_minimum_size = Vector2(38, 38)
 layout_mode = 2
 texture = ExtResource("2_icon")
 expand_mode = 1
@@ -41,7 +41,7 @@ stretch_mode = 5
 
 [node name="LblDesc" type="Label" parent="VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 11
+theme_override_font_sizes/font_size = 12
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
 horizontal_alignment = 1
 autowrap_mode = 3

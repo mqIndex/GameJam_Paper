@@ -1,19 +1,19 @@
 [gd_scene format=3 uid="uid://63mxpljw8fxt"]
 
 [ext_resource type="Script" uid="uid://d1blbpqbkg6ok" path="res://scripts/main.gd" id="1_main"]
-[ext_resource type="PackedScene" uid="uid://bf1y7frlys8o1" path="res://scenes/ui/top_bar.tscn" id="2_top_bar"]
+[ext_resource type="PackedScene" path="res://scenes/ui/top_bar.tscn" id="2_top_bar"]
 [ext_resource type="PackedScene" uid="uid://bown1hmc4qvnx" path="res://scenes/ui/enemy_hp_bar.tscn" id="3_enemy_hp_bar"]
 [ext_resource type="PackedScene" uid="uid://csmfjxrx51het" path="res://scenes/ui/chart_panel.tscn" id="4_chart"]
-[ext_resource type="PackedScene" uid="uid://biieas1ndb020" path="res://scenes/ui/data_panel.tscn" id="5_data"]
+[ext_resource type="PackedScene" path="res://scenes/ui/data_panel.tscn" id="5_data"]
 [ext_resource type="PackedScene" path="res://scenes/ui/action_bar.tscn" id="6_action"]
 [ext_resource type="PackedScene" uid="uid://dnwopclkbknh0" path="res://scenes/ui/enemy_panel.tscn" id="7_enemy"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hand_panel.tscn" id="8_hand"]
 [ext_resource type="PackedScene" path="res://scenes/ui/turn_panel.tscn" id="9_turn"]
 [ext_resource type="PackedScene" path="res://scenes/ui/player_panel.tscn" id="10_player"]
 [ext_resource type="PackedScene" path="res://scenes/ui/end_dialog.tscn" id="11_end"]
-[ext_resource type="PackedScene" path="res://scenes/ui/shop/shop_overlay.tscn" id="12_shop"]
+[ext_resource type="PackedScene" uid="uid://dfld4r55m3imf" path="res://scenes/ui/shop/shop_overlay.tscn" id="12_shop"]
 [ext_resource type="PackedScene" path="res://scenes/ui/deck_preview_popup.tscn" id="13_deck"]
-[ext_resource type="PackedScene" uid="uid://dyv8pvh8bmy1b" path="res://scenes/ui/player_target_bar.tscn" id="14_player_target"]
+[ext_resource type="PackedScene" path="res://scenes/ui/player_target_bar.tscn" id="14_player_target"]
 [ext_resource type="PackedScene" uid="uid://bykifblxx3yc7" path="res://scenes/ui/tutorial_overlay.tscn" id="15_tutorial"]
 [ext_resource type="Shader" uid="uid://dkrj8iceq56wl" path="res://scenes/Main.gdshader" id="16_cvmbd"]
 
@@ -24,7 +24,7 @@ shader_parameter/scanlines_opacity = 0.05200000247
 shader_parameter/scanlines_width = 0.278000013205
 shader_parameter/grille_opacity = 0.030000001425
 shader_parameter/resolution = Vector2(1920, 1080)
-shader_parameter/pixelate = true
+shader_parameter/pixelate = false
 shader_parameter/roll = true
 shader_parameter/roll_speed = 2.0
 shader_parameter/roll_size = 0.0
@@ -143,6 +143,8 @@ offset_right = 896.0
 offset_bottom = 500.0
 
 [node name="ShopOverlay" parent="." unique_id=1158079318 instance=ExtResource("12_shop")]
+visible = false
+layout_mode = 0
 anchors_preset = 0
 
 [node name="DeckPreviewPopup" parent="." unique_id=625219257 instance=ExtResource("13_deck")]
@@ -151,9 +153,6 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="TutorialOverlay" parent="." unique_id=257724525 instance=ExtResource("15_tutorial")]
-z_index = 260
-layout_mode = 1
-[node name="TutorialOverlay" parent="." unique_id=671062315 instance=ExtResource("15_tutorial")]
 z_index = 260
 layout_mode = 1
 

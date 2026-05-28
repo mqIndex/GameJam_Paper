@@ -13,6 +13,8 @@ var _tutorial_button_override: String = ""
 
 
 func _ready() -> void:
+	_force_full_rect(self)
+	_force_full_rect(get_node_or_null("Dim") as Control)
 	btn_leave_shop.add_theme_color_override("font_color", UF.COL_HIGHLIGHT)
 	var sb := UF.panel_stylebox(UF.COL_HIGHLIGHT)
 	btn_leave_shop.add_theme_stylebox_override("normal", sb)
@@ -24,6 +26,18 @@ func _ready() -> void:
 	Game.shop_entered.connect(_on_shop_entered)
 	Game.shop_changed.connect(_refresh_header)
 	Game.phase_changed.connect(_on_phase_changed)
+
+
+func _force_full_rect(ctrl: Control) -> void:
+	if ctrl == null:
+		return
+	ctrl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ctrl.offset_left = 0.0
+	ctrl.offset_top = 0.0
+	ctrl.offset_right = 0.0
+	ctrl.offset_bottom = 0.0
+	ctrl.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	ctrl.grow_vertical = Control.GROW_DIRECTION_BOTH
 
 
 func _on_shop_entered(_d: int) -> void:

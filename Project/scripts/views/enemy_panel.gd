@@ -16,7 +16,9 @@ const SpeechArrow = preload("res://scripts/views/speech_arrow.gd")
 @onready var avatar: Control = $VBox/AvatarSlot/Avatar
 
 const BUBBLE_DURATION: float = 3.4
-const BUBBLE_W: float = 224.0
+const BUBBLE_W: float = 286.0
+const BUBBLE_MIN_H: float = 58.0
+const BUBBLE_LEFT_SHIFT: float = 38.0
 const BUBBLE_ARROW_SIZE: Vector2 = Vector2(24.0, 13.0)
 const BUBBLE_COLOR: Color = Color(0.03, 0.0, 0.02, 0.94)
 const BUBBLE_BORDER_COLOR: Color = Color(1.0, 0.22, 0.34, 0.92)
@@ -144,17 +146,19 @@ func _build_bubble_overlay() -> void:
 	sb.corner_radius_top_right = 5
 	sb.corner_radius_bottom_left = 5
 	sb.corner_radius_bottom_right = 5
-	sb.content_margin_left = 13.0
-	sb.content_margin_top = 10.0
-	sb.content_margin_right = 13.0
-	sb.content_margin_bottom = 10.0
+	sb.content_margin_left = 16.0
+	sb.content_margin_top = 12.0
+	sb.content_margin_right = 16.0
+	sb.content_margin_bottom = 12.0
 	sb.shadow_color = Color(BUBBLE_BORDER_COLOR.r, BUBBLE_BORDER_COLOR.g, BUBBLE_BORDER_COLOR.b, 0.34)
 	sb.shadow_size = 8
 	_bubble_panel.add_theme_stylebox_override("panel", sb)
 	_bubble_text = Label.new()
-	_bubble_text.custom_minimum_size = Vector2(BUBBLE_W - 26.0, 0.0)
+	_bubble_text.custom_minimum_size = Vector2(BUBBLE_W - 32.0, BUBBLE_MIN_H - 24.0)
 	_bubble_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_bubble_text.add_theme_font_size_override("font_size", 14)
+	_bubble_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_bubble_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_bubble_text.add_theme_font_size_override("font_size", 16)
 	_bubble_text.add_theme_color_override("font_color", Color.WHITE)
 	_bubble_panel.add_child(_bubble_text)
 	add_child(_bubble_panel)
@@ -176,10 +180,10 @@ func _position_bubble() -> void:
 		return
 	var avatar_rect := avatar.get_global_rect()
 	var panel_min := _bubble_panel.get_combined_minimum_size()
-	_bubble_panel.size = Vector2(BUBBLE_W, panel_min.y)
+	_bubble_panel.size = Vector2(BUBBLE_W, max(BUBBLE_MIN_H, panel_min.y))
 	_bubble_panel.pivot_offset = _bubble_panel.size * 0.5
 	var viewport_rect := get_viewport_rect()
-	var x: float = avatar_rect.get_center().x - _bubble_panel.size.x * 0.5
+	var x: float = avatar_rect.get_center().x - _bubble_panel.size.x * 0.5 - BUBBLE_LEFT_SHIFT
 	x = clamp(x, 8.0, max(8.0, viewport_rect.size.x - _bubble_panel.size.x - 8.0))
 	var y: float = avatar_rect.position.y - _bubble_panel.size.y - BUBBLE_ARROW_SIZE.y - 9.0
 	y = max(8.0, y)

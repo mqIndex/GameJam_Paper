@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://dych53j2o7ku6" path="res://scripts/views/shop/shop_card.gd" id="1_script"]
 
 [node name="ShopCard" type="Control" unique_id=1894738156]
-custom_minimum_size = Vector2(92, 166)
+custom_minimum_size = Vector2(108, 184)
 layout_mode = 3
 anchors_preset = 0
 script = ExtResource("1_script")
@@ -12,8 +12,8 @@ script = ExtResource("1_script")
 z_index = 1
 layout_mode = 0
 offset_left = 4.0
-offset_right = 88.0
-offset_bottom = 122.0
+offset_right = 104.0
+offset_bottom = 136.0
 
 [node name="VBox" type="VBoxContainer" parent="CardVisual" unique_id=1964859583]
 layout_mode = 0
@@ -24,25 +24,25 @@ offset_top = 6.0
 offset_right = -4.0
 offset_bottom = -4.0
 mouse_filter = 2
-theme_override_constants/separation = 2
+theme_override_constants/separation = 3
 
 [node name="LblName" type="Label" parent="CardVisual/VBox" unique_id=2145950895]
 layout_mode = 2
-theme_override_font_sizes/font_size = 10
+theme_override_font_sizes/font_size = 12
 horizontal_alignment = 1
 
 [node name="LblCost" type="Label" parent="CardVisual/VBox" unique_id=1124425347]
 layout_mode = 2
-theme_override_font_sizes/font_size = 9
+theme_override_font_sizes/font_size = 11
 horizontal_alignment = 1
 
 [node name="IconSlot" type="CenterContainer" parent="CardVisual/VBox" unique_id=1815392013]
-custom_minimum_size = Vector2(0, 40)
+custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 mouse_filter = 2
 
 [node name="Icon" type="TextureRect" parent="CardVisual/VBox/IconSlot" unique_id=1815392014]
-custom_minimum_size = Vector2(36, 36)
+custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 mouse_filter = 2
 expand_mode = 1
@@ -52,26 +52,26 @@ stretch_mode = 5
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
-theme_override_font_sizes/font_size = 8
+theme_override_font_sizes/font_size = 10
 horizontal_alignment = 1
 autowrap_mode = 3
 
 [node name="LblPrice" type="Label" parent="." unique_id=1560615992]
 layout_mode = 0
 offset_left = 4.0
-offset_top = 126.0
-offset_right = 88.0
-offset_bottom = 140.0
+offset_top = 140.0
+offset_right = 104.0
+offset_bottom = 156.0
 theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
-theme_override_font_sizes/font_size = 10
+theme_override_font_sizes/font_size = 12
 text = "¥0"
 horizontal_alignment = 1
 
 [node name="BtnAction" type="Button" parent="." unique_id=1881105842]
 layout_mode = 0
 offset_left = 4.0
-offset_top = 142.0
-offset_right = 88.0
-offset_bottom = 164.0
-theme_override_font_sizes/font_size = 10
+offset_top = 158.0
+offset_right = 104.0
+offset_bottom = 182.0
+theme_override_font_sizes/font_size = 12
 text = "购买"

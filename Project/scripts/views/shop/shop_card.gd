@@ -43,9 +43,12 @@ func setup(card: Card, price: int, action_text: String, action_color: Color, can
 		btn_action = $BtnAction
 	lbl_name.text = card.name
 	var col: Color = UF.kind_color(card.kind)
+	_apply_text_clarity(lbl_name, col)
 	lbl_cost.text = "耗 %d" % card.cost
 	lbl_cost.add_theme_color_override("font_color", col)
+	_apply_text_clarity(lbl_cost, col)
 	lbl_desc.text = card.description
+	_apply_text_clarity(lbl_desc, UF.COL_TEXT)
 	_apply_visual_style(col)
 	lbl_price.text = "¥%d" % price
 	btn_action.text = action_text
@@ -74,9 +77,12 @@ func setup_talent(talent: Talent, can_afford: bool, action_text: String = "购�
 		btn_action = $BtnAction
 	lbl_name.text = talent.name
 	var col: Color = UF.COL_HIGHLIGHT
+	_apply_text_clarity(lbl_name, col)
 	lbl_cost.text = "天赋"
 	lbl_cost.add_theme_color_override("font_color", col)
+	_apply_text_clarity(lbl_cost, col)
 	lbl_desc.text = talent.description
+	_apply_text_clarity(lbl_desc, UF.COL_TEXT)
 	_apply_visual_style(col)
 	lbl_price.text = "¥%d" % talent.price if talent.price > 0 else "免费"
 	btn_action.text = action_text
@@ -105,6 +111,14 @@ func _apply_visual_style(col: Color) -> void:
 	sb.corner_radius_bottom_left = 4
 	sb.corner_radius_bottom_right = 4
 	card_visual.add_theme_stylebox_override("panel", sb)
+
+
+func _apply_text_clarity(label: Label, color: Color) -> void:
+	if label == null:
+		return
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.86))
+	label.add_theme_constant_override("outline_size", 2)
 
 
 func _on_mouse_entered() -> void:

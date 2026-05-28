@@ -1,9 +1,9 @@
 extends Control
 
-const CARD_WIDTH: float = 96.0
-const CARD_HEIGHT: float = 148.0
+const CARD_WIDTH: float = 108.0
+const CARD_HEIGHT: float = 164.0
 const NORMAL_SEP: float = 6.0
-const HOVER_LIFT: float = 20.0
+const HOVER_LIFT: float = 16.0
 const HOVER_SCALE: float = 1.1
 const TWEEN_DURATION: float = 0.12
 const HOVER_Z: int = 100

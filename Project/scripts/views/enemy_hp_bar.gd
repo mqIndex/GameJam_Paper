@@ -1,5 +1,5 @@
-# EnemyHpBar — 对手剩余资金竖向条 (与 PlayerTargetBar 镜像布局)
-# 剩余资金越多, 底部向上的高亮填充越多; 资金越少, 颜色越偏红.
+# EnemyHpBar — 对手爆仓距离竖向条 (与 PlayerTargetBar 镜像布局)
+# 股价越接近爆仓线, 底部向上的高亮填充越低; 风险越高, 颜色越偏红.
 extends Panel
 
 const UF = preload("res://scripts/views/ui_factory.gd")
@@ -23,13 +23,12 @@ const SEG_HIGH: Color = Color("#153125")
 const BAR_BORDER_COL: Color = Color("#ff5d6c")
 const BAR_BORDER_COL_ALPHA: float = 0.2
 const MARKER_COL: Color = Color("#f5f5f5")
-const FILL_COL: Color = Color("#ff5d6c")  # 新样式: 红色实心填充
-# 刻度: 量程 0..150K (与 PlayerTargetBar 对称), 每 10K 一段, 共 15 段 14 条内部横线
-const TICK_COUNT: int = 15
-const TICK_STEP_K: int = 10
-const TICK_MAX_K: int = 150
-# 在这些 K 值旁边显示数字标签 (单位: 千)
-const TICK_LABEL_KS: Array[int] = [0, 50, 100, 150]
+const FILL_SAFE_COL: Color = Color("#3ddc97")
+const FILL_WARN_COL: Color = Color("#ffc857")
+const FILL_DANGER_COL: Color = Color("#ff5d6c")
+# 刻度: 爆仓距离百分比, 0% = 爆仓, 100% = 相对安全.
+const TICK_COUNT: int = 10
+const TICK_LABEL_PCTS: Array[int] = [0, 50, 100]
 const BAR_INNER_SCALE: float = 0.6  # 红色空心内柱相对面板可用宽的缩放比 (1.0 = 原大, 0.6 = 缩小到 60%)
 const BAR_INNER_HEIGHT_SCALE: float = 0.75  # 红色空心内柱相对面板可用高的缩放比 (从顶部向下收缩, 底部对齐保持不变)
 
@@ -48,7 +47,7 @@ var _border_b: ColorRect = null
 var _border_l: ColorRect = null
 var _border_r: ColorRect = null
 var _ticks: Array[ColorRect] = []
-var _tick_text_labels: Array[Label] = []  # 与 TICK_LABEL_KS 一一对应的右侧数字标签
+var _tick_text_labels: Array[Label] = []  # 与 TICK_LABEL_PCTS 一一对应的右侧数字标签
 var _cash_fill: ColorRect = null
 var _target_line: ColorRect = null
 var _target_arrow: Polygon2D = null
@@ -61,7 +60,7 @@ var _scale_labels: Array[Label] = []
 
 func _ready() -> void:
 	if lbl_title != null:
-		lbl_title.text = "剩余资金"
+		lbl_title.text = "爆仓线"
 	# 内部 panel stylebox 保持原纯色 (内部框线 _border_t/b/l/r 仍然显示)
 	add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	_decorate_icon()
@@ -156,19 +155,19 @@ func _build_bar() -> void:
 	# 内部水平刻度线 (TICK_COUNT-1 条)
 	for i in range(TICK_COUNT - 1):
 		_ticks.append(_new_rect(Color(BAR_BORDER_COL.r, BAR_BORDER_COL.g, BAR_BORDER_COL.b, BAR_BORDER_COL_ALPHA)))
-	# 右侧数字标签: 0 / 50K / 100K / 150K
-	for k in TICK_LABEL_KS:
+	# 右侧数字标签: 0% / 50% / 100%
+	for pct in TICK_LABEL_PCTS:
 		var lbl := Label.new()
-		lbl.add_theme_font_size_override("font_size", 9)
+		lbl.add_theme_font_size_override("font_size", 10)
 		lbl.add_theme_color_override("font_color", Color(BAR_BORDER_COL.r, BAR_BORDER_COL.g, BAR_BORDER_COL.b, 0.85))
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		lbl.text = "0" if k == 0 else "%dK" % k
+		lbl.text = "%d%%" % pct
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(lbl)
 		_tick_text_labels.append(lbl)
-	# 资金填充: 新样式使用纯红实心
-	_cash_fill = _new_rect(FILL_COL)
+	# 爆仓距离填充
+	_cash_fill = _new_rect(FILL_SAFE_COL)
 	# 旧的金色目标值刻度/三角/标签已废弃 (新样式无此元素), 创建后立即隐藏
 	_target_line = _new_rect(UF.COL_GOLD)
 	_target_line.visible = false
@@ -230,19 +229,19 @@ func _layout_bar() -> void:
 		_border_r.size = Vector2(1.0, oh)
 	# 内部水平刻度线: 把柱平均分为 TICK_COUNT 段, 在中间各分隔位绘制一条横线
 	var tick_count: int = TICK_COUNT
-	# 内部水平刻度线: 量程 0..TICK_MAX_K, 每 10K 一段 (从底向上 idx=1..TICK_COUNT-1)
+	# 内部水平刻度线: 量程 0%..100%, 从底向上 idx=1..TICK_COUNT-1.
 	for i in range(_ticks.size()):
 		var idx: int = i + 1
 		var ty: float = _bar_top + _bar_h * (float(idx) / float(tick_count))
 		_ticks[i].position = Vector2(bar_left, ty - 0.5)
 		_ticks[i].size = Vector2(_bar_w, 1.0)
-	# 右侧数字标签 (0 / 50K / 100K / 150K)
+	# 右侧数字标签 (0% / 50% / 100%)
 	var label_x: float = bar_left + _bar_w + 4.0
-	var label_w: float = 28.0
-	var label_h: float = 10.0
+	var label_w: float = 32.0
+	var label_h: float = 11.0
 	for i in range(_tick_text_labels.size()):
-		var k_val: int = TICK_LABEL_KS[i]
-		var k_ratio: float = clampf(float(k_val) / float(TICK_MAX_K), 0.0, 1.0)
+		var pct: int = TICK_LABEL_PCTS[i]
+		var k_ratio: float = clampf(float(pct) / 100.0, 0.0, 1.0)
 		var ly: float = _bar_top + _bar_h * (1.0 - k_ratio) - label_h * 0.5
 		_tick_text_labels[i].position = Vector2(label_x, ly)
 		_tick_text_labels[i].size = Vector2(label_w, label_h)
@@ -292,23 +291,21 @@ func _refresh() -> void:
 		_layout_scale_labels()
 		return
 
-	var ratio: float = clampf(opp.cash / max(1.0, opp.initial_cash), 0.0, 1.0)
-	lbl_value.text = _fmt_compact_cash(opp.cash)
-	# 数值文字颜色: 仍然按危险度切色, 立柱填充色固定为红 (新样式)
-	var text_col: Color
-	if ratio <= 0.25:
-		text_col = UF.COL_DOWN
-	elif ratio <= 0.55:
-		text_col = UF.COL_YELLOW
-	else:
-		text_col = UF.COL_UP
-	lbl_value.add_theme_color_override("font_color", text_col)
-	# 立柱填充: 红色实心, 居中略窄于外框 (左右各留 2px), 与右图视觉一致
+	var safe_ratio: float = _opponent_safe_ratio(opp)
+	var danger_ratio: float = 1.0 - safe_ratio
+	var risk_col: Color = _risk_color(danger_ratio)
+	lbl_value.text = "¥%.1f" % opp.liquidation_price
+	lbl_value.add_theme_color_override("font_color", risk_col)
+	if lbl_liq_price != null:
+		lbl_liq_price.visible = true
+		lbl_liq_price.text = "现价 ¥%.2f" % Game.price
+		lbl_liq_price.add_theme_color_override("font_color", Color(risk_col.r, risk_col.g, risk_col.b, 0.9))
+	# 立柱填充: 爆仓距离越小, 填充越低; 风险越高, 颜色越红.
 	var bar_left: float = (size.x - _bar_w) * 0.5
 	var fill_inset: float = 2.0
 	var fill_w: float = max(2.0, _bar_w - fill_inset * 2.0)
-	var fill_h: float = _bar_h * ratio
-	_cash_fill.color = FILL_COL
+	var fill_h: float = _bar_h * safe_ratio
+	_cash_fill.color = risk_col
 	_cash_fill.visible = true
 	_cash_fill.position = Vector2(bar_left + fill_inset, _bar_top + _bar_h - fill_h)
 	_cash_fill.size = Vector2(fill_w, fill_h)
@@ -356,6 +353,7 @@ func _show_cash_marker(ratio: float) -> void:
 
 func _hide_current_marks() -> void:
 	if _cash_fill != null: _cash_fill.visible = false
+	if lbl_liq_price != null: lbl_liq_price.visible = false
 	if _target_line != null: _target_line.visible = false
 	if _target_label_bg != null: _target_label_bg.visible = false
 	if _lbl_target_k != null: _lbl_target_k.visible = false
@@ -371,3 +369,17 @@ func _fmt_compact_cash(v: float, with_currency: bool = true) -> String:
 	if abs_v >= 10000.0:
 		return "%s%dK" % [prefix, int(round(v / 1000.0))]
 	return "%s%s" % [prefix, UF.fmt_money(v)]
+
+
+func _opponent_safe_ratio(opp) -> float:
+	if opp == null or opp.liquidation_price <= 0.0:
+		return 0.0
+	var safe_base: float = max(1.0, opp.liquidation_price - opp.entry_avg_price)
+	return clampf((opp.liquidation_price - Game.price) / safe_base, 0.0, 1.0)
+
+
+func _risk_color(danger_ratio: float) -> Color:
+	var d: float = clampf(danger_ratio, 0.0, 1.0)
+	if d < 0.55:
+		return FILL_SAFE_COL.lerp(FILL_WARN_COL, d / 0.55)
+	return FILL_WARN_COL.lerp(FILL_DANGER_COL, (d - 0.55) / 0.45)

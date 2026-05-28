@@ -1,6 +1,6 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene format=3 uid="uid://dfld4r55m3imf"]
 
-[ext_resource type="Script" path="res://scripts/views/shop/shop_overlay.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://c5fg7bwt0mqe2" path="res://scripts/views/shop/shop_overlay.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://scenes/ui/shop/shop_buy_panel.tscn" id="2_buy"]
 [ext_resource type="PackedScene" path="res://scenes/ui/shop/shop_upgrade_panel.tscn" id="3_upgrade"]
 [ext_resource type="PackedScene" path="res://scenes/ui/shop/shop_delete_panel.tscn" id="4_delete"]
@@ -15,11 +15,11 @@ border_width_bottom = 2
 border_color = Color(1, 0.682, 0.259, 1)
 corner_radius_top_left = 4
 corner_radius_top_right = 4
-corner_radius_bottom_left = 4
 corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
 
-[node name="ShopOverlay" type="Control"]
-visible = false
+[node name="ShopOverlay" type="Control" unique_id=536970336]
+layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -27,124 +27,136 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
 
-[node name="Dim" type="ColorRect" parent="."]
-anchors_preset = 15
+[node name="Dim" type="ColorRect" parent="." unique_id=1027375402]
+layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.04, 0.07, 0.13, 0.9)
 
-[node name="ShopPanel" type="PanelContainer" parent="."]
-anchors_preset = 15
+[node name="ShopPanel" type="PanelContainer" parent="." unique_id=1131863001]
+layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
 offset_left = 40.0
 offset_top = 24.0
 offset_right = -40.0
 offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_shop")
 
-[node name="Margin" type="MarginContainer" parent="ShopPanel"]
+[node name="Margin" type="MarginContainer" parent="ShopPanel" unique_id=1456915271]
 layout_mode = 2
 theme_override_constants/margin_left = 20
 theme_override_constants/margin_top = 14
 theme_override_constants/margin_right = 20
 theme_override_constants/margin_bottom = 14
 
-[node name="RootVBox" type="VBoxContainer" parent="ShopPanel/Margin"]
+[node name="RootVBox" type="VBoxContainer" parent="ShopPanel/Margin" unique_id=1546260847]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="TopBar" type="HBoxContainer" parent="ShopPanel/Margin/RootVBox"]
+[node name="TopBar" type="HBoxContainer" parent="ShopPanel/Margin/RootVBox" unique_id=944664384]
 layout_mode = 2
 theme_override_constants/separation = 24
 
-[node name="LblShopTitle" type="Label" parent="ShopPanel/Margin/RootVBox/TopBar"]
+[node name="LblShopTitle" type="Label" parent="ShopPanel/Margin/RootVBox/TopBar" unique_id=325244488]
 layout_mode = 2
-theme_override_font_sizes/font_size = 26
 theme_override_colors/font_color = Color(1, 0.682, 0.259, 1)
+theme_override_font_sizes/font_size = 26
 text = "盘后商店"
 
-[node name="Sep" type="Label" parent="ShopPanel/Margin/RootVBox/TopBar"]
+[node name="Sep" type="Label" parent="ShopPanel/Margin/RootVBox/TopBar" unique_id=476809236]
 layout_mode = 2
-theme_override_font_sizes/font_size = 16
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+theme_override_font_sizes/font_size = 16
 text = "|"
 
-[node name="LblShopDay" type="Label" parent="ShopPanel/Margin/RootVBox/TopBar"]
+[node name="LblShopDay" type="Label" parent="ShopPanel/Margin/RootVBox/TopBar" unique_id=39336044]
 layout_mode = 2
 theme_override_font_sizes/font_size = 16
 text = "第 1 / 5 天 结束"
 
-[node name="Spacer" type="Control" parent="ShopPanel/Margin/RootVBox/TopBar"]
+[node name="Spacer" type="Control" parent="ShopPanel/Margin/RootVBox/TopBar" unique_id=961810952]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="LblCashTitle" type="Label" parent="ShopPanel/Margin/RootVBox/TopBar"]
+[node name="LblCashTitle" type="Label" parent="ShopPanel/Margin/RootVBox/TopBar" unique_id=110116202]
 layout_mode = 2
-theme_override_font_sizes/font_size = 12
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+theme_override_font_sizes/font_size = 12
 text = "当前现金"
 
-[node name="LblShopCash" type="Label" parent="ShopPanel/Margin/RootVBox/TopBar"]
+[node name="LblShopCash" type="Label" parent="ShopPanel/Margin/RootVBox/TopBar" unique_id=744444015]
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
 theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
+theme_override_font_sizes/font_size = 22
 text = "¥100,000"
 
-[node name="TopSep" type="HSeparator" parent="ShopPanel/Margin/RootVBox"]
+[node name="TopSep" type="HSeparator" parent="ShopPanel/Margin/RootVBox" unique_id=1668059116]
 layout_mode = 2
 
-[node name="SummaryPanel" type="PanelContainer" parent="ShopPanel/Margin/RootVBox"]
-layout_mode = 2
+[node name="SummaryPanel" type="PanelContainer" parent="ShopPanel/Margin/RootVBox" unique_id=542398499]
 custom_minimum_size = Vector2(0, 90)
+layout_mode = 2
 
-[node name="SumMargin" type="MarginContainer" parent="ShopPanel/Margin/RootVBox/SummaryPanel"]
+[node name="SumMargin" type="MarginContainer" parent="ShopPanel/Margin/RootVBox/SummaryPanel" unique_id=2057812605]
 layout_mode = 2
 theme_override_constants/margin_left = 12
 theme_override_constants/margin_top = 10
 theme_override_constants/margin_right = 12
 theme_override_constants/margin_bottom = 10
 
-[node name="SumVBox" type="VBoxContainer" parent="ShopPanel/Margin/RootVBox/SummaryPanel/SumMargin"]
+[node name="SumVBox" type="VBoxContainer" parent="ShopPanel/Margin/RootVBox/SummaryPanel/SumMargin" unique_id=1205352266]
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="LblSumTitle" type="Label" parent="ShopPanel/Margin/RootVBox/SummaryPanel/SumMargin/SumVBox"]
+[node name="LblSumTitle" type="Label" parent="ShopPanel/Margin/RootVBox/SummaryPanel/SumMargin/SumVBox" unique_id=1558300840]
 layout_mode = 2
-theme_override_font_sizes/font_size = 14
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+theme_override_font_sizes/font_size = 14
 text = "当日结算"
 
-[node name="LblSummary" type="Label" parent="ShopPanel/Margin/RootVBox/SummaryPanel/SumMargin/SumVBox"]
+[node name="LblSummary" type="Label" parent="ShopPanel/Margin/RootVBox/SummaryPanel/SumMargin/SumVBox" unique_id=1632502139]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
-autowrap_mode = 3
 text = "..."
+autowrap_mode = 3
 
-[node name="Tabs" type="TabContainer" parent="ShopPanel/Margin/RootVBox"]
-layout_mode = 2
+[node name="Tabs" type="TabContainer" parent="ShopPanel/Margin/RootVBox" unique_id=1691341013]
 custom_minimum_size = Vector2(0, 220)
+layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
+current_tab = 0
 
-[node name="买卡" parent="ShopPanel/Margin/RootVBox/Tabs" instance=ExtResource("2_buy")]
+[node name="买卡" parent="ShopPanel/Margin/RootVBox/Tabs" unique_id=2114332525 instance=ExtResource("2_buy")]
+layout_mode = 2
+metadata/_tab_index = 0
 
-[node name="升级" parent="ShopPanel/Margin/RootVBox/Tabs" instance=ExtResource("3_upgrade")]
+[node name="升级" parent="ShopPanel/Margin/RootVBox/Tabs" unique_id=137355531 instance=ExtResource("3_upgrade")]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 1
 
-[node name="删卡" parent="ShopPanel/Margin/RootVBox/Tabs" instance=ExtResource("4_delete")]
+[node name="删卡" parent="ShopPanel/Margin/RootVBox/Tabs" unique_id=1976669905 instance=ExtResource("4_delete")]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 2
 
-[node name="天赋" parent="ShopPanel/Margin/RootVBox/Tabs" instance=ExtResource("5_talent")]
+[node name="天赋" parent="ShopPanel/Margin/RootVBox/Tabs" unique_id=550258742 instance=ExtResource("5_talent")]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 3
 
-[node name="BottomBar" type="HBoxContainer" parent="ShopPanel/Margin/RootVBox"]
+[node name="BottomBar" type="HBoxContainer" parent="ShopPanel/Margin/RootVBox" unique_id=1867143833]
 layout_mode = 2
 alignment = 2
 
-[node name="BtnLeaveShop" type="Button" parent="ShopPanel/Margin/RootVBox/BottomBar"]
-layout_mode = 2
+[node name="BtnLeaveShop" type="Button" parent="ShopPanel/Margin/RootVBox/BottomBar" unique_id=370527314]
 custom_minimum_size = Vector2(280, 44)
+layout_mode = 2
 theme_override_font_sizes/font_size = 16
 text = "离开商店, 进入下一天 →"

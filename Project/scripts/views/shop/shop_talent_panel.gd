@@ -20,6 +20,10 @@ var _tip_title: RichTextLabel = null
 var _tip_desc: RichTextLabel = null
 var _tip_anchor: Control = null
 
+const TALENT_CARD_SIZE: Vector2 = Vector2(116.0, 158.0)
+const TALENT_ICON_SIZE: Vector2 = Vector2(82.0, 82.0)
+const TALENT_BUTTON_SIZE: Vector2 = Vector2(86.0, 30.0)
+
 
 func _ready() -> void:
 	Game.talents_changed.connect(refresh)
@@ -34,15 +38,15 @@ func _build_tip() -> void:
 	_tip.z_index = 100
 	_tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_tip.visible = false
-	_tip.custom_minimum_size = Vector2(280, 0)
+	_tip.custom_minimum_size = Vector2(340, 0)
 	var sb := UF.panel_stylebox(UF.COL_HIGHLIGHT)
 	_tip.add_theme_stylebox_override("panel", sb)
 	add_child(_tip)
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 4)
 	_tip.add_child(vbox)
-	_tip_title = _make_rich(14)
-	_tip_desc  = _make_rich(12)
+	_tip_title = _make_rich(16)
+	_tip_desc  = _make_rich(14)
 	vbox.add_child(_tip_title)
 	vbox.add_child(_tip_desc)
 
@@ -53,7 +57,7 @@ func _make_rich(font_size: int) -> RichTextLabel:
 	r.fit_content = true
 	r.scroll_active = false
 	r.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	r.custom_minimum_size = Vector2(260, 0)
+	r.custom_minimum_size = Vector2(320, 0)
 	r.add_theme_font_size_override("normal_font_size", font_size)
 	r.add_theme_color_override("default_color", UF.COL_TEXT)
 	return r
@@ -90,12 +94,13 @@ func refresh() -> void:
 # 构建天赋 logo 组件: TextureRect + 价格/标签 + 购买按钮
 func _make_talent_logo(t: Talent, can_afford: bool) -> VBoxContainer:
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 4)
+	vbox.custom_minimum_size = TALENT_CARD_SIZE
+	vbox.add_theme_constant_override("separation", 6)
 	vbox.mouse_filter = Control.MOUSE_FILTER_PASS
 
 	# logo 图片
 	var tex := TextureRect.new()
-	tex.custom_minimum_size = Vector2(48, 48)
+	tex.custom_minimum_size = TALENT_ICON_SIZE
 	tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	tex.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -108,10 +113,20 @@ func _make_talent_logo(t: Talent, can_afford: bool) -> VBoxContainer:
 			push_warning("ShopTalent: 无法加载天赋 logo %s" % icon_path)
 	vbox.add_child(tex)
 
+	var lbl_name := Label.new()
+	lbl_name.text = t.name
+	lbl_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl_name.add_theme_font_size_override("font_size", 14)
+	lbl_name.add_theme_color_override("font_color", UF.COL_TEXT)
+	lbl_name.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.82))
+	lbl_name.add_theme_constant_override("outline_size", 2)
+	lbl_name.clip_text = true
+	vbox.add_child(lbl_name)
+
 	# 价格 / 状态标签
 	var lbl := Label.new()
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.add_theme_font_size_override("font_size", 10)
+	lbl.add_theme_font_size_override("font_size", 13)
 	if not can_afford and t.price > 0:
 		# 已拥有 → 显示 "已拥有"
 		lbl.text = "已拥有"
@@ -128,8 +143,8 @@ func _make_talent_logo(t: Talent, can_afford: bool) -> VBoxContainer:
 	var btn := Button.new()
 	btn.name = "BtnBuy"
 	btn.text = "购买" if can_afford else "已拥有"
-	btn.custom_minimum_size = Vector2(48, 24)
-	btn.add_theme_font_size_override("font_size", 10)
+	btn.custom_minimum_size = TALENT_BUTTON_SIZE
+	btn.add_theme_font_size_override("font_size", 13)
 	var btn_col: Color = UF.COL_HIGHLIGHT if can_afford else UF.COL_TEXT_DIM
 	btn.add_theme_color_override("font_color", btn_col)
 	var btn_sb := UF.panel_stylebox(btn_col)

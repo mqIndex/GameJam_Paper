@@ -1,6 +1,6 @@
 # PlayerTargetBar — 玩家总资产竖向目标条
 # 风格已同步 EnemyHpBar 新样式: 空心边框 + 内部水平刻度线 + 实心填充, 颜色 #fbe4b2 (金黄)
-# 量程固定 0 → VICTORY_TARGET * 1.25 (即 150K), 资金来源 Game.get_total_assets() / Game.VICTORY_TARGET.
+# 量程动态绑定当前关卡目标: 0 → VICTORY_TARGET * 1.25.
 extends Panel
 
 const UF = preload("res://scripts/views/ui_factory.gd")
@@ -33,13 +33,8 @@ const BAR_BORDER_COL_ALPHA: float = 0.2
 const FILL_COL: Color = Color("#fbe4b2")
 const PROFIT_FILL_COL: Color = Color("#eb9236")  # 盈利段 (现金条上方堆叠)
 
-# 刻度: 量程 0..150K (= VICTORY_TARGET * SCALE_RATIO), 每 10K 一段, 共 15 段 16 个分点
-# 内部画 14 条横线 (除去顶/底两个由边框承担的点)
+# 刻度: 视觉上仍分 15 段; 右侧数字由当前 VICTORY_TARGET 动态计算.
 const TICK_COUNT: int = 15
-const TICK_STEP_K: int = 10
-const TICK_MAX_K: int = 150
-# 在这些 K 值旁边显示数字标签 (单位: 千)
-const TICK_LABEL_KS: Array[int] = [0, 50, 100, 150]
 
 const BAR_INNER_SCALE: float = 0.6
 const BAR_INNER_HEIGHT_SCALE: float = 0.75
@@ -74,7 +69,7 @@ var _border_b: ColorRect = null
 var _border_l: ColorRect = null
 var _border_r: ColorRect = null
 var _ticks: Array[ColorRect] = []
-var _tick_text_labels: Array[Label] = []  # 与 TICK_LABEL_KS 一一对应的右侧数字标签
+var _tick_text_labels: Array[Label] = []  # 右侧动态数字标签
 var _bar_fill: ColorRect = null
 var _bar_profit_fill: ColorRect = null  # 盈利段, 叠在现金段上方
 
@@ -177,14 +172,14 @@ func _build_bar() -> void:
 	# 内部水平刻度线
 	for i in range(TICK_COUNT - 1):
 		_ticks.append(_new_rect(Color(BAR_BORDER_COL.r, BAR_BORDER_COL.g, BAR_BORDER_COL.b, BAR_BORDER_COL_ALPHA)))
-	# 右侧数字标签: 0 / 50K / 100K / 150K
-	for k in TICK_LABEL_KS:
+	# 右侧数字标签: 0 / 目标50% / 目标 / 量程上限
+	for _i in range(4):
 		var lbl := Label.new()
 		lbl.add_theme_font_size_override("font_size", 9)
 		lbl.add_theme_color_override("font_color", Color(BAR_BORDER_COL.r, BAR_BORDER_COL.g, BAR_BORDER_COL.b, 0.85))
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		lbl.text = "0" if k == 0 else "%dK" % k
+		lbl.text = "--"
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(lbl)
 		_tick_text_labels.append(lbl)
@@ -303,16 +298,19 @@ func _layout_bar() -> void:
 		var ty: float = _bar_top + _bar_h * (float(idx) / float(TICK_COUNT))
 		_ticks[i].position = Vector2(bar_left, ty - 0.5)
 		_ticks[i].size = Vector2(_bar_w, 1.0)
-	# 右侧数字标签 (0 / 50K / 100K / 150K)
+	# 右侧数字标签 (随当前关卡目标刷新)
 	var label_x: float = bar_left + _bar_w + 4.0
 	var label_w: float = 28.0
 	var label_h: float = 10.0
+	var tick_values: Array = _target_tick_values()
+	var max_v: float = _scale_max_value()
 	for i in range(_tick_text_labels.size()):
-		var k_val: int = TICK_LABEL_KS[i]
-		var k_ratio: float = clampf(float(k_val) / float(TICK_MAX_K), 0.0, 1.0)
+		var value: float = float(tick_values[min(i, tick_values.size() - 1)])
+		var k_ratio: float = clampf(value / max_v, 0.0, 1.0)
 		var ly: float = _bar_top + _bar_h * (1.0 - k_ratio) - label_h * 0.5
 		_tick_text_labels[i].position = Vector2(label_x, ly)
 		_tick_text_labels[i].size = Vector2(label_w, label_h)
+		_tick_text_labels[i].text = "0" if value <= 0.0 else _format_k(value)
 
 	_layout_target_mark(bar_left)
 
@@ -324,8 +322,8 @@ func _layout_target_mark(bar_left: float) -> void:
 	var y: float = _value_to_y(Game.VICTORY_TARGET)
 	# 让标记在面板可用宽度内布局: 起点紧贴 bar 左边外, 终点贴 bar 右边外+ label
 	var bar_right: float = bar_left + _bar_w
-	# 标签 (右侧): "120K"
-	var label_w: float = 32.0
+	# 标签 (右侧): 当前关卡目标
+	var label_w: float = 40.0
 	var label_h: float = 14.0
 	var max_right: float = size.x - 2.0  # 面板右内边距
 	var label_x: float = bar_right + 4.0
@@ -334,7 +332,7 @@ func _layout_target_mark(bar_left: float) -> void:
 	var label_y: float = clampf(y - label_h * 0.5, _bar_top - label_h * 0.5, _bar_top + _bar_h - label_h * 0.5)
 	_tgt_label.position = Vector2(label_x, label_y)
 	_tgt_label.size = Vector2(label_w, label_h)
-	_tgt_label_text.text = "%dK" % int(Game.VICTORY_TARGET / 1000.0)
+	_tgt_label_text.text = _format_k(Game.VICTORY_TARGET)
 	_tgt_label.visible = true
 	# 三角 (左侧, 朝右)
 	var tri_size: float = 5.0
@@ -359,14 +357,24 @@ func _layout_target_mark(bar_left: float) -> void:
 
 func _value_to_y(v: float) -> float:
 	# 把 0..MAX 数值映射到 bar y 坐标 (底=0, 顶=MAX)
-	var max_v: float = max(1.0, Game.VICTORY_TARGET * SCALE_RATIO)
+	var max_v: float = _scale_max_value()
 	var ratio: float = clamp(v / max_v, 0.0, 1.0)
 	return _bar_top + (1.0 - ratio) * _bar_h
+
+
+func _scale_max_value() -> float:
+	return max(1.0, Game.VICTORY_TARGET * SCALE_RATIO)
+
+
+func _target_tick_values() -> Array:
+	var target: float = max(1.0, Game.VICTORY_TARGET)
+	return [0.0, target * 0.5, target, _scale_max_value()]
 
 
 func _refresh() -> void:
 	if lbl_value == null:
 		return
+	_layout_bar()
 	var total: float = Game.get_total_assets()
 	# 紧凑金额格式
 	lbl_value.text = _format_money_compact(total)
@@ -377,7 +385,7 @@ func _refresh() -> void:
 
 	# 实心填充: 底部=现金, 上方=盈利(持仓市值)
 	if _bar_fill != null and _bar_h > 0.0:
-		var max_v: float = max(1.0, Game.VICTORY_TARGET * SCALE_RATIO)
+		var max_v: float = _scale_max_value()
 		var cash_v: float = clamp(Game.cash, 0.0, max_v)
 		var profit_v: float = clamp(Game.get_holding_value(), 0.0, max_v)
 		var cash_ratio: float = cash_v / max_v

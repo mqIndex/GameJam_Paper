@@ -21,7 +21,7 @@ theme_override_constants/separation = 12
 
 [node name="LblHint" type="Label" parent="Margin/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 15
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
 text = "升级牌组中的卡牌:"
 
@@ -29,8 +29,8 @@ text = "升级牌组中的卡牌:"
 layout_mode = 2
 size_flags_horizontal = 3
 columns = 4
-theme_override_constants/h_separation = 4
-theme_override_constants/v_separation = 8
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 12
 
 [node name="LblEmpty" type="Label" parent="Margin/VBox"]
 visible = false

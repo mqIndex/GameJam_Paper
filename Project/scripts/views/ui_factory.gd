@@ -31,16 +31,16 @@ const COL_BG_DEEP: Color = Color("#06080d")
 
 # ===== 字号策略 (1280x720) =====
 # 等级 / 用途 / 字号
-# HERO (主标题/价格)  20-22
-# H1   (区块标题/对手名)  14
-# H2   (常规数值/按钮)    13
-# BODY (说明/小数据)      11
-# CAPTION (辅助灰字)      10
-const FS_HERO: int = 22
-const FS_H1: int = 14
-const FS_H2: int = 13
-const FS_BODY: int = 11
-const FS_CAPTION: int = 10
+# HERO (主标题/价格)  24
+# H1   (区块标题/对手名)  16
+# H2   (常规数值/按钮)    15
+# BODY (说明/小数据)      13
+# CAPTION (辅助灰字)      11
+const FS_HERO: int = 24
+const FS_H1: int = 16
+const FS_H2: int = 15
+const FS_BODY: int = 13
+const FS_CAPTION: int = 11
 
 # ===== 美术贴图资源 (RGB 不透明背景版, 缺失时自动 fallback 到 StyleBoxFlat) =====
 # 路径常量集中, 便于美术更新替换. 加载失败会返回 null, 由调用方做 fallback.

@@ -53,13 +53,14 @@ func setup(card: Card, index: int) -> void:
 	lbl_desc.add_theme_font_size_override("font_size", UF.FS_BODY)
 	lbl_desc.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
 	lbl_desc.add_theme_constant_override("outline_size", 2)
-	# 卡牌框: 数据驱动纯色边框 (无底图, 透明底)
+	# 卡牌框: 数据驱动纯色边框 + 实心暗底，避免窗口缩放或后处理下看起来半透明。
 	# 边框颜色优先来自 Cards_Visual.csv "颜色" 列, 缺失时 fallback 到 kind_color
 	var border_col: Color = UF.card_color_for(card.name)
 	if border_col.a <= 0.0:
 		border_col = col
+	var normal_bg := Color(0.035, 0.055, 0.095, 0.94)
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0, 0, 0, 0)  # 透明底, 不画底图
+	sb.bg_color = normal_bg
 	sb.border_color = border_col
 	sb.border_width_top = 3
 	sb.border_width_left = 3
@@ -71,17 +72,21 @@ func setup(card: Card, index: int) -> void:
 	sb.corner_radius_bottom_right = 4
 	add_theme_stylebox_override("normal", sb)
 	var hover_sb := sb.duplicate() as StyleBoxFlat
-	hover_sb.bg_color = Color(border_col.r, border_col.g, border_col.b, 0.10)
+	var hover_bg := normal_bg.lerp(border_col, 0.16)
+	hover_bg.a = 0.98
+	hover_sb.bg_color = hover_bg
 	add_theme_stylebox_override("hover", hover_sb)
 	var pressed_sb := sb.duplicate() as StyleBoxFlat
-	pressed_sb.bg_color = Color(border_col.r, border_col.g, border_col.b, 0.18)
+	var pressed_bg := normal_bg.lerp(border_col, 0.24)
+	pressed_bg.a = 1.0
+	pressed_sb.bg_color = pressed_bg
 	add_theme_stylebox_override("pressed", pressed_sb)
 	var hover_pressed_sb := pressed_sb.duplicate() as StyleBoxFlat
 	add_theme_stylebox_override("hover_pressed", hover_pressed_sb)
 	add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	var disabled_sb := sb.duplicate() as StyleBoxFlat
 	disabled_sb.border_color = UF.COL_AP_OFF
-	disabled_sb.bg_color = Color(0, 0, 0, 0)
+	disabled_sb.bg_color = Color(0.035, 0.045, 0.07, 0.9)
 	add_theme_stylebox_override("disabled", disabled_sb)
 	disabled = false
 	refresh_play_block_reason()
@@ -124,7 +129,7 @@ func set_play_block_reason(reason: String) -> void:
 		modulate = Color.WHITE
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	else:
-		modulate = Color(1.0, 1.0, 1.0, 0.58)
+		modulate = Color(0.72, 0.76, 0.84, 1.0)
 		mouse_default_cursor_shape = Control.CURSOR_HELP
 
 

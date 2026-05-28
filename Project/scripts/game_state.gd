@@ -59,7 +59,10 @@ var SHOP_DELETE_BASE_PRICE: int = 1000
 var SHOP_DELETE_PRICE_INCREMENT: int = 1000   # 策划: 后续每次删卡价格+1000
 
 # ===== 对手参数 =====
-var LEVEL_OPPONENT_ID: Array = ["boss_six", "boss_blade", "boss_snake"]
+var LEVEL_OPPONENT_ID: Array = ["boss_six", "boss_blade"]
+var LEVEL_DISPLAY_NAMES: Array = ["正式关", "高压关"]
+var LEVEL_START_CASH: Array = [200000.0, 200000.0]
+var LEVEL_VICTORY_TARGET: Array = [250000.0, 320000.0]
 var OPPONENT_DEFEAT_EMOTION_BONUS: int = 15
 var TIGHT_CASH_MULTIPLIER: int = 50
 var current_level_index: int = 0              # 当前关卡索引 (0-based)
@@ -305,12 +308,33 @@ func tutorial_finish_and_start_formal_level() -> void:
 
 
 func start_formal_level_from_tutorial() -> void:
-	var carry: Array = _tutorial_carryover_effect_ids()
+	var carry: Array = _level_carryover_effect_ids()
 	tutorial_active = false
 	shop_tutorial_active = false
 	shop_tutorial_completed = true
 	tutorial_completed = true
 	current_level_index = 1
+	new_level(carry)
+
+
+func has_next_level() -> bool:
+	return current_level_index < LEVEL_OPPONENT_ID.size()
+
+
+func start_next_level_from_result() -> void:
+	if not has_next_level():
+		new_level()
+		return
+	var carry: Array = _level_carryover_effect_ids()
+	if is_tutorial_level():
+		tutorial_active = false
+		shop_tutorial_active = false
+		shop_tutorial_completed = true
+		tutorial_completed = true
+	else:
+		tutorial_active = false
+		shop_tutorial_active = false
+	current_level_index += 1
 	new_level(carry)
 
 
@@ -324,7 +348,7 @@ func restart_tutorial_level() -> void:
 	new_level()
 
 
-func _tutorial_carryover_effect_ids() -> Array:
+func _level_carryover_effect_ids() -> Array:
 	var starter_counts := _effect_counts(CardDatabase.build_starter_deck())
 	var current_counts := _effect_counts(get_full_deck())
 	var carry: Array = []
@@ -348,13 +372,41 @@ func is_tutorial_level() -> bool:
 	return current_level_index == 0
 
 
+func get_current_level_name() -> String:
+	if is_tutorial_level():
+		return "新手关"
+	var level_idx: int = current_level_index - 1
+	if level_idx >= 0 and level_idx < LEVEL_DISPLAY_NAMES.size():
+		return String(LEVEL_DISPLAY_NAMES[level_idx])
+	return "第 %d 关" % (current_level_index + 1)
+
+
+func get_next_level_name() -> String:
+	if not has_next_level():
+		return ""
+	var next_index: int = current_level_index + 1
+	if next_index == 0:
+		return "新手关"
+	var level_idx: int = next_index - 1
+	if level_idx >= 0 and level_idx < LEVEL_DISPLAY_NAMES.size():
+		return String(LEVEL_DISPLAY_NAMES[level_idx])
+	return "第 %d 关" % (next_index + 1)
+
+
 func _configure_current_level_params() -> void:
 	if is_tutorial_level():
 		START_CASH = _tutorial_start_cash
 		VICTORY_TARGET = _tutorial_victory_target
 	else:
-		START_CASH = _formal_start_cash
-		VICTORY_TARGET = _formal_victory_target
+		var level_idx: int = current_level_index - 1
+		START_CASH = _level_float(LEVEL_START_CASH, level_idx, _formal_start_cash)
+		VICTORY_TARGET = _level_float(LEVEL_VICTORY_TARGET, level_idx, _formal_victory_target)
+
+
+func _level_float(values: Array, index: int, fallback: float) -> float:
+	if index >= 0 and index < values.size():
+		return float(values[index])
+	return fallback
 
 
 # 从 /root/Cfg.balance 把数值刷到本节点的同名 var; 不存在的键保留代码默认.
@@ -392,10 +444,26 @@ func _apply_balance_from_cfg() -> void:
 		var arr: Variant = b["LEVEL_OPPONENT_ID"]
 		if typeof(arr) == TYPE_ARRAY:
 			LEVEL_OPPONENT_ID = arr
+	if b.has("LEVEL_DISPLAY_NAMES"):
+		var names: Variant = b["LEVEL_DISPLAY_NAMES"]
+		if typeof(names) == TYPE_ARRAY:
+			LEVEL_DISPLAY_NAMES = names
+	if b.has("LEVEL_START_CASH"):
+		var level_cash: Variant = b["LEVEL_START_CASH"]
+		if typeof(level_cash) == TYPE_ARRAY:
+			LEVEL_START_CASH = level_cash
+	if b.has("LEVEL_VICTORY_TARGET"):
+		var level_targets: Variant = b["LEVEL_VICTORY_TARGET"]
+		if typeof(level_targets) == TYPE_ARRAY:
+			LEVEL_VICTORY_TARGET = level_targets
 	if b.has("OPPONENT_DEFEAT_EMOTION_BONUS"): OPPONENT_DEFEAT_EMOTION_BONUS = int(b["OPPONENT_DEFEAT_EMOTION_BONUS"])
 	if b.has("TIGHT_CASH_MULTIPLIER"): TIGHT_CASH_MULTIPLIER = int(b["TIGHT_CASH_MULTIPLIER"])
 	_tutorial_start_cash = START_CASH
 	_tutorial_victory_target = VICTORY_TARGET
+	if LEVEL_START_CASH.size() > 0:
+		_formal_start_cash = float(LEVEL_START_CASH[0])
+	if LEVEL_VICTORY_TARGET.size() > 0:
+		_formal_victory_target = float(LEVEL_VICTORY_TARGET[0])
 
 
 func new_level(carried_effect_ids: Array = []) -> void:
@@ -440,7 +508,8 @@ func new_level(carried_effect_ids: Array = []) -> void:
 	_clear_event_state()
 	emit_signal("event_triggered", null)
 	_init_opponent()
-	_log("新一关开始 - 资金 ¥%s, 目标 ¥%s, 5 天 × 10 回合" % [_fmt_money(START_CASH), _fmt_money(VICTORY_TARGET)])
+	_log("%s开始 - 资金 ¥%s, 目标 ¥%s, 5 天 × 10 回合" % [
+		get_current_level_name(), _fmt_money(START_CASH), _fmt_money(VICTORY_TARGET)])
 	emit_signal("state_changed")
 	_start_day()
 	emit_signal("level_started", current_level_index)

@@ -6,7 +6,7 @@ const UF = preload("res://scripts/views/ui_factory.gd")
 @onready var lbl_detail: Label = $Margin/VBox/LblDetail
 @onready var btn_restart: Button = $Margin/VBox/BtnRestart
 
-var _continue_to_formal: bool = false
+var _continue_to_next_level: bool = false
 
 
 func _ready() -> void:
@@ -21,7 +21,7 @@ func _ready() -> void:
 
 
 func _on_level_finished(victory: bool, final_assets: float) -> void:
-	_continue_to_formal = Game.current_level_index == 0 and victory
+	_continue_to_next_level = victory and Game.has_next_level()
 	if victory:
 		lbl_title.text = "胜  利"
 		lbl_title.add_theme_color_override("font_color", UF.COL_UP)
@@ -31,15 +31,22 @@ func _on_level_finished(victory: bool, final_assets: float) -> void:
 	var extra: String = ""
 	if Game.current_level_index == 0:
 		extra = "\n\n%s" % ("宝叔：干得不错，年轻人大有前途。" if victory else "宝叔：山高路远，江湖再见。")
+	elif victory and _continue_to_next_level:
+		extra = "\n\n空头还没彻底认输，下一场会更凶。"
+	elif victory:
+		extra = "\n\n空头退场，盘面终于稳住了。"
 	lbl_detail.text = "最终资产: ¥%s\n胜利目标: ¥%s%s" % [UF.fmt_money(final_assets), UF.fmt_money(Game.VICTORY_TARGET), extra]
-	btn_restart.text = "进入正式关" if _continue_to_formal else "再来一关"
+	if _continue_to_next_level:
+		btn_restart.text = "进入%s" % Game.get_next_level_name()
+	else:
+		btn_restart.text = "重新挑战" if victory else "再来一关"
 	visible = true
 
 
 func _on_restart() -> void:
 	visible = false
-	if _continue_to_formal and Game.has_method("start_formal_level_from_tutorial"):
-		Game.call("start_formal_level_from_tutorial")
+	if _continue_to_next_level and Game.has_method("start_next_level_from_result"):
+		Game.call("start_next_level_from_result")
 	elif Game.current_level_index == 0 and Game.has_method("restart_tutorial_level"):
 		Game.call("restart_tutorial_level")
 		var tutorial: Control = null

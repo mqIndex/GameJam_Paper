@@ -24,7 +24,7 @@ theme_override_constants/separation = 8
 [node name="LblStockTitle" type="Label" parent="VBox/TopRow" unique_id=193594663]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
-theme_override_font_sizes/font_size = 11
+theme_override_font_sizes/font_size = 13
 text = "股价"
 vertical_alignment = 2
 
@@ -34,7 +34,7 @@ size_flags_horizontal = 3
 
 [node name="LblStockPrice" type="Label" parent="VBox/TopRow" unique_id=1058418378]
 layout_mode = 2
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 30
 text = "¥100.00"
 horizontal_alignment = 2
 vertical_alignment = 1
@@ -42,7 +42,7 @@ vertical_alignment = 1
 [node name="LblStockChange" type="Label" parent="VBox" unique_id=1103466358]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.024, 0.839, 0.627, 1)
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 13
 text = "+0.00%"
 horizontal_alignment = 2
 
@@ -63,18 +63,18 @@ theme_override_constants/separation = 2
 [node name="LblSharesTitle" type="Label" parent="VBox/StatsGrid/CellShares" unique_id=1318691284]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
-theme_override_font_sizes/font_size = 10
+theme_override_font_sizes/font_size = 12
 text = "持仓"
 
 [node name="LblShares" type="Label" parent="VBox/StatsGrid/CellShares" unique_id=1679778310]
 layout_mode = 2
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 15
 text = "0 股"
 
 [node name="LblHoldingValue" type="Label" parent="VBox/StatsGrid/CellShares" unique_id=1039496776]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
-theme_override_font_sizes/font_size = 11
+theme_override_font_sizes/font_size = 12
 text = "市值 ¥0"
 
 [node name="CellPnl" type="VBoxContainer" parent="VBox/StatsGrid" unique_id=1395118179]
@@ -85,18 +85,18 @@ theme_override_constants/separation = 2
 [node name="LblPnlTitle" type="Label" parent="VBox/StatsGrid/CellPnl" unique_id=768216218]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
-theme_override_font_sizes/font_size = 10
+theme_override_font_sizes/font_size = 12
 text = "总盈亏"
 
 [node name="LblPnl" type="Label" parent="VBox/StatsGrid/CellPnl" unique_id=1280764913]
 layout_mode = 2
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 15
 text = "+¥0"
 
 [node name="LblPnlPct" type="Label" parent="VBox/StatsGrid/CellPnl" unique_id=1680315008]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.024, 0.839, 0.627, 1)
-theme_override_font_sizes/font_size = 11
+theme_override_font_sizes/font_size = 12
 text = "+0.00%"
 
 [node name="CellCash" type="VBoxContainer" parent="VBox/StatsGrid" unique_id=614104395]
@@ -108,13 +108,13 @@ theme_override_constants/separation = 2
 [node name="LblCashTitle" type="Label" parent="VBox/StatsGrid/CellCash" unique_id=1810082341]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
-theme_override_font_sizes/font_size = 10
+theme_override_font_sizes/font_size = 12
 text = "现金"
 
 [node name="LblCash" type="Label" parent="VBox/StatsGrid/CellCash" unique_id=1620639868]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 15
 text = "¥100,000"
 
 [node name="CellTotal" type="VBoxContainer" parent="VBox/StatsGrid" unique_id=116662706]
@@ -126,12 +126,12 @@ theme_override_constants/separation = 2
 [node name="LblTotalTitle" type="Label" parent="VBox/StatsGrid/CellTotal" unique_id=204503617]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
-theme_override_font_sizes/font_size = 10
+theme_override_font_sizes/font_size = 12
 text = "总资产"
 
 [node name="LblTotalAssets" type="Label" parent="VBox/StatsGrid/CellTotal" unique_id=612835218]
 layout_mode = 2
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 15
 text = "¥100,000"
 
 [node name="Sep2" type="HSeparator" parent="VBox" unique_id=826920917]
@@ -179,7 +179,7 @@ mouse_filter = 2
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
-theme_override_font_sizes/font_size = 13
+theme_override_font_sizes/font_size = 14
 text = "«  »"
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -207,7 +207,7 @@ horizontal_alignment = 1
 [node name="LblMascotSub" type="Label" parent="VBox/MascotSlot/MascotVBox" unique_id=425007957]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
-theme_override_font_sizes/font_size = 10
+theme_override_font_sizes/font_size = 12
 horizontal_alignment = 1
 
 [node name="TargetProgressRow" type="VBoxContainer" parent="VBox" unique_id=515836216]
@@ -221,7 +221,7 @@ layout_mode = 2
 [node name="LblTargetTitle" type="Label" parent="VBox/TargetProgressRow/TargetHeader" unique_id=975553262]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
-theme_override_font_sizes/font_size = 10
+theme_override_font_sizes/font_size = 12
 text = "目标"
 
 [node name="Spacer" type="Control" parent="VBox/TargetProgressRow/TargetHeader" unique_id=1468189732]
@@ -231,7 +231,7 @@ size_flags_horizontal = 3
 [node name="LblBarProgress" type="Label" parent="VBox/TargetProgressRow/TargetHeader" unique_id=1343386380]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 11
+theme_override_font_sizes/font_size = 12
 text = "0%"
 
 [node name="BarBorder" type="ColorRect" parent="VBox/TargetProgressRow" unique_id=109542431]

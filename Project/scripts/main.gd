@@ -33,6 +33,8 @@ var _opponent_popup: PanelContainer = null
 var _opponent_popup_title: Label = null
 var _opponent_popup_body: Label = null
 var _opponent_popup_tween: Tween = null
+var _opponent_popup_size: Vector2 = Vector2.ZERO
+var _opponent_popup_y_ratio: float = 0.34
 var _subtitle_banner: Label = null
 var _tutorial_overlay: Control = null
 
@@ -55,6 +57,8 @@ const DATA_PANEL_MAX_W: float = 224.0
 const END_DIALOG_SIZE: Vector2 = Vector2(512.0, 280.0)
 const OPPONENT_POPUP_SIZE: Vector2 = Vector2(332.0, 126.0)
 const OPPONENT_POPUP_DURATION: float = 2.4
+const OPPONENT_DEFEAT_POPUP_SIZE: Vector2 = Vector2(430.0, 150.0)
+const OPPONENT_DEFEAT_POPUP_DURATION: float = 3.4
 
 
 func _ready() -> void:
@@ -72,6 +76,7 @@ func _ready() -> void:
 	_apply_bg_texture()
 	_setup_tutorial_overlay()
 	Game.opponent_entered.connect(_on_opponent_entered_popup)
+	Game.opponent_defeated.connect(_on_opponent_defeated_popup)
 	Game.opponent_defeated.connect(_on_opponent_defeated_for_tutorial)
 	Game.shop_entered.connect(_on_shop_entered_for_tutorial)
 	Game.day_started.connect(_on_day_started_for_tutorial)
@@ -256,6 +261,7 @@ func _build_opponent_popup() -> void:
 	_opponent_popup_body.custom_minimum_size = Vector2(OPPONENT_POPUP_SIZE.x - 28.0, 0.0)
 	vbox.add_child(_opponent_popup_body)
 	add_child(_opponent_popup)
+	_opponent_popup_size = OPPONENT_POPUP_SIZE
 	_position_opponent_popup()
 
 
@@ -265,13 +271,74 @@ func _on_opponent_entered_popup(_opponent_id: String) -> void:
 	var opp = Game.get_opponent_state()
 	if opp == null:
 		return
-	_opponent_popup_title.text = "庄家入场 · %s" % opp.display_name
-	_opponent_popup_body.text = "做空 %d 股 @ ¥%.2f\n爆仓线 ¥%.2f  现金 ¥%s" % [
+	var body: String = "做空 %d 股 @ ¥%.2f\n爆仓线 ¥%.2f  现金 ¥%s" % [
 		opp.short_position,
 		opp.entry_avg_price,
 		opp.liquidation_price,
 		UF.fmt_money(opp.cash)
 	]
+	_show_opponent_popup(
+		"庄家入场 · %s" % opp.display_name,
+		body,
+		COL_DOWN,
+		COL_DOWN,
+		OPPONENT_POPUP_SIZE,
+		OPPONENT_POPUP_DURATION,
+		0.34
+	)
+	if Game.current_level_index > 0 and not Game.opponent_tutorial_completed and _tutorial_overlay != null:
+		if _tutorial_overlay.has_method("start_opponent_intro"):
+			_tutorial_overlay.call_deferred("start_opponent_intro")
+
+
+func _on_opponent_defeated_popup(_opponent_id: String, reward_card_id: String) -> void:
+	if _opponent_popup == null:
+		return
+	var opp = Game.get_opponent_state()
+	var opponent_name: String = "空头"
+	if opp != null and opp.display_name != "":
+		opponent_name = opp.display_name
+	var reward_text: String = "\n奖励牌已加入抽牌堆" if reward_card_id != "" else ""
+	var body: String = "%s被迫离场，空头撤了。\n场内情绪明显回暖：上涨情绪 +%d%s" % [
+		opponent_name,
+		Game.OPPONENT_DEFEAT_EMOTION_BONUS,
+		reward_text
+	]
+	_show_opponent_popup(
+		"空头退场 · 情绪回暖",
+		body,
+		COL_UP,
+		COL_UP,
+		OPPONENT_DEFEAT_POPUP_SIZE,
+		OPPONENT_DEFEAT_POPUP_DURATION,
+		0.42
+	)
+
+
+func _show_opponent_popup(
+	title: String,
+	body: String,
+	title_color: Color,
+	border_color: Color,
+	popup_size: Vector2,
+	duration: float,
+	y_ratio: float
+) -> void:
+	if _opponent_popup == null:
+		return
+	_opponent_popup_size = popup_size
+	_opponent_popup_y_ratio = y_ratio
+	_set_opponent_popup_style(border_color)
+	_opponent_popup_title.text = title
+	_opponent_popup_title.add_theme_color_override("font_color", title_color)
+	_opponent_popup_title.add_theme_font_size_override("font_size", 18 if popup_size.x > OPPONENT_POPUP_SIZE.x else 15)
+	_opponent_popup_body.text = body
+	_opponent_popup_body.add_theme_font_size_override("font_size", 14 if popup_size.x > OPPONENT_POPUP_SIZE.x else 12)
+	_opponent_popup_body.add_theme_color_override(
+		"font_color",
+		Color("#dce7df") if popup_size.x > OPPONENT_POPUP_SIZE.x else COL_TEXT_DIM
+	)
+	_opponent_popup_body.custom_minimum_size = Vector2(max(0.0, popup_size.x - 28.0), 0.0)
 	_position_opponent_popup()
 	_opponent_popup.visible = true
 	if _opponent_popup_tween != null and _opponent_popup_tween.is_valid():
@@ -279,12 +346,30 @@ func _on_opponent_entered_popup(_opponent_id: String) -> void:
 	_opponent_popup.modulate = Color(1, 1, 1, 0)
 	_opponent_popup_tween = create_tween()
 	_opponent_popup_tween.tween_property(_opponent_popup, "modulate", Color(1, 1, 1, 1), 0.14)
-	_opponent_popup_tween.tween_interval(OPPONENT_POPUP_DURATION)
+	_opponent_popup_tween.tween_interval(duration)
 	_opponent_popup_tween.tween_property(_opponent_popup, "modulate", Color(1, 1, 1, 0), 0.28)
 	_opponent_popup_tween.tween_callback(_hide_opponent_popup)
-	if Game.current_level_index > 0 and not Game.opponent_tutorial_completed and _tutorial_overlay != null:
-		if _tutorial_overlay.has_method("start_opponent_intro"):
-			_tutorial_overlay.call_deferred("start_opponent_intro")
+
+
+func _set_opponent_popup_style(border_color: Color) -> void:
+	if _opponent_popup == null:
+		return
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.04, 0.07, 0.13, 0.9)
+	sb.border_color = Color(border_color.r, border_color.g, border_color.b, 0.86)
+	sb.border_width_left = 2
+	sb.border_width_top = 2
+	sb.border_width_right = 2
+	sb.border_width_bottom = 2
+	sb.corner_radius_top_left = 5
+	sb.corner_radius_top_right = 5
+	sb.corner_radius_bottom_left = 5
+	sb.corner_radius_bottom_right = 5
+	sb.content_margin_left = 16.0
+	sb.content_margin_top = 12.0
+	sb.content_margin_right = 16.0
+	sb.content_margin_bottom = 12.0
+	_opponent_popup.add_theme_stylebox_override("panel", sb)
 
 
 func _hide_opponent_popup() -> void:
@@ -300,10 +385,13 @@ func _position_opponent_popup() -> void:
 		view_size = get_viewport_rect().size
 	view_size.x = max(view_size.x, MIN_WINDOW_SIZE.x)
 	view_size.y = max(view_size.y, MIN_WINDOW_SIZE.y)
-	_opponent_popup.size = OPPONENT_POPUP_SIZE
+	var popup_size: Vector2 = _opponent_popup_size
+	if popup_size == Vector2.ZERO:
+		popup_size = OPPONENT_POPUP_SIZE
+	_opponent_popup.size = popup_size
 	_opponent_popup.position = Vector2(
-		(view_size.x - OPPONENT_POPUP_SIZE.x) * 0.5,
-		max(64.0, (view_size.y - OPPONENT_POPUP_SIZE.y) * 0.34)
+		(view_size.x - popup_size.x) * 0.5,
+		max(64.0, (view_size.y - popup_size.y) * _opponent_popup_y_ratio)
 	)
 
 
@@ -347,6 +435,12 @@ func _on_opponent_defeated_for_tutorial(_opponent_id: String, _reward_card_id: S
 	if _tutorial_overlay == null:
 		return
 	if Game.current_level_index > 0 and not Game.opponent_reward_tutorial_completed:
+		var defeated_level_index: int = Game.current_level_index
+		await get_tree().create_timer(OPPONENT_DEFEAT_POPUP_DURATION + 0.2).timeout
+		if _tutorial_overlay == null or Game.opponent_reward_tutorial_completed:
+			return
+		if Game.is_level_over or Game.current_level_index != defeated_level_index:
+			return
 		if _tutorial_overlay.has_method("start_opponent_reward_intro"):
 			_tutorial_overlay.call_deferred("start_opponent_reward_intro")
 
