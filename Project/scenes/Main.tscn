@@ -15,6 +15,31 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/deck_preview_popup.tscn" id="13_deck"]
 [ext_resource type="PackedScene" uid="uid://dyv8pvh8bmy1b" path="res://scenes/ui/player_target_bar.tscn" id="14_player_target"]
 [ext_resource type="PackedScene" uid="uid://bykifblxx3yc7" path="res://scenes/ui/tutorial_overlay.tscn" id="15_tutorial"]
+[ext_resource type="Shader" uid="uid://dkrj8iceq56wl" path="res://scenes/Main.gdshader" id="16_cvmbd"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ft6cd"]
+shader = ExtResource("16_cvmbd")
+shader_parameter/overlay = true
+shader_parameter/scanlines_opacity = 0.05200000247
+shader_parameter/scanlines_width = 0.278000013205
+shader_parameter/grille_opacity = 0.030000001425
+shader_parameter/resolution = Vector2(1920, 1080)
+shader_parameter/pixelate = true
+shader_parameter/roll = true
+shader_parameter/roll_speed = 2.0
+shader_parameter/roll_size = 0.0
+shader_parameter/roll_variation = 0.10000000149012
+shader_parameter/distort_intensity = 0.0
+shader_parameter/noise_opacity = 0.0
+shader_parameter/noise_speed = 0.0
+shader_parameter/static_noise_intensity = 0.02000000095
+shader_parameter/aberration = 4.7499999933364734e-08
+shader_parameter/brightness = 1.5
+shader_parameter/discolor = false
+shader_parameter/warp_amount = 0.0
+shader_parameter/clip_warp = false
+shader_parameter/vignette_intensity = 0.5
+shader_parameter/vignette_opacity = 0.16400000779
 
 [node name="Main" type="Control" unique_id=1846624010]
 layout_mode = 3
@@ -26,7 +51,8 @@ grow_vertical = 2
 script = ExtResource("1_main")
 
 [node name="BG" type="ColorRect" parent="." unique_id=737905088]
-layout_mode = 0
+layout_mode = 1
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
@@ -127,3 +153,13 @@ grow_vertical = 2
 [node name="TutorialOverlay" parent="." unique_id=257724525 instance=ExtResource("15_tutorial")]
 z_index = 260
 layout_mode = 1
+[node name="TutorialOverlay" parent="." unique_id=671062315 instance=ExtResource("15_tutorial")]
+z_index = 260
+layout_mode = 1
+
+[node name="ColorRect" type="ColorRect" parent="." unique_id=775589172]
+material = SubResource("ShaderMaterial_ft6cd")
+layout_mode = 0
+offset_right = 1281.0
+offset_bottom = 769.0
+mouse_filter = 2
