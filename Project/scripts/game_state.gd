@@ -1118,8 +1118,16 @@ func _start_turn() -> void:
 	emit_signal("hand_changed")
 	emit_signal("state_changed")
 	# 突发事件刷新: 每天第 1 / 第 5 回合开盘抽牌后
-	if (turn_in_day == 1 or turn_in_day == 5) and not tutorial_active and not is_tutorial_level():
-		_trigger_random_event()
+	# 教学关: 第 1 天无事件, 第 2 天由 tutorial_overlay 手动触发固定事件, 第 3 天起恢复正常随机刷新
+	var should_trigger: bool = (turn_in_day == 1 or turn_in_day == 5)
+	if should_trigger:
+		if is_tutorial_level():
+			# 教学关: 第 3 天起才随机刷新
+			if day >= 3:
+				_trigger_random_event()
+		elif not tutorial_active:
+			# 正式关: tutorial_active=false 时正常刷新
+			_trigger_random_event()
 	_capture_turn_undo_snapshot()
 	emit_signal("state_changed")
 

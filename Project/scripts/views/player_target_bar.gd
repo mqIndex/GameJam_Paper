@@ -29,6 +29,7 @@ const FILL_HIGH_TRANS: Color = Color(1.0, 0.784, 0.341, 0.35)
 # 新样式 (与 EnemyHpBar 同款, 仅配色不同)
 const BAR_BORDER_COL: Color = Color("#fbe4b2")  # 边框 + 内部刻度线 + 实心填充统一金黄色
 const FILL_COL: Color = Color("#fbe4b2")
+const PROFIT_FILL_COL: Color = Color("#eb9236")  # 盈利段 (现金条上方堆叠)
 const TICK_COUNT: int = 7
 const BAR_INNER_SCALE: float = 0.6
 const BAR_INNER_HEIGHT_SCALE: float = 0.75
@@ -64,6 +65,7 @@ var _border_l: ColorRect = null
 var _border_r: ColorRect = null
 var _ticks: Array[ColorRect] = []
 var _bar_fill: ColorRect = null
+var _bar_profit_fill: ColorRect = null  # 盈利段, 叠在现金段上方
 
 # 目标资金线: 左三角 + 中间虚线 + 右侧带描边的 "120K" 标签
 var _tgt_arrow: Polygon2D = null
@@ -113,6 +115,8 @@ func _build_bar() -> void:
 		_ticks.append(_new_rect(BAR_BORDER_COL))
 	# 实心填充 (从底部向上, 颜色 #fbe4b2)
 	_bar_fill = _new_rect(FILL_COL)
+	# 盈利段填充 (叠在现金段上方, 颜色 #eb9236)
+	_bar_profit_fill = _new_rect(PROFIT_FILL_COL)
 	# 旧顶部半透明渐变 (隐藏)
 	_bar_fill_top = _new_rect(FILL_LOW_TRANS)
 	_bar_fill_top.visible = false
@@ -286,18 +290,32 @@ func _refresh() -> void:
 	else:
 		lbl_value.add_theme_color_override("font_color", UF.COL_GOLD)
 
-	# 实心填充: 底部向上, 长度按当前资金比例
+	# 实心填充: 底部=现金, 上方=盈利(持仓市值)
 	if _bar_fill != null and _bar_h > 0.0:
 		var max_v: float = max(1.0, Game.VICTORY_TARGET * SCALE_RATIO)
-		var ratio: float = clamp(total / max_v, 0.0, 1.0)
+		var cash_v: float = clamp(Game.cash, 0.0, max_v)
+		var profit_v: float = clamp(Game.get_holding_value(), 0.0, max_v)
+		var cash_ratio: float = cash_v / max_v
+		var profit_ratio: float = profit_v / max_v
+		# 总高不超过 bar
+		var combined: float = min(cash_ratio + profit_ratio, 1.0)
+		var actual_profit_ratio: float = combined - cash_ratio
 		# 填充柱宽 = 内框宽 * FILL_WIDTH_SCALE (0.8), 留出左右更宽空白; 在内框内水平居中
 		var fill_w: float = max(2.0, _bar_w * FILL_WIDTH_SCALE)
 		var fill_x: float = (size.x - fill_w) * 0.5
-		var fill_h: float = _bar_h * ratio
+		# 现金段 (底部)
+		var cash_h: float = _bar_h * cash_ratio
 		_bar_fill.color = FILL_COL
-		_bar_fill.visible = true
-		_bar_fill.position = Vector2(fill_x, _bar_top + _bar_h - fill_h)
-		_bar_fill.size = Vector2(fill_w, fill_h)
+		_bar_fill.visible = cash_h > 0.5
+		_bar_fill.position = Vector2(fill_x, _bar_top + _bar_h - cash_h)
+		_bar_fill.size = Vector2(fill_w, cash_h)
+		# 盈利段 (紧贴现金段上方)
+		if _bar_profit_fill != null:
+			var profit_h: float = _bar_h * actual_profit_ratio
+			_bar_profit_fill.color = PROFIT_FILL_COL
+			_bar_profit_fill.visible = profit_h > 0.5
+			_bar_profit_fill.position = Vector2(fill_x, _bar_top + _bar_h - cash_h - profit_h)
+			_bar_profit_fill.size = Vector2(fill_w, profit_h)
 
 
 
