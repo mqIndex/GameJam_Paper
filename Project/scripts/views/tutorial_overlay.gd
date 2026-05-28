@@ -12,6 +12,8 @@ const PROMPT_H: float = 64.0
 const ENTER_SCENE_TEXTURE: Texture2D = preload("res://assets/EnterSecen.png")
 const BAOSHU_AVATAR_TEXTURE: Texture2D = preload("res://assets/baoshu_avatar_UpperHalf.png")
 const INTRO_TYPEWRITER_CHARS_PER_SECOND: float = 18.0
+const DIALOG_TYPEWRITER_CHARS_PER_SECOND: float = 22.0
+const DIALOG_PLAYER_GAP_SEC: float = 0.25  # 宝叔说完 → 玩家开口 中间停顿
 
 
 var _main: Control = null
@@ -48,6 +50,11 @@ var _arrow = null
 var _next_button: Button = null
 var _intro_text_tween: Tween = null
 var _intro_typewriter_done: bool = true
+var _dialog_text_tween: Tween = null
+var _player_text_tween: Tween = null
+var _dialog_typewriter_done: bool = true
+var _pending_player_text: String = ""
+var _player_dialog_pending: bool = false  # 宝叔说话期间, 玩家对话框暂时隐藏
 
 
 func setup(main_node: Control) -> void:
@@ -696,6 +703,76 @@ func _stop_intro_typewriter() -> void:
 	_intro_typewriter_done = true
 
 
+# ============== 对话框打字机 (宝叔 + 玩家依次) ==============
+
+func _start_dialog_typewriter(main_text: String, player_text: String) -> void:
+	_stop_dialog_typewriter()
+	_dialog_text.text = main_text
+	_player_dialog_text.text = player_text
+	_pending_player_text = player_text
+	_dialog_typewriter_done = false
+	if main_text.length() <= 0:
+		_dialog_text.visible_characters = -1
+		_on_main_dialog_typewriter_finished()
+		return
+	_dialog_text.visible_characters = 0
+	var duration: float = max(0.4, float(main_text.length()) / DIALOG_TYPEWRITER_CHARS_PER_SECOND)
+	_dialog_text_tween = create_tween()
+	_dialog_text_tween.tween_property(_dialog_text, "visible_characters", main_text.length(), duration)
+	# 宝叔说话期间: 玩家对话框先隐藏
+	_player_dialog_pending = player_text != ""
+	_player_dialog.visible = false
+	_dialog_text_tween.finished.connect(_on_main_dialog_typewriter_finished)
+
+
+func _on_main_dialog_typewriter_finished() -> void:
+	_dialog_text_tween = null
+	if _pending_player_text == "":
+		_dialog_typewriter_done = true
+		_player_dialog_pending = false
+		return
+	# 启动玩家对话框打字机
+	_player_dialog_pending = false
+	_player_dialog.visible = true
+	_player_dialog_text.visible_characters = 0
+	var duration: float = max(0.4, float(_pending_player_text.length()) / DIALOG_TYPEWRITER_CHARS_PER_SECOND)
+	_player_text_tween = create_tween()
+	_player_text_tween.tween_interval(DIALOG_PLAYER_GAP_SEC)
+	_player_text_tween.tween_property(_player_dialog_text, "visible_characters", _pending_player_text.length(), duration)
+	_player_text_tween.finished.connect(_on_player_dialog_typewriter_finished)
+
+
+func _on_player_dialog_typewriter_finished() -> void:
+	_player_text_tween = null
+	_dialog_typewriter_done = true
+
+
+func _stop_dialog_typewriter() -> void:
+	if _dialog_text_tween != null and _dialog_text_tween.is_valid():
+		_dialog_text_tween.kill()
+	_dialog_text_tween = null
+	if _player_text_tween != null and _player_text_tween.is_valid():
+		_player_text_tween.kill()
+	_player_text_tween = null
+	_dialog_typewriter_done = true
+	_player_dialog_pending = false
+
+
+# 点击/按钮触发: 当对话动画进行中 → 立即把所有文字补齐, 返回 true 表示"已消耗本次点击"
+func _try_complete_dialog_typewriter() -> bool:
+	if _dialog_typewriter_done:
+		return false
+	_stop_dialog_typewriter()
+	if _dialog_text != null:
+		_dialog_text.visible_characters = -1
+	if _pending_player_text != "":
+		_player_dialog.visible = true
+		_player_dialog_text.text = _pending_player_text
+		_player_dialog_text.visible_characters = -1
+	_dialog_typewriter_done = true
+	return true
+
+
 func _is_step_shop_guide(step: Dictionary) -> bool:
 	return _mode == "shop" or bool(step.get("shop_guide", false))
 
@@ -734,10 +811,10 @@ func _enter_step() -> void:
 	_name_label.add_theme_color_override("font_color", UF.COL_BLUE if is_player_speaker else UF.COL_GOLD)
 	_avatar.visible = not is_player_speaker
 	_dialog.visible = true
-	_dialog_text.text = String(step.get("dialog", ""))
+	var baoshu_text: String = String(step.get("dialog", ""))
 	var player_text: String = String(step.get("player_dialog", ""))
-	_player_dialog.visible = player_text != ""
-	_player_dialog_text.text = player_text
+	# 启动打字机: 宝叔(主对话)先, 完成后再放玩家对话框
+	_start_dialog_typewriter(baoshu_text, player_text)
 	_prompt_text.text = String(step.get("prompt", ""))
 	var button_text: String = String(step.get("button", "下一步"))
 	if _is_step_shop_guide(step):
@@ -773,6 +850,8 @@ func _try_advance_by_click() -> void:
 		return
 	var step: Dictionary = _steps[_step_index]
 	if _try_complete_intro_typewriter(step):
+		return
+	if _try_complete_dialog_typewriter():
 		return
 	if _should_dismiss_shop_guide_on_blank_click(step):
 		_close_shop_dialog()
@@ -826,6 +905,8 @@ func _on_next_pressed() -> void:
 	var step: Dictionary = _steps[_step_index]
 	if _try_complete_intro_typewriter(step):
 		return
+	if _try_complete_dialog_typewriter():
+		return
 	if bool(step.get("finish", false)):
 		_finish()
 	else:
@@ -833,6 +914,7 @@ func _on_next_pressed() -> void:
 
 
 func _go_next() -> void:
+	_stop_dialog_typewriter()
 	_step_index += 1
 	_enter_step()
 
