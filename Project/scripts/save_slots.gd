@@ -17,10 +17,13 @@
 # 版本:
 #   - v1: 初始 (无 [meta] 段; 无 opponent_intro_seen)
 #   - v2: 增加 [meta] 段含 version; 槽位增加 opponent_intro_seen 字段
+#   - v3: 槽位增加 current_level_index / deck_effect_ids / talent_ids (跨关继承的牌组+天赋)
+#   - v4: 槽位增加 resume_day / resume_phase / resume_cash / resume_shares / resume_avg_cost / resume_price / resume_bull / resume_turn_global
+#         (中途退出后恢复到最近一次 _start_day / _enter_shop 的快照点; 商店内购买不更新)
 extends Node
 
 const SAVE_PATH := "user://saves.cfg"
-const SAVE_VERSION := 2
+const SAVE_VERSION := 4
 const META_SECTION := "meta"
 const SLOT_COUNT := 3
 # 关卡总数 = 教程关 1 + 正式关数 (LEVEL_OPPONENT_ID.size())
@@ -199,6 +202,17 @@ func capture_from_game() -> void:
 	for var_name in GAME_DICT_FIELDS.keys():
 		var d: Variant = game.get(var_name)
 		slot[GAME_DICT_FIELDS[var_name]] = (d as Dictionary).duplicate(true) if d is Dictionary else {}
+	slot["current_level_index"] = int(game.get("current_level_index"))
+	slot["deck_effect_ids"] = _to_string_array(game.get("snapshot_deck_effect_ids"))
+	slot["talent_ids"] = _to_string_array(game.get("snapshot_talent_ids"))
+	slot["resume_day"] = int(game.get("snapshot_day"))
+	slot["resume_phase"] = String(game.get("snapshot_phase"))
+	slot["resume_cash"] = float(game.get("snapshot_cash"))
+	slot["resume_shares"] = int(game.get("snapshot_shares"))
+	slot["resume_avg_cost"] = float(game.get("snapshot_avg_cost"))
+	slot["resume_price"] = float(game.get("snapshot_price"))
+	slot["resume_bull"] = int(game.get("snapshot_bull"))
+	slot["resume_turn_global"] = int(game.get("snapshot_turn_global"))
 	slot["played_at"] = _now_string()
 	slots[active_slot_index] = slot
 	_save_to_disk()
@@ -216,6 +230,17 @@ func compute_capture_hash() -> int:
 	for var_name in GAME_DICT_FIELDS.keys():
 		var d: Variant = game.get(var_name)
 		snap[GAME_DICT_FIELDS[var_name]] = (d as Dictionary).duplicate(true) if d is Dictionary else {}
+	snap["current_level_index"] = int(game.get("current_level_index"))
+	snap["deck_effect_ids"] = _to_string_array(game.get("snapshot_deck_effect_ids"))
+	snap["talent_ids"] = _to_string_array(game.get("snapshot_talent_ids"))
+	snap["resume_day"] = int(game.get("snapshot_day"))
+	snap["resume_phase"] = String(game.get("snapshot_phase"))
+	snap["resume_cash"] = float(game.get("snapshot_cash"))
+	snap["resume_shares"] = int(game.get("snapshot_shares"))
+	snap["resume_avg_cost"] = float(game.get("snapshot_avg_cost"))
+	snap["resume_price"] = float(game.get("snapshot_price"))
+	snap["resume_bull"] = int(game.get("snapshot_bull"))
+	snap["resume_turn_global"] = int(game.get("snapshot_turn_global"))
 	return snap.hash()
 
 
@@ -245,6 +270,10 @@ func apply_to_game(start_level_override: int = -1) -> void:
 			game.set(flag_name, TUTORIAL_FLAG_DEFAULTS[flag_name])
 		for var_name in GAME_DICT_FIELDS.keys():
 			game.set(var_name, {})
+		game.set("pending_restore_deck_effect_ids", [])
+		game.set("pending_restore_talent_ids", [])
+		game.set("pending_restore_day_target", 0)
+		game.set("pending_restore_phase_target", "")
 		game.current_level_index = 0
 		return
 	var slot: Dictionary = slots[active_slot_index]
@@ -253,13 +282,30 @@ func apply_to_game(start_level_override: int = -1) -> void:
 	for var_name in GAME_DICT_FIELDS.keys():
 		var stored: Variant = slot.get(GAME_DICT_FIELDS[var_name], {})
 		game.set(var_name, (stored as Dictionary).duplicate(true) if stored is Dictionary else {})
-	# 启动关卡: override > 默认 (max_cleared + 1)
+	# 跨关继承的牌组 + 天赋 + 当关恢复点: 写入 Game 的 pending 缓冲, new_level 末尾自动应用
+	var deck_ids: Variant = slot.get("deck_effect_ids", [])
+	var talent_ids: Variant = slot.get("talent_ids", [])
+	game.set("pending_restore_deck_effect_ids", (deck_ids as Array).duplicate() if deck_ids is Array else [])
+	game.set("pending_restore_talent_ids", (talent_ids as Array).duplicate() if talent_ids is Array else [])
+	game.set("pending_restore_day_target", int(slot.get("resume_day", 0)))
+	game.set("pending_restore_phase_target", String(slot.get("resume_phase", "")))
+	game.set("pending_restore_cash", float(slot.get("resume_cash", 0.0)))
+	game.set("pending_restore_shares", int(slot.get("resume_shares", 0)))
+	game.set("pending_restore_avg_cost", float(slot.get("resume_avg_cost", 0.0)))
+	game.set("pending_restore_price", float(slot.get("resume_price", 0.0)))
+	game.set("pending_restore_bull", int(slot.get("resume_bull", 0)))
+	game.set("pending_restore_turn_global", int(slot.get("resume_turn_global", 0)))
+	# 启动关卡: override > slot.current_level_index > 默认 (max_cleared + 1)
 	var start_level: int
 	if start_level_override >= 0:
 		start_level = clamp(start_level_override, 0, TOTAL_LEVEL_COUNT - 1)
 	else:
-		var max_cleared: int = int(slot.get("max_cleared_level_index", -1))
-		start_level = clamp(max_cleared + 1, 0, TOTAL_LEVEL_COUNT - 1)
+		var saved_cur: int = int(slot.get("current_level_index", -1))
+		if saved_cur >= 0:
+			start_level = clamp(saved_cur, 0, TOTAL_LEVEL_COUNT - 1)
+		else:
+			var max_cleared: int = int(slot.get("max_cleared_level_index", -1))
+			start_level = clamp(max_cleared + 1, 0, TOTAL_LEVEL_COUNT - 1)
 	game.current_level_index = start_level
 
 
@@ -282,6 +328,17 @@ func _empty_slot() -> Dictionary:
 		"persona_id": "",
 		"played_at": "",
 		"max_cleared_level_index": -1,
+		"current_level_index": -1,
+		"deck_effect_ids": [],
+		"talent_ids": [],
+		"resume_day": 0,
+		"resume_phase": "",
+		"resume_cash": 0.0,
+		"resume_shares": 0,
+		"resume_avg_cost": 0.0,
+		"resume_price": 0.0,
+		"resume_bull": 0,
+		"resume_turn_global": 0,
 	}
 	for flag_name in TUTORIAL_FLAG_DEFAULTS.keys():
 		slot[flag_name] = TUTORIAL_FLAG_DEFAULTS[flag_name]
@@ -309,6 +366,19 @@ func _load_from_disk() -> void:
 		slot["persona_id"] = persona_id
 		slot["played_at"] = String(cfg.get_value(sec, "played_at", ""))
 		slot["max_cleared_level_index"] = int(cfg.get_value(sec, "max_cleared_level_index", -1))
+		slot["current_level_index"] = int(cfg.get_value(sec, "current_level_index", -1))
+		var deck_v: Variant = cfg.get_value(sec, "deck_effect_ids", [])
+		slot["deck_effect_ids"] = _to_string_array(deck_v)
+		var talent_v: Variant = cfg.get_value(sec, "talent_ids", [])
+		slot["talent_ids"] = _to_string_array(talent_v)
+		slot["resume_day"] = int(cfg.get_value(sec, "resume_day", 0))
+		slot["resume_phase"] = String(cfg.get_value(sec, "resume_phase", ""))
+		slot["resume_cash"] = float(cfg.get_value(sec, "resume_cash", 0.0))
+		slot["resume_shares"] = int(cfg.get_value(sec, "resume_shares", 0))
+		slot["resume_avg_cost"] = float(cfg.get_value(sec, "resume_avg_cost", 0.0))
+		slot["resume_price"] = float(cfg.get_value(sec, "resume_price", 0.0))
+		slot["resume_bull"] = int(cfg.get_value(sec, "resume_bull", 0))
+		slot["resume_turn_global"] = int(cfg.get_value(sec, "resume_turn_global", 0))
 		for flag_name in TUTORIAL_FLAG_DEFAULTS.keys():
 			slot[flag_name] = bool(cfg.get_value(sec, flag_name, TUTORIAL_FLAG_DEFAULTS[flag_name]))
 		for var_name in GAME_DICT_FIELDS.keys():
@@ -336,6 +406,17 @@ func _save_to_disk() -> void:
 		cfg.set_value(sec, "persona_id", String(s.get("persona_id", "")))
 		cfg.set_value(sec, "played_at", String(s.get("played_at", "")))
 		cfg.set_value(sec, "max_cleared_level_index", int(s.get("max_cleared_level_index", -1)))
+		cfg.set_value(sec, "current_level_index", int(s.get("current_level_index", -1)))
+		cfg.set_value(sec, "deck_effect_ids", _to_string_array(s.get("deck_effect_ids", [])))
+		cfg.set_value(sec, "talent_ids", _to_string_array(s.get("talent_ids", [])))
+		cfg.set_value(sec, "resume_day", int(s.get("resume_day", 0)))
+		cfg.set_value(sec, "resume_phase", String(s.get("resume_phase", "")))
+		cfg.set_value(sec, "resume_cash", float(s.get("resume_cash", 0.0)))
+		cfg.set_value(sec, "resume_shares", int(s.get("resume_shares", 0)))
+		cfg.set_value(sec, "resume_avg_cost", float(s.get("resume_avg_cost", 0.0)))
+		cfg.set_value(sec, "resume_price", float(s.get("resume_price", 0.0)))
+		cfg.set_value(sec, "resume_bull", int(s.get("resume_bull", 0)))
+		cfg.set_value(sec, "resume_turn_global", int(s.get("resume_turn_global", 0)))
 		for flag_name in TUTORIAL_FLAG_DEFAULTS.keys():
 			cfg.set_value(sec, flag_name, bool(s.get(flag_name, TUTORIAL_FLAG_DEFAULTS[flag_name])))
 		for var_name in GAME_DICT_FIELDS.keys():
@@ -351,3 +432,46 @@ func _get_game() -> Node:
 func _now_string() -> String:
 	var t := Time.get_datetime_dict_from_system()
 	return "%04d-%02d-%02d %02d:%02d" % [t.year, t.month, t.day, t.hour, t.minute]
+
+
+# ---- 牌组 / 天赋 helper ----
+func _collect_deck_effect_ids(game: Node) -> Array:
+	var ids: Array = []
+	if game == null:
+		return ids
+	if not game.has_method("get_full_deck"):
+		return ids
+	var full: Array = game.get_full_deck()
+	for c in full:
+		if c == null:
+			continue
+		if "transient" in c and bool(c.transient):
+			continue
+		var eid: String = String(c.get("effect_id"))
+		if eid != "":
+			ids.append(eid)
+	return ids
+
+
+func _collect_talent_ids(game: Node) -> Array:
+	var ids: Array = []
+	if game == null:
+		return ids
+	var talents: Variant = game.get("owned_talents")
+	if not (talents is Array):
+		return ids
+	for t in talents:
+		if t == null:
+			continue
+		var tid: String = String(t.get("id"))
+		if tid != "":
+			ids.append(tid)
+	return ids
+
+
+func _to_string_array(v: Variant) -> Array:
+	var out: Array = []
+	if v is Array:
+		for item in v:
+			out.append(String(item))
+	return out

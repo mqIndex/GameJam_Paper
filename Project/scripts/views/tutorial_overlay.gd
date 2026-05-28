@@ -497,11 +497,13 @@ func _build_steps() -> void:
 			"button": "进入第二天",
 		},
 		{
+			"tutorial_day": 2,
 			"action": "leave_shop_for_event",
 			"dialog": "准备好了就走。第二天开盘，市场可不会等你。",
 			"button": "继续",
 		},
 		{
+			"tutorial_day": 2,
 			"action": "trigger_event",
 			"event_id": "black_swan",
 			"target_path": "TopBar",
@@ -510,19 +512,38 @@ func _build_steps() -> void:
 			"button": "继续",
 		},
 		{
-			"dialog": "所以今天开盘大跌，昨天跑的对吧？",
-			"player_dialog": "所以呢？",
+			"tutorial_day": 2,
+			"dialog": "所以今天开盘大跌，昨天跑的没错吧？",
+			
 		},
 		{
+			"tutorial_day": 2,
 			"speaker": "player",
 			"dialog": "。。。。",
 		},
 		{
+			"tutorial_day": 2,
 			"dialog": "今天的思路是先打压股价，低位买入，然后拉高出货，记得尾盘跑路。",
 			"button": "继续交易",
 			"finish": true,
 		},
 	]
+	_filter_steps_by_save_day()
+
+
+# 按 Game.tutorial_skip_until_day 过滤教学步: 任意 step 的 tutorial_day <= 该值则丢弃
+# step 不带 tutorial_day 视为第 1 天 (默认 day=1)
+# 若过滤后只剩"finish: true"的收尾节点也保留, 让 _enter_step 走完 _finish 把 tutorial_completed 置位
+func _filter_steps_by_save_day() -> void:
+	var threshold: int = int(Game.get("tutorial_skip_until_day"))
+	if threshold <= 0:
+		return
+	var kept: Array = []
+	for s in _steps:
+		var d: int = int((s as Dictionary).get("tutorial_day", 1))
+		if d > threshold:
+			kept.append(s)
+	_steps = kept
 
 
 func _build_goal_steps() -> void:
@@ -640,7 +661,7 @@ func _build_opponent_reward_steps() -> void:
 			"button": "继续",
 		},
 		{
-			"dialog": "盘后市场有一张稀有卡，作为你打败对手的奖励，记得去看看。",
+			"dialog": "我在你卡组里放了一张稀有卡，作为你打败对手的奖励，记得去看看。",
 			"button": "知道了",
 			"finish": true,
 		},
