@@ -11,18 +11,25 @@ const UF = preload("res://scripts/views/ui_factory.gd")
 @onready var bar_bg: ColorRect = $BarBg
 @onready var bar_fill: ColorRect = $BarFill
 
-const BAR_TOP_PAD: float = 80.0
+const BAR_TOP_PAD: float = 112.0
 const BAR_BOTTOM_PAD: float = 12.0
 const BAR_X: float = 12.0
+const FUND_ICON_SIZE: float = 96.0  # IconSlot 原 48px 的 2 倍
 
 # 旧的三段彩色背景已废弃 (兼容字段, 不再使用)
 const SEG_LOW: Color = Color("#321018")
 const SEG_MID: Color = Color("#3a2a18")
 const SEG_HIGH: Color = Color("#153125")
 const BAR_BORDER_COL: Color = Color("#ff5d6c")
+const BAR_BORDER_COL_ALPHA: float = 0.2
 const MARKER_COL: Color = Color("#f5f5f5")
 const FILL_COL: Color = Color("#ff5d6c")  # 新样式: 红色实心填充
-const TICK_COUNT: int = 7  # 立柱内部水平刻度横线段数 (将柱分成 TICK_COUNT 段, 即绘制 TICK_COUNT-1 条内部线)
+# 刻度: 量程 0..150K (与 PlayerTargetBar 对称), 每 10K 一段, 共 15 段 14 条内部横线
+const TICK_COUNT: int = 15
+const TICK_STEP_K: int = 10
+const TICK_MAX_K: int = 150
+# 在这些 K 值旁边显示数字标签 (单位: 千)
+const TICK_LABEL_KS: Array[int] = [0, 50, 100, 150]
 const BAR_INNER_SCALE: float = 0.6  # 红色空心内柱相对面板可用宽的缩放比 (1.0 = 原大, 0.6 = 缩小到 60%)
 const BAR_INNER_HEIGHT_SCALE: float = 0.75  # 红色空心内柱相对面板可用高的缩放比 (从顶部向下收缩, 底部对齐保持不变)
 
@@ -41,6 +48,7 @@ var _border_b: ColorRect = null
 var _border_l: ColorRect = null
 var _border_r: ColorRect = null
 var _ticks: Array[ColorRect] = []
+var _tick_text_labels: Array[Label] = []  # 与 TICK_LABEL_KS 一一对应的右侧数字标签
 var _cash_fill: ColorRect = null
 var _target_line: ColorRect = null
 var _target_arrow: Polygon2D = null
@@ -54,9 +62,11 @@ var _scale_labels: Array[Label] = []
 func _ready() -> void:
 	if lbl_title != null:
 		lbl_title.text = "剩余资金"
-	add_theme_stylebox_override("panel", UF.panel_stylebox(UF.COL_NEON_RED))
+	# 内部 panel stylebox 保持原纯色 (内部框线 _border_t/b/l/r 仍然显示)
+	add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	_decorate_icon()
 	_build_bar()
+	_apply_outer_frame(UF.PATH_BORDER_ENEMY_FUND)
 	resized.connect(_layout_bar)
 	Game.opponent_state_changed.connect(_refresh)
 	Game.opponent_entered.connect(_on_opponent_entered)
@@ -66,11 +76,57 @@ func _ready() -> void:
 	_refresh()
 
 
+# 最外层装饰边框: 用 TextureRect 铺满整个面板, 贴图中心透明不遮内部立柱;
+# 内部 panel stylebox + _border_t/b/l/r 内部框线照常显示 (用户要求只换外边框)
+func _apply_outer_frame(texture_path: String) -> void:
+	if has_node("OuterFrame"):
+		return
+	var tex := UF.try_load_texture(texture_path)
+	if tex == null:
+		return
+	var tr := TextureRect.new()
+	tr.name = "OuterFrame"
+	tr.texture = tex
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_SCALE
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# 不设 z_index: 让 OuterFrame 跟随 EnemyHpBar 自身渲染层级,
+	# 避免 z_index=50 穿透 ShopOverlay/EndDialog 等覆盖层
+	tr.anchor_left = 0.0
+	tr.anchor_top = 0.0
+	tr.anchor_right = 1.0
+	tr.anchor_bottom = 1.0
+	tr.offset_left = 0.0
+	tr.offset_top = 0.0
+	tr.offset_right = 0.0
+	tr.offset_bottom = 0.0
+	add_child(tr)
+
+
 func _decorate_icon() -> void:
-	# 新样式不再显示圆形 X 图标; 直接隐藏 IconSlot 即可.
+	# 在 IconSlot (LblValue 下方, 立柱上方) 内挂载 enemy_fund_Icon.png 作为资金图标
 	if icon_slot == null:
 		return
-	icon_slot.visible = false
+	if icon_slot.has_node("FundIcon"):
+		icon_slot.visible = true
+		return
+	var tex := UF.try_load_texture(UF.PATH_ICON_ENEMY_FUND)
+	if tex == null:
+		icon_slot.visible = false
+		return
+	# IconSlot 自身透明 (不要 panel stylebox), 只作为定位容器
+	icon_slot.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	icon_slot.visible = true
+	icon_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var icon := TextureRect.new()
+	icon.name = "FundIcon"
+	icon.texture = tex
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.anchor_right = 1.0
+	icon.anchor_bottom = 1.0
+	icon_slot.add_child(icon)
 
 
 
@@ -84,6 +140,12 @@ func _build_bar() -> void:
 	_border_b = _new_rect(BAR_BORDER_COL)
 	_border_l = _new_rect(BAR_BORDER_COL)
 	_border_r = _new_rect(BAR_BORDER_COL)
+	# 4 边线半透明 (用户要求, 让外框 PNG 风格更突出)
+	var border_a: Color = Color(BAR_BORDER_COL.r, BAR_BORDER_COL.g, BAR_BORDER_COL.b, BAR_BORDER_COL_ALPHA)
+	_border_t.color = border_a
+	_border_b.color = border_a
+	_border_l.color = border_a
+	_border_r.color = border_a
 	# 旧三段彩色背景: 隐藏 (新样式立柱内透明)
 	_seg_high = _new_rect(SEG_HIGH)
 	_seg_high.visible = false
@@ -93,7 +155,18 @@ func _build_bar() -> void:
 	_seg_low.visible = false
 	# 内部水平刻度线 (TICK_COUNT-1 条)
 	for i in range(TICK_COUNT - 1):
-		_ticks.append(_new_rect(BAR_BORDER_COL))
+		_ticks.append(_new_rect(Color(BAR_BORDER_COL.r, BAR_BORDER_COL.g, BAR_BORDER_COL.b, BAR_BORDER_COL_ALPHA)))
+	# 右侧数字标签: 0 / 50K / 100K / 150K
+	for k in TICK_LABEL_KS:
+		var lbl := Label.new()
+		lbl.add_theme_font_size_override("font_size", 9)
+		lbl.add_theme_color_override("font_color", Color(BAR_BORDER_COL.r, BAR_BORDER_COL.g, BAR_BORDER_COL.b, 0.85))
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lbl.text = "0" if k == 0 else "%dK" % k
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(lbl)
+		_tick_text_labels.append(lbl)
 	# 资金填充: 新样式使用纯红实心
 	_cash_fill = _new_rect(FILL_COL)
 	# 旧的金色目标值刻度/三角/标签已废弃 (新样式无此元素), 创建后立即隐藏
@@ -157,11 +230,22 @@ func _layout_bar() -> void:
 		_border_r.size = Vector2(1.0, oh)
 	# 内部水平刻度线: 把柱平均分为 TICK_COUNT 段, 在中间各分隔位绘制一条横线
 	var tick_count: int = TICK_COUNT
+	# 内部水平刻度线: 量程 0..TICK_MAX_K, 每 10K 一段 (从底向上 idx=1..TICK_COUNT-1)
 	for i in range(_ticks.size()):
 		var idx: int = i + 1
 		var ty: float = _bar_top + _bar_h * (float(idx) / float(tick_count))
 		_ticks[i].position = Vector2(bar_left, ty - 0.5)
 		_ticks[i].size = Vector2(_bar_w, 1.0)
+	# 右侧数字标签 (0 / 50K / 100K / 150K)
+	var label_x: float = bar_left + _bar_w + 4.0
+	var label_w: float = 28.0
+	var label_h: float = 10.0
+	for i in range(_tick_text_labels.size()):
+		var k_val: int = TICK_LABEL_KS[i]
+		var k_ratio: float = clampf(float(k_val) / float(TICK_MAX_K), 0.0, 1.0)
+		var ly: float = _bar_top + _bar_h * (1.0 - k_ratio) - label_h * 0.5
+		_tick_text_labels[i].position = Vector2(label_x, ly)
+		_tick_text_labels[i].size = Vector2(label_w, label_h)
 	_layout_scale_labels()
 	_refresh()
 

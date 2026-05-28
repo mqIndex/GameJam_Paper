@@ -10,7 +10,7 @@ signal pile_clicked(pile_name: String)
 
 
 func _ready() -> void:
-	add_theme_stylebox_override("panel", UF.panel_stylebox(UF.COL_NEON_ORANGE))
+	add_theme_stylebox_override("panel", UF.panel_stylebox(UF.COL_BORDER))
 	_decorate_avatar_slot(UF.COL_NEON_ORANGE)
 	lbl_cash.add_theme_font_size_override("font_size", UF.FS_H1)
 	lbl_cash.add_theme_color_override("font_color", UF.COL_GOLD)

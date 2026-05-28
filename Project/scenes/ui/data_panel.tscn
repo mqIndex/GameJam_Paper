@@ -164,6 +164,27 @@ mouse_filter = 2
 expand_mode = 1
 stretch_mode = 6
 
+[node name="EventNameStrip" type="Panel" parent="VBox/MascotSlot/EventFrame" unique_id=1439734482]
+layout_mode = 0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 3.0
+offset_top = -22.0
+offset_right = -3.0
+offset_bottom = -3.0
+mouse_filter = 2
+
+[node name="LblEventName" type="Label" parent="VBox/MascotSlot/EventFrame/EventNameStrip" unique_id=898956527]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_font_sizes/font_size = 13
+text = "«  »"
+horizontal_alignment = 1
+vertical_alignment = 1
+clip_text = true
+
 [node name="MascotVBox" type="VBoxContainer" parent="VBox/MascotSlot" unique_id=1765345518]
 layout_mode = 0
 anchor_right = 1.0

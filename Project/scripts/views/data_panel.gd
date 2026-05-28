@@ -24,6 +24,8 @@ const UF = preload("res://scripts/views/ui_factory.gd")
 @onready var mascot_vbox: VBoxContainer = $VBox/MascotSlot/MascotVBox
 @onready var event_frame: Panel = $VBox/MascotSlot/EventFrame
 @onready var event_image: TextureRect = $VBox/MascotSlot/EventFrame/EventImage
+@onready var event_name_strip: Panel = get_node_or_null("VBox/MascotSlot/EventFrame/EventNameStrip")
+@onready var lbl_event_name: Label = get_node_or_null("VBox/MascotSlot/EventFrame/EventNameStrip/LblEventName")
 
 
 func _ready() -> void:
@@ -139,6 +141,7 @@ func _apply_event_image() -> void:
 			lbl_mascot.visible = true
 		if lbl_mascot_sub != null:
 			lbl_mascot_sub.visible = true
+		_apply_event_name_strip(null)
 		return
 	var tex = load(path)
 	if tex is Texture2D:
@@ -154,6 +157,7 @@ func _apply_event_image() -> void:
 			lbl_mascot.visible = false
 		if lbl_mascot_sub != null:
 			lbl_mascot_sub.visible = false
+		_apply_event_name_strip(ev)
 	else:
 		_set_mascot_slot_event_mode(false)
 		event_image.texture = null
@@ -165,6 +169,33 @@ func _apply_event_image() -> void:
 			lbl_mascot.visible = true
 		if lbl_mascot_sub != null:
 			lbl_mascot_sub.visible = true
+		_apply_event_name_strip(null)
+
+
+# 事件名横条: 显示在事件图底部, 文字 = 事件名, 颜色 = 事件主题色;
+# 无事件/无图时整条隐藏 (回退到 APE 占位时无此条)
+func _apply_event_name_strip(ev) -> void:
+	if event_name_strip == null or lbl_event_name == null:
+		return
+	if ev == null:
+		event_name_strip.visible = false
+		return
+	var name_text: String = String(ev.name)
+	if name_text == "":
+		event_name_strip.visible = false
+		return
+	var color: Color = _get_current_event_theme_color()
+	# 背景: 半透明黑底, 让事件主题色文字突出
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0, 0, 0, 0.78)
+	sb.border_color = color
+	sb.border_width_top = 1
+	event_name_strip.add_theme_stylebox_override("panel", sb)
+	lbl_event_name.text = "«  %s  »" % name_text
+	lbl_event_name.add_theme_color_override("font_color", color)
+	lbl_event_name.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	lbl_event_name.add_theme_constant_override("outline_size", 2)
+	event_name_strip.visible = true
 
 
 func _refresh() -> void:

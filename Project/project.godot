@@ -38,8 +38,7 @@ folder_colors={
 "res://data/": "purple",
 "res://scenes/": "blue",
 "res://scripts/": "green",
-"res://tests/": "gray",
-"res://ui/": "orange"
+"res://tests/": "gray"
 }
 
 [rendering]

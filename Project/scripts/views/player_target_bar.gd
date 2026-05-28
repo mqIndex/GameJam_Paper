@@ -10,9 +10,10 @@ const DashedTicks = preload("res://scripts/views/dashed_ticks.gd")
 @onready var lbl_value: Label = $LblValue
 @onready var icon_slot: Panel = $IconSlot
 
-const BAR_TOP_PAD: float = 80.0
+const BAR_TOP_PAD: float = 112.0
 const BAR_BOTTOM_PAD: float = 12.0
 const BAR_X: float = 12.0
+const FUND_ICON_SIZE: float = 96.0  # IconSlot 原 48px 的 2 倍
 const SCALE_RATIO: float = 1.25  # 量程上限 = VICTORY_TARGET * 1.25 = 150K
 
 # 旧字段保留 (兼容, 不再使用)
@@ -28,9 +29,18 @@ const FILL_HIGH_TRANS: Color = Color(1.0, 0.784, 0.341, 0.35)
 
 # 新样式 (与 EnemyHpBar 同款, 仅配色不同)
 const BAR_BORDER_COL: Color = Color("#fbe4b2")  # 边框 + 内部刻度线 + 实心填充统一金黄色
+const BAR_BORDER_COL_ALPHA: float = 0.2
 const FILL_COL: Color = Color("#fbe4b2")
 const PROFIT_FILL_COL: Color = Color("#eb9236")  # 盈利段 (现金条上方堆叠)
-const TICK_COUNT: int = 7
+
+# 刻度: 量程 0..150K (= VICTORY_TARGET * SCALE_RATIO), 每 10K 一段, 共 15 段 16 个分点
+# 内部画 14 条横线 (除去顶/底两个由边框承担的点)
+const TICK_COUNT: int = 15
+const TICK_STEP_K: int = 10
+const TICK_MAX_K: int = 150
+# 在这些 K 值旁边显示数字标签 (单位: 千)
+const TICK_LABEL_KS: Array[int] = [0, 50, 100, 150]
+
 const BAR_INNER_SCALE: float = 0.6
 const BAR_INNER_HEIGHT_SCALE: float = 0.75
 const FILL_WIDTH_SCALE: float = 0.8  # 实心填充柱宽相对内框宽的进一步缩放 (柱体居中, 留出左右更宽留白)
@@ -64,6 +74,7 @@ var _border_b: ColorRect = null
 var _border_l: ColorRect = null
 var _border_r: ColorRect = null
 var _ticks: Array[ColorRect] = []
+var _tick_text_labels: Array[Label] = []  # 与 TICK_LABEL_KS 一一对应的右侧数字标签
 var _bar_fill: ColorRect = null
 var _bar_profit_fill: ColorRect = null  # 盈利段, 叠在现金段上方
 
@@ -76,20 +87,67 @@ var _tgt_label_text: Label = null
 
 
 func _ready() -> void:
-	add_theme_stylebox_override("panel", UF.panel_stylebox(UF.COL_GOLD))
+	# 内部 panel stylebox 保持原纯色 (内部框线 _border_t/b/l/r 仍然显示)
+	add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	_decorate_icon()
 	_build_bar()
+	_apply_outer_frame(UF.PATH_BORDER_PLAYER_FUND)
 	resized.connect(_layout_bar)
 	Game.state_changed.connect(_refresh)
 	_layout_bar()
 	_refresh()
 
 
+# 最外层装饰边框: 用 TextureRect 铺满整个面板, 贴图中心透明不遮内部立柱;
+# 内部 panel stylebox + _border_t/b/l/r 内部框线照常显示 (用户要求只换外边框)
+func _apply_outer_frame(texture_path: String) -> void:
+	if has_node("OuterFrame"):
+		return
+	var tex := UF.try_load_texture(texture_path)
+	if tex == null:
+		return
+	var tr := TextureRect.new()
+	tr.name = "OuterFrame"
+	tr.texture = tex
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_SCALE
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# 不设 z_index: 让 OuterFrame 跟随 PlayerTargetBar 自身渲染层级,
+	# 避免 z_index=50 穿透 ShopOverlay/EndDialog 等覆盖层
+	tr.anchor_left = 0.0
+	tr.anchor_top = 0.0
+	tr.anchor_right = 1.0
+	tr.anchor_bottom = 1.0
+	tr.offset_left = 0.0
+	tr.offset_top = 0.0
+	tr.offset_right = 0.0
+	tr.offset_bottom = 0.0
+	add_child(tr)
+
+
 func _decorate_icon() -> void:
-	# 新样式不再显示圆形 "$" 图标
+	# 在 IconSlot (LblValue 下方, 立柱上方) 内挂载 player_fund_Icon.png 作为资金图标
 	if icon_slot == null:
 		return
-	icon_slot.visible = false
+	if icon_slot.has_node("FundIcon"):
+		icon_slot.visible = true
+		return
+	var tex := UF.try_load_texture(UF.PATH_ICON_PLAYER_FUND)
+	if tex == null:
+		icon_slot.visible = false
+		return
+	icon_slot.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	icon_slot.visible = true
+	icon_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var icon := TextureRect.new()
+	icon.name = "FundIcon"
+	icon.texture = tex
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.anchor_right = 1.0
+	icon.anchor_bottom = 1.0
+	icon_slot.add_child(icon)
 
 
 func _build_bar() -> void:
@@ -103,6 +161,12 @@ func _build_bar() -> void:
 	_border_b = _new_rect(BAR_BORDER_COL)
 	_border_l = _new_rect(BAR_BORDER_COL)
 	_border_r = _new_rect(BAR_BORDER_COL)
+	# 4 边线半透明 (用户要求, 让外框 PNG 风格更突出)
+	var border_a: Color = Color(BAR_BORDER_COL.r, BAR_BORDER_COL.g, BAR_BORDER_COL.b, BAR_BORDER_COL_ALPHA)
+	_border_t.color = border_a
+	_border_b.color = border_a
+	_border_l.color = border_a
+	_border_r.color = border_a
 	# 旧 3 段彩色背景 (隐藏)
 	_seg_dark = _new_rect(SEG_DARK)
 	_seg_dark.visible = false
@@ -112,7 +176,18 @@ func _build_bar() -> void:
 	_seg_blue.visible = false
 	# 内部水平刻度线
 	for i in range(TICK_COUNT - 1):
-		_ticks.append(_new_rect(BAR_BORDER_COL))
+		_ticks.append(_new_rect(Color(BAR_BORDER_COL.r, BAR_BORDER_COL.g, BAR_BORDER_COL.b, BAR_BORDER_COL_ALPHA)))
+	# 右侧数字标签: 0 / 50K / 100K / 150K
+	for k in TICK_LABEL_KS:
+		var lbl := Label.new()
+		lbl.add_theme_font_size_override("font_size", 9)
+		lbl.add_theme_color_override("font_color", Color(BAR_BORDER_COL.r, BAR_BORDER_COL.g, BAR_BORDER_COL.b, 0.85))
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		lbl.text = "0" if k == 0 else "%dK" % k
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(lbl)
+		_tick_text_labels.append(lbl)
 	# 实心填充 (从底部向上, 颜色 #fbe4b2)
 	_bar_fill = _new_rect(FILL_COL)
 	# 盈利段填充 (叠在现金段上方, 颜色 #eb9236)
@@ -228,6 +303,16 @@ func _layout_bar() -> void:
 		var ty: float = _bar_top + _bar_h * (float(idx) / float(TICK_COUNT))
 		_ticks[i].position = Vector2(bar_left, ty - 0.5)
 		_ticks[i].size = Vector2(_bar_w, 1.0)
+	# 右侧数字标签 (0 / 50K / 100K / 150K)
+	var label_x: float = bar_left + _bar_w + 4.0
+	var label_w: float = 28.0
+	var label_h: float = 10.0
+	for i in range(_tick_text_labels.size()):
+		var k_val: int = TICK_LABEL_KS[i]
+		var k_ratio: float = clampf(float(k_val) / float(TICK_MAX_K), 0.0, 1.0)
+		var ly: float = _bar_top + _bar_h * (1.0 - k_ratio) - label_h * 0.5
+		_tick_text_labels[i].position = Vector2(label_x, ly)
+		_tick_text_labels[i].size = Vector2(label_w, label_h)
 
 	_layout_target_mark(bar_left)
 

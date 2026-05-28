@@ -29,7 +29,7 @@ var _bubble_tween: Tween = null
 
 
 func _ready() -> void:
-	add_theme_stylebox_override("panel", UF.panel_stylebox(UF.COL_NEON_RED))
+	add_theme_stylebox_override("panel", UF.panel_stylebox(UF.COL_BORDER))
 	_decorate_avatar_slot(UF.COL_NEON_RED)
 	_build_bubble_overlay()
 	Game.opponent_state_changed.connect(_refresh)

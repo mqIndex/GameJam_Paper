@@ -10,20 +10,20 @@ script = ExtResource("1_script")
 [node name="LblTitle" type="Label" parent="." unique_id=1064358654]
 layout_mode = 0
 offset_left = 4.0
-offset_top = 4.0
+offset_top = 10.0
 offset_right = 128.0
-offset_bottom = 16.0
-theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
-theme_override_font_sizes/font_size = 10
+offset_bottom = 36.0
+theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
+theme_override_font_sizes/font_size = 18
 text = "我的资金"
 horizontal_alignment = 1
 
 [node name="LblValue" type="Label" parent="." unique_id=627606613]
 layout_mode = 0
 offset_left = 2.0
-offset_top = 18.0
+offset_top = 45.0
 offset_right = 130.0
-offset_bottom = 40.0
+offset_bottom = 71.0
 theme_override_colors/font_color = Color(1, 0.82, 0.4, 1)
 theme_override_font_sizes/font_size = 18
 text = "¥100K"
@@ -32,7 +32,7 @@ clip_text = true
 
 [node name="IconSlot" type="Panel" parent="." unique_id=1264426815]
 layout_mode = 0
-offset_left = 54.0
-offset_top = 44.0
-offset_right = 78.0
-offset_bottom = 68.0
+offset_left = 42.0
+offset_top = 80.0
+offset_right = 90.0
+offset_bottom = 128.0

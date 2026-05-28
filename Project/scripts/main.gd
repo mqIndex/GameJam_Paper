@@ -445,12 +445,16 @@ func _relayout() -> void:
 	var chart_w: float = max(300.0, data_x - GAP - chart_x)
 
 	_set_rect(top_bar, Rect2(OUTER_PAD, top_y, content_w, TOP_BAR_H))
-	_set_rect(enemy_hp_bar, Rect2(OUTER_PAD, middle_y, MONEY_BAR_W, side_h))
+	# EnemyHpBar / PlayerTargetBar / DataPanel 三者下边缘统一对齐 ActionBar 下沿 (= bottom_y - GAP).
+	# 高度 bar_h = action_y + ACTION_BAR_H - middle_y, 与 DataPanel 同公式;
+	# 这样资金条与下方 EnemyPanel/PlayerPanel 之间留出 GAP 间距, 视觉上头像与资金条自然分离.
+	var bar_h: float = action_y + ACTION_BAR_H - middle_y
+	_set_rect(enemy_hp_bar, Rect2(OUTER_PAD, middle_y, MONEY_BAR_W, bar_h))
 	_set_rect(chart_panel, Rect2(chart_x, middle_y, chart_w, chart_h))
 	# DataPanel 下边缘 = ActionBar 下边缘 (action_y + ACTION_BAR_H)
 	var data_h: float = action_y + ACTION_BAR_H - middle_y
 	_set_rect(data_panel, Rect2(data_x, middle_y, data_w, data_h))
-	_set_rect(player_target_bar, Rect2(player_target_x, middle_y, PLAYER_TARGET_BAR_W, side_h))
+	_set_rect(player_target_bar, Rect2(player_target_x, middle_y, PLAYER_TARGET_BAR_W, bar_h))
 	_set_rect(action_bar, Rect2(chart_x, action_y, chart_w, ACTION_BAR_H))
 
 	var fixed_bottom_w: float = ENEMY_W + TURN_W + PLAYER_W + GAP * 3.0

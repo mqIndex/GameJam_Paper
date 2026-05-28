@@ -54,6 +54,12 @@ const PATH_CARD_SKILL: String = "res://assets/ui/cards/card_frame_skill.png"
 const PATH_CARD_EVENT: String = "res://assets/ui/cards/card_frame_event.png"
 const PATH_CARD_DISABLED: String = "res://assets/ui/cards/card_overlay_disabled.png"
 const PATH_BG_MAIN: String = "res://assets/ui/bg/bg_main.png"
+# 资金条外边框 (敌/玩家)
+const PATH_BORDER_ENEMY_FUND: String = "res://assets/ui/border/enemy_fund.png"
+const PATH_BORDER_PLAYER_FUND: String = "res://assets/ui/border/player_fund.png"
+# 资金条标题/数额下方的小图标
+const PATH_ICON_ENEMY_FUND: String = "res://assets/ui/icons/enemy_fund_Icon.png"
+const PATH_ICON_PLAYER_FUND: String = "res://assets/ui/icons/player_fund_Icon.png"
 
 # 九宫格 patch_margin (面板 1024×1024, 边框约 64px = 6.25%)
 const PANEL_PATCH_MARGIN: int = 64
@@ -79,6 +85,25 @@ static func try_load_texture(path: String) -> Texture2D:
 	if tex is Texture2D:
 		return tex as Texture2D
 	return null
+
+
+# 资金条外边框: StyleBoxTexture 九宫格; 纹理缺失时返回 null, 调用方走 fallback
+static func fund_bar_border_stylebox(texture_path: String, patch: int = 32) -> StyleBox:
+	var tex := try_load_texture(texture_path)
+	if tex == null:
+		return null
+	var sb := StyleBoxTexture.new()
+	sb.texture = tex
+	sb.texture_margin_left = patch
+	sb.texture_margin_top = patch
+	sb.texture_margin_right = patch
+	sb.texture_margin_bottom = patch
+	# 不挤压内部内容: content_margin 走 view 自身的 BAR_TOP_PAD/BAR_X 计算
+	sb.content_margin_left = 0.0
+	sb.content_margin_top = 0.0
+	sb.content_margin_right = 0.0
+	sb.content_margin_bottom = 0.0
+	return sb
 
 
 # ===== 卡牌 Icon 路径解析 =====
