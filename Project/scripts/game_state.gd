@@ -150,9 +150,13 @@ var event_modifier_dur: int = 0                          # >0 = 短期 N 回合,
 var banned_effect_ids: Array = []                        # 当前被禁出的 effect_id
 var triggered_event_ids_this_level: Dictionary = {}      # 本关已触发过的事件 id (一关不重复)
 var skills_played_this_turn: int = 0                     # 本回合已使用技能牌数 (skill_cap_per_turn 计数)
-var turn_emotion_mul: float = 1.0                        # 本回合情绪变化倍率 (水军出动 → 2.0; _start_turn 重置)
+var turn_emotion_mul: float = 1.0                        # 本回合情绪变化倍率 (水军出动 → 2.0; _start_turn 倒计时归零时重置)
+var turn_emotion_mul_duration: int = 0                   # 上述倍率剩余回合数 (含设置时所在回合); 0 = 已失效
+var turn_sell_bonus_mul: float = 1.0                     # 本回合卖出收入倍率 (保命之道 → 1.1/1.5; _start_turn 重置)
 var pending_event_id: String = ""                        # 内幕消息预选: 下次 _trigger_random_event 优先用此 id
-var liquidity_buffed_cards: Array = []                   # 本回合 流动性泛滥 命中后 cost-1 的 Card 引用; _settle_turn 末还原
+var pending_discard_draw_count: int = 1                  # 顺势而为: dispatch 时塞入, discard_one_then_draw 取后归位 1
+var liquidity_buffed_cards: Array = []                   # 本回合 流动性泛滥 命中后 cost-N 的 Card 引用; _settle_turn 末还原
+var liquidity_buffed_amounts: Array = []                 # 与 liquidity_buffed_cards 并行; 记录每张卡的减费量 (用于还原)
 var daily_play_count: Dictionary = {}                    # effect_id → 本日已使用次数 (供 daily_limit 检查); _start_day 重置
 
 # ===== K线 =====
@@ -488,6 +492,11 @@ func new_level(carried_effect_ids: Array = []) -> void:
 			draw_pile.append(carried_card)
 	draw_pile.shuffle()
 	liquidity_buffed_cards.clear()
+	liquidity_buffed_amounts.clear()
+	turn_emotion_mul = 1.0
+	turn_emotion_mul_duration = 0
+	turn_sell_bonus_mul = 1.0
+	pending_discard_draw_count = 1
 	daily_play_count.clear()
 	candles.clear()
 	intraday_ticks.clear()
@@ -804,24 +813,30 @@ func set_pending_event(event_id: String) -> void:
 
 
 # 顺势而为: 让 UI 列出当前手牌让玩家选 1 张
+# draw_n: 选完后要补抽的牌数 (CSV discard_draw_count; 基础=1, 顺势而为+=2);
+#         effect_system 调用前会把 pending_discard_draw_count 设好, 此函数兜底读取
 func request_discard_choice() -> void:
+	var draw_n: int = max(1, pending_discard_draw_count)
 	if hand.is_empty():
-		_log("  [顺势而为] 手牌为空, 直接抽 1")
-		draw_cards(1)
+		_log("  [顺势而为] 手牌为空, 直接抽 %d" % draw_n)
+		draw_cards(draw_n)
+		pending_discard_draw_count = 1
 		return
 	emit_signal("discard_choice_requested", hand.duplicate())
 
 
-# UI 回调: 弃 hand[idx] 后抽 1
+# UI 回调: 弃 hand[idx] 后按 pending_discard_draw_count 补抽
 func discard_one_then_draw(idx: int) -> void:
 	if idx < 0 or idx >= hand.size():
 		return
+	var draw_n: int = max(1, pending_discard_draw_count)
+	pending_discard_draw_count = 1
 	var c: Card = hand[idx]
 	hand.remove_at(idx)
 	discard_pile.append(c)
-	_log("  [顺势而为] 弃掉「%s」" % c.name)
+	_log("  [顺势而为] 弃掉「%s」, 抽 %d 张" % [c.name, draw_n])
 	emit_signal("hand_changed")
-	draw_cards(1)
+	draw_cards(draw_n)
 	emit_signal("state_changed")
 
 
@@ -842,9 +857,10 @@ func discard_hand_redraw() -> void:
 	emit_signal("state_changed")
 
 
-# 孤注一掷: 股价 ±X% (50/50), X = 卡组里 BUY+SELL 牌总数 (含手牌/抽牌堆/弃牌堆/此卡之外; 化整为零产出的 transient 小买/小卖也计入)
+# 孤注一掷: 股价 ±(X × mul)% (50/50), X = 卡组里 BUY+SELL 牌总数 (含手牌/抽牌堆/弃牌堆/此卡之外; 化整为零产出的 transient 小买/小卖也计入)
+# mul: CSV mob_swing_mul; 基础 1.0, 孤注一掷+ = 2.0
 # 走 apply_price_change, 会经过情绪倍率 / 突发事件 up_mul/down_mul 等正常通道
-func apply_mob_swing() -> void:
+func apply_mob_swing(mul: float = 1.0) -> void:
 	var x: int = 0
 	for c in get_full_deck():
 		if c.is_buy() or c.is_sell():
@@ -852,11 +868,16 @@ func apply_mob_swing() -> void:
 	if x <= 0:
 		_log("  [孤注一掷] 卡组无买卖牌, 无效果")
 		return
+	var effective_mul: float = max(1.0, mul)
 	var up: bool = randi() % 2 == 0
-	var rate: float = float(x) / 100.0
+	var pct: float = float(x) * effective_mul
+	var rate: float = pct / 100.0
 	if not up:
 		rate = -rate
-	_log("  [孤注一掷] 卡组 BUY+SELL = %d, %s %d%%" % [x, "上涨" if up else "下跌", x])
+	if effective_mul > 1.0:
+		_log("  [孤注一掷] 卡组 BUY+SELL = %d × %.1f, %s %.0f%%" % [x, effective_mul, "上涨" if up else "下跌", pct])
+	else:
+		_log("  [孤注一掷] 卡组 BUY+SELL = %d, %s %d%%" % [x, "上涨" if up else "下跌", x])
 	apply_price_change(rate)
 
 
@@ -879,30 +900,37 @@ func place_on_top_of_draw(idx: int) -> void:
 	emit_signal("state_changed")
 
 
-# 流动性泛滥: chance 概率让所有手牌 cost -1 (最低 0), 仅本回合生效, _settle_turn 末还原
-func try_apply_liquidity(chance: float) -> void:
+# 流动性泛滥: chance 概率让所有手牌 cost -reduction (最低 0), 仅本回合生效, _settle_turn 末还原
+# reduction: CSV liquidity_reduction; 基础 1, 流动性泛滥+ = 2
+func try_apply_liquidity(chance: float, reduction: int = 1) -> void:
+	var dec: int = max(1, reduction)
 	if randf() >= chance:
 		_log("  [流动性泛滥] 未触发 (%.0f%% 概率)" % (chance * 100.0))
 		return
 	var n: int = 0
 	for c in hand:
 		if c.cost > 0:
-			c.cost -= 1
+			var amount: int = min(dec, c.cost)
+			c.cost -= amount
 			liquidity_buffed_cards.append(c)
+			liquidity_buffed_amounts.append(amount)
 			n += 1
-	_log("  [流动性泛滥] 触发! %d 张手牌费用 -1 (仅本回合)" % n)
+	_log("  [流动性泛滥] 触发! %d 张手牌费用 -%d (仅本回合)" % [n, dec])
 	emit_signal("hand_changed")
 	emit_signal("state_changed")
 
 
-# 还原流动性泛滥的 cost-1 buff (回合末调用; Card 可能已经离开 hand 进 discard, 引用还原仍生效)
+# 还原流动性泛滥的减费 buff (回合末调用; Card 可能已经离开 hand 进 discard, 引用还原仍生效)
 func _revert_liquidity_buffs() -> void:
 	if liquidity_buffed_cards.is_empty():
 		return
-	for c in liquidity_buffed_cards:
-		c.cost += 1
+	for i in range(liquidity_buffed_cards.size()):
+		var c: Card = liquidity_buffed_cards[i]
+		var amount: int = int(liquidity_buffed_amounts[i]) if i < liquidity_buffed_amounts.size() else 1
+		c.cost += amount
 	_log("  [流动性泛滥] 回合结束, %d 张卡费用还原" % liquidity_buffed_cards.size())
 	liquidity_buffed_cards.clear()
+	liquidity_buffed_amounts.clear()
 	emit_signal("hand_changed")
 
 
@@ -1011,6 +1039,11 @@ func _sell_shares(n: int, trade_price_pct: float = 0.0) -> void:
 		return
 	if n > shares: n = shares
 	var income: float = float(n) * price
+	# 本回合卖出现金倍率 (保命之道 → 1.1; +版 → 1.5)
+	if turn_sell_bonus_mul > 1.0 and income > 0.0:
+		var bonus: float = income * (turn_sell_bonus_mul - 1.0)
+		income += bonus
+		_log("  [卖出加成] 现金 ×%.2f → +¥%s" % [turn_sell_bonus_mul, _fmt_money(bonus)])
 	shares -= n
 	cash += income
 	if shares <= 0:
@@ -1150,7 +1183,12 @@ func _start_turn() -> void:
 	# UI 仍认为是 SETTLE 阶段而把所有手牌按钮 disable
 	phase = Phase.PLAY
 	skills_played_this_turn = 0
-	turn_emotion_mul = 1.0
+	# 情绪倍率: 未到期的持续效果跨回合保留, 由 _settle_turn 末递减并清零
+	if turn_emotion_mul_duration <= 0:
+		turn_emotion_mul = 1.0
+	# 卖出倍率 / 顺势抽牌数: 仅本回合作用域, 每回合开局兜底重置
+	turn_sell_bonus_mul = 1.0
+	pending_discard_draw_count = 1
 	combo_buy_count = 0
 	combo_sell_count = 0
 	# 抽牌 (会发 hand_changed)
@@ -1255,6 +1293,15 @@ func _settle_turn() -> void:
 	emit_signal("candle_committed", turn_global)
 	ACTION_POINTS_PER_TURN = min(ACTION_POINTS_PER_TURN + 1, ACTION_POINTS_MAX)
 	_revert_liquidity_buffs()
+	# 情绪倍率持续回合数倒计时 (水军出动/水军出动+)
+	if turn_emotion_mul_duration > 0:
+		turn_emotion_mul_duration -= 1
+		if turn_emotion_mul_duration == 0:
+			_log("  [情绪倍率] 持续效果到期, 倍率还原 ×1.0")
+			turn_emotion_mul = 1.0
+	# 本回合卖出倍率仅当回合有效, 结算后还原 (与 _start_turn 兜底双保险)
+	if turn_sell_bonus_mul != 1.0:
+		turn_sell_bonus_mul = 1.0
 	# 新机制: 回合结束时手牌全部进弃牌堆; 下回合开局重抽 FIRST_TURN_DRAW 张
 	if not hand.is_empty():
 		var dumped: int = hand.size()
@@ -1566,6 +1613,9 @@ func _capture_turn_undo_snapshot() -> void:
 		"discard_pile": _clone_card_array(discard_pile),
 		"skills_played_this_turn": skills_played_this_turn,
 		"turn_emotion_mul": turn_emotion_mul,
+		"turn_emotion_mul_duration": turn_emotion_mul_duration,
+		"turn_sell_bonus_mul": turn_sell_bonus_mul,
+		"pending_discard_draw_count": pending_discard_draw_count,
 		"combo_buy_count": combo_buy_count,
 		"combo_sell_count": combo_sell_count,
 		"daily_play_count": daily_play_count.duplicate(true),
@@ -1576,6 +1626,7 @@ func _capture_turn_undo_snapshot() -> void:
 		"banned_effect_ids": banned_effect_ids.duplicate(),
 		"triggered_event_ids_this_level": triggered_event_ids_this_level.duplicate(true),
 		"liquidity_buffed_cards": _clone_card_array(liquidity_buffed_cards),
+		"liquidity_buffed_amounts": liquidity_buffed_amounts.duplicate(),
 		"cur_open": cur_open,
 		"cur_high": cur_high,
 		"cur_low": cur_low,
@@ -1599,6 +1650,9 @@ func _restore_turn_undo_snapshot() -> void:
 	discard_pile = _clone_card_array(s["discard_pile"])
 	skills_played_this_turn = int(s["skills_played_this_turn"])
 	turn_emotion_mul = float(s["turn_emotion_mul"])
+	turn_emotion_mul_duration = int(s.get("turn_emotion_mul_duration", 0))
+	turn_sell_bonus_mul = float(s.get("turn_sell_bonus_mul", 1.0))
+	pending_discard_draw_count = int(s.get("pending_discard_draw_count", 1))
 	combo_buy_count = int(s["combo_buy_count"])
 	combo_sell_count = int(s["combo_sell_count"])
 	daily_play_count = (s["daily_play_count"] as Dictionary).duplicate(true)
@@ -1609,6 +1663,7 @@ func _restore_turn_undo_snapshot() -> void:
 	banned_effect_ids = (s["banned_effect_ids"] as Array).duplicate()
 	triggered_event_ids_this_level = (s["triggered_event_ids_this_level"] as Dictionary).duplicate(true)
 	liquidity_buffed_cards = _clone_card_array(s["liquidity_buffed_cards"])
+	liquidity_buffed_amounts = (s.get("liquidity_buffed_amounts", []) as Array).duplicate()
 	cur_open = float(s["cur_open"])
 	cur_high = float(s["cur_high"])
 	cur_low = float(s["cur_low"])

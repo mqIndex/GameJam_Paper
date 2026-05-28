@@ -6,7 +6,7 @@
 [ext_resource type="PackedScene" uid="uid://csmfjxrx51het" path="res://scenes/ui/chart_panel.tscn" id="4_chart"]
 [ext_resource type="PackedScene" path="res://scenes/ui/data_panel.tscn" id="5_data"]
 [ext_resource type="PackedScene" path="res://scenes/ui/action_bar.tscn" id="6_action"]
-[ext_resource type="PackedScene" uid="uid://dnwopclkbknh0" path="res://scenes/ui/enemy_panel.tscn" id="7_enemy"]
+[ext_resource type="PackedScene" path="res://scenes/ui/enemy_panel.tscn" id="7_enemy"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hand_panel.tscn" id="8_hand"]
 [ext_resource type="PackedScene" path="res://scenes/ui/turn_panel.tscn" id="9_turn"]
 [ext_resource type="PackedScene" path="res://scenes/ui/player_panel.tscn" id="10_player"]
@@ -156,9 +156,10 @@ grow_vertical = 2
 z_index = 260
 layout_mode = 1
 
+
 [node name="ColorRect" type="ColorRect" parent="." unique_id=775589172]
 material = SubResource("ShaderMaterial_ft6cd")
 layout_mode = 0
-offset_right = 1281.0
-offset_bottom = 769.0
+offset_right = 1367.0
+offset_bottom = 810.0
 mouse_filter = 2

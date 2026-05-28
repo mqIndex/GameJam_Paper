@@ -155,16 +155,19 @@ func _load_cards() -> void:
 			"trade_price_pct": _float(_cell(row, col, "trade_price_pct")),
 			"trade_shares":    int(_cell_or(row, col, "trade_shares", "0")),
 			# 新机制 (2026-05-23): 情绪锚定 / 反转 / 回合倍率 / 事件刷新
-			"emotion_set":      int(_cell_or(row, col, "emotion_set", "-1")),
-			"emotion_invert":   _bool(_cell(row, col, "emotion_invert")),
-			"reroll_event":     _bool(_cell(row, col, "reroll_event")),
-			"emotion_mul_turn": _float(_cell(row, col, "emotion_mul_turn")),
+			"emotion_set":          int(_cell_or(row, col, "emotion_set", "-1")),
+			"emotion_invert":       _bool(_cell(row, col, "emotion_invert")),
+			"reroll_event":         _bool(_cell(row, col, "reroll_event")),
+			"emotion_mul_turn":     _float(_cell(row, col, "emotion_mul_turn")),
+			"emotion_mul_duration": int(_cell_or(row, col, "emotion_mul_duration", "1")),
 			# 选择类机制 (2026-05-23 第二批): 信号驱动, UI 弹窗 → 回调 game_state apply_*
-			"event_preview":     _bool(_cell(row, col, "event_preview")),
-			"discard_then_draw": _bool(_cell(row, col, "discard_then_draw")),
-			"topdeck_pick":      _bool(_cell(row, col, "topdeck_pick")),
-			"liquidity_chance":  _float(_cell(row, col, "liquidity_chance")),
-			"shatter":           _bool(_cell(row, col, "shatter")),
+			"event_preview":      _bool(_cell(row, col, "event_preview")),
+			"discard_then_draw":  _bool(_cell(row, col, "discard_then_draw")),
+			"discard_draw_count": int(_cell_or(row, col, "discard_draw_count", "1")),
+			"topdeck_pick":       _bool(_cell(row, col, "topdeck_pick")),
+			"liquidity_chance":    _float(_cell(row, col, "liquidity_chance")),
+			"liquidity_reduction": int(_cell_or(row, col, "liquidity_reduction", "1")),
+			"shatter":             _bool(_cell(row, col, "shatter")),
 			# 商店/牌组约束 (2026-05-23 平衡): 唯一卡 / 个性化售价 / 每日使用上限 / 当日封存
 			"shop_unique":  _bool(_cell(row, col, "shop_unique")),
 			"shop_price":   int(_cell_or(row, col, "shop_price", "0")),
@@ -172,9 +175,13 @@ func _load_cards() -> void:
 			"daily_exile":  _bool(_cell(row, col, "daily_exile")),
 			# 自动效果: 弃光手牌再抽等量 (快速换手)
 			"discard_hand_redraw": _bool(_cell(row, col, "discard_hand_redraw")),
-			# 动态效果: 孤注一掷 — ±X% (50/50, X = 卡组中 BUY+SELL 数)
-			"mob_swing":           _bool(_cell(row, col, "mob_swing")),
+			# 动态效果: 孤注一掷 — ±X% (50/50, X = 卡组中 BUY+SELL 数); mul 用于 + 版本
+			"mob_swing":     _bool(_cell(row, col, "mob_swing")),
+			"mob_swing_mul": _float(_cell_or(row, col, "mob_swing_mul", "1.0")),
 			"draw_count":      int(_cell_or(row, col, "draw_count", "0")),
+			"sell_bonus_mul":  _float(_cell_or(row, col, "sell_bonus_mul", "0")),
+			"ap_bonus":        int(_cell_or(row, col, "ap_bonus", "0")),
+			"share_cost":      int(_cell_or(row, col, "share_cost", "0")),
 		}
 		cards[eid] = entry
 	f.close()
