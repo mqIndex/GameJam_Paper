@@ -61,9 +61,12 @@ func starter_deck_defs() -> Array:
 
 
 # 返回商店候选 effect_id 列表
+# _plus (升级版) 卡牌永远不进商店, 只能通过升级获得
 func shop_pool_ids() -> Array:
 	var out: Array = []
 	for eid in cards.keys():
+		if eid.ends_with("_plus"):
+			continue
 		var t: Dictionary = cards[eid]
 		if t.get("in_shop", false):
 			out.append(eid)

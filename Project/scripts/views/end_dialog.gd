@@ -6,6 +6,9 @@ const UF = preload("res://scripts/views/ui_factory.gd")
 @onready var lbl_detail: Label = $Margin/VBox/LblDetail
 @onready var btn_restart: Button = $Margin/VBox/BtnRestart
 
+# 存档身份小标签 (动态添加, 放在标题上方)
+var _lbl_slot_info: Label = null
+
 var _continue_to_next_level: bool = false
 
 
@@ -17,11 +20,44 @@ func _ready() -> void:
 	hover.bg_color = Color(UF.COL_UP.r, UF.COL_UP.g, UF.COL_UP.b, 0.18)
 	btn_restart.add_theme_stylebox_override("hover", hover)
 	btn_restart.pressed.connect(_on_restart)
+	_build_slot_info_label()
 	Game.level_finished.connect(_on_level_finished)
+
+
+# 在标题前插一行小字: "存档 N · 人格名 · 累计通关 X / Y"
+func _build_slot_info_label() -> void:
+	_lbl_slot_info = Label.new()
+	_lbl_slot_info.name = "LblSlotInfo"
+	_lbl_slot_info.add_theme_font_size_override("font_size", 13)
+	_lbl_slot_info.add_theme_color_override("font_color", UF.COL_TEXT_DIM)
+	_lbl_slot_info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var vbox: VBoxContainer = $Margin/VBox
+	vbox.add_child(_lbl_slot_info)
+	vbox.move_child(_lbl_slot_info, 0)
+
+
+func _refresh_slot_info() -> void:
+	if _lbl_slot_info == null:
+		return
+	if Saves.active_slot_index < 0:
+		_lbl_slot_info.text = "未选档 · 测试模式"
+		return
+	var persona_name: String = Saves.get_active_persona_name()
+	var slot: Dictionary = Saves.get_active_slot()
+	var max_cleared: int = int(slot.get("max_cleared_level_index", -1))
+	# 累计通关 = max_cleared + 1 (含教学关); 全通关时显示"全通关"
+	var cleared_count: int = max(0, max_cleared + 1)
+	var progress: String
+	if max_cleared >= Saves.TOTAL_LEVEL_COUNT - 1:
+		progress = "全通关"
+	else:
+		progress = "累计通关 %d / %d" % [cleared_count, Saves.TOTAL_LEVEL_COUNT]
+	_lbl_slot_info.text = "存档 %d · %s · %s" % [Saves.active_slot_index + 1, persona_name, progress]
 
 
 func _on_level_finished(victory: bool, final_assets: float) -> void:
 	_continue_to_next_level = victory and Game.has_next_level()
+	_refresh_slot_info()
 	if victory:
 		lbl_title.text = "胜  利"
 		lbl_title.add_theme_color_override("font_color", UF.COL_UP)

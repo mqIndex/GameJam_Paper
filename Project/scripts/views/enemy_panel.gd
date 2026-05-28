@@ -23,6 +23,12 @@ const BUBBLE_ARROW_SIZE: Vector2 = Vector2(24.0, 13.0)
 const BUBBLE_COLOR: Color = Color(0.03, 0.0, 0.02, 0.94)
 const BUBBLE_BORDER_COLOR: Color = Color(1.0, 0.22, 0.34, 0.92)
 
+# opponent_id → 商战对手面板的小头像
+const PORTRAIT_BY_ID: Dictionary = {
+	"boss_six": preload("res://assets/chev/ememy/DR1_GS_1024.png"),
+	"boss_blade": preload("res://assets/chev/ememy/DR2_BL_1024.png"),
+}
+
 var _bubble_timer: float = 0.0
 var _bubble_panel: PanelContainer = null
 var _bubble_text: Label = null
@@ -84,6 +90,7 @@ func _refresh() -> void:
 	var opp = Game.get_opponent_state()
 	if opp == null or (not opp.present and not opp.defeated_this_level):
 		# 未出现: 只显示"(未出现)", 隐藏统计行
+		_apply_portrait("")
 		lbl_name.text = "对手"
 		lbl_name.add_theme_color_override("font_color", UF.COL_GOLD)
 		lbl_status.text = "(未出现)"
@@ -94,6 +101,7 @@ func _refresh() -> void:
 		return
 
 	# 出现 (在场或已击败): 隐藏状态行, 显示统计
+	_apply_portrait(opp.opponent_id)
 	lbl_status.visible = false
 	separator.visible = true
 	stats_grid.visible = true
@@ -257,3 +265,10 @@ func _flash_avatar(color: Color) -> void:
 	var t := create_tween()
 	t.tween_property(avatar, "modulate", color, 0.12)
 	t.tween_property(avatar, "modulate", Color.WHITE, 0.12)
+
+
+func _apply_portrait(opponent_id: String) -> void:
+	if avatar == null or not avatar.has_method("set_portrait"):
+		return
+	var tex: Texture2D = PORTRAIT_BY_ID.get(opponent_id, null)
+	avatar.call("set_portrait", tex)

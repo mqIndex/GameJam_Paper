@@ -6,6 +6,7 @@ const UF = preload("res://scripts/views/ui_factory.gd")
 @export var avatar_color: Color = Color("#26395a") : set = _set_avatar_color
 
 @onready var avatar_rect: ColorRect = $AvatarRect
+@onready var portrait: TextureRect = $Portrait
 
 
 func _ready() -> void:
@@ -26,3 +27,11 @@ func _set_avatar_color(value: Color) -> void:
 	avatar_color = value
 	if avatar_rect != null:
 		avatar_rect.color = value
+
+
+# 设置或清除头像贴图. tex == null 时回退到纯色块.
+func set_portrait(tex: Texture2D) -> void:
+	if portrait == null:
+		return
+	portrait.texture = tex
+	portrait.visible = tex != null

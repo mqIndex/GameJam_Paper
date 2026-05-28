@@ -21,6 +21,7 @@ config/icon="uid://5i5yrywg2f30"
 
 Cfg="*res://scripts/config/config_loader.gd"
 Game="*res://scripts/game_state.gd"
+Saves="*res://scripts/save_slots.gd"
 
 [display]
 

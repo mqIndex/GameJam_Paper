@@ -108,6 +108,8 @@ func _ready() -> void:
 	Game.state_changed.connect(_refresh)
 	Game.event_triggered.connect(_on_event_triggered)
 	resized.connect(_relayout_bars)
+	# 插槽真正拿到宽度 (HBoxContainer 排版完成 / TopBar 由隐藏切回可见) 时, 重新摆 11 段色块
+	emotion_bar_slot.resized.connect(_layout_emotion_bar)
 	_relayout_bars()
 	_refresh()
 
@@ -200,10 +202,6 @@ func _relayout_bars() -> void:
 
 
 func _layout_emotion_bar() -> void:
-	if _emotion_border == null:
-		return
-	# 等下一帧 EmotionBarSlot 拿到真实 size (HBox 布局完成)
-	await get_tree().process_frame
 	if _emotion_border == null:
 		return
 	var slot_size: Vector2 = emotion_bar_slot.size

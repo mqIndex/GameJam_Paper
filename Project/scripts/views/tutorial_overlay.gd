@@ -15,6 +15,22 @@ const INTRO_TYPEWRITER_CHARS_PER_SECOND: float = 18.0
 const DIALOG_TYPEWRITER_CHARS_PER_SECOND: float = 22.0
 const DIALOG_PLAYER_GAP_SEC: float = 0.25  # 宝叔说完 → 玩家开口 中间停顿
 
+# 对手出场介绍框 (intro 样式) 资源, 按 opponent_id 索引
+const OPPONENT_INTRO_BY_ID: Dictionary = {
+	"boss_six": {
+		"portrait": preload("res://assets/chev/ememy/DR1_GS.png"),
+		"name": "GS",
+		"title": "对手介绍",
+		"body": "市场上著名的空头机构 GS，靠砸低股价获利，善于操控市场，是不好对付的敌人。",
+	},
+	"boss_blade": {
+		"portrait": preload("res://assets/chev/ememy/DR2_BL.png"),
+		"name": "伯里",
+		"title": "对手介绍",
+		"body": "嗅觉敏锐的空头猎手伯里，敢于在高位重仓做空，下手极狠，难缠程度更上一层。",
+	},
+}
+
 
 var _main: Control = null
 var _steps: Array = []
@@ -55,6 +71,8 @@ var _player_text_tween: Tween = null
 var _dialog_typewriter_done: bool = true
 var _pending_player_text: String = ""
 var _player_dialog_pending: bool = false  # 宝叔说话期间, 玩家对话框暂时隐藏
+var _opponent_intro_id: String = ""        # 本次 opponent 介绍流程对应的 opponent_id
+var _opponent_includes_generic: bool = false  # 本次流程是否包含通用做空教学步骤
 
 
 func setup(main_node: Control) -> void:
@@ -554,26 +572,65 @@ func _build_formal_intro_steps() -> void:
 
 
 func _build_opponent_intro_steps() -> void:
-	_steps = [
-		{
-			"target_path": "EnemyPanel",
-			"dialog": "做空对手出现了。他们主要靠砸低股价来获利，这是把双刃剑。",
-			"prompt": "对手会干预股价，也可能帮你把价格砸到低位。",
-			"button": "继续",
-		},
-		{
-			"dialog": "他们既会干预我们拉升股价的节奏，也可以被我们利用：等他们砸低股价，你买点便宜股票，然后拉升卖出。",
-			"player_dialog": "那现在怎么办？",
-			"button": "继续",
-		},
-		{
-			"target_path": "EnemyHpBar",
-			"dialog": "如果你看不惯他们，可以看他们的平仓线。把股价拉升到平仓线，他们受不了亏损就走了。",
-			"prompt": "平仓线：股价越接近这里，对手越危险。",
-			"button": "知道了",
-			"finish": true,
-		},
-	]
+	_steps = []
+	_opponent_intro_id = ""
+	_opponent_includes_generic = false
+	var opp = Game.get_opponent_state()
+	if opp != null:
+		_opponent_intro_id = String(opp.opponent_id)
+	var intro_step: Dictionary = _opponent_intro_step()
+	var show_intro: bool = (
+		not intro_step.is_empty()
+		and _opponent_intro_id != ""
+		and not Game.opponent_intro_seen(_opponent_intro_id)
+	)
+	var show_generic: bool = not Game.opponent_tutorial_completed
+	_opponent_includes_generic = show_generic
+	if show_intro:
+		if not show_generic:
+			intro_step["button"] = "知道了"
+			intro_step["finish"] = true
+		_steps.append(intro_step)
+	if show_generic:
+		_steps.append_array([
+			{
+				"target_path": "EnemyPanel",
+				"dialog": "做空对手出现了。他们主要靠砸低股价来获利，这是把双刃剑。",
+				"prompt": "对手会干预股价，也可能帮你把价格砸到低位。",
+				"button": "继续",
+			},
+			{
+				"dialog": "他们既会干预我们拉升股价的节奏，也可以被我们利用：等他们砸低股价，你买点便宜股票，然后拉升卖出。",
+				"player_dialog": "那现在怎么办？",
+				"button": "继续",
+			},
+			{
+				"target_path": "EnemyHpBar",
+				"dialog": "如果你看不惯他们，可以看他们的平仓线。把股价拉升到平仓线，他们受不了亏损就走了。",
+				"prompt": "平仓线：股价越接近这里，对手越危险。",
+				"button": "知道了",
+				"finish": true,
+			},
+		])
+
+
+# 当前 opponent_id 命中 OPPONENT_INTRO_BY_ID 时, 返回模仿新手教学样式的 intro 步
+func _opponent_intro_step() -> Dictionary:
+	var opp = Game.get_opponent_state()
+	if opp == null:
+		return {}
+	var data: Dictionary = OPPONENT_INTRO_BY_ID.get(opp.opponent_id, {})
+	if data.is_empty():
+		return {}
+	return {
+		"intro": true,
+		"intro_texture": data.get("portrait"),
+		"intro_name": String(data.get("name", opp.display_name)),
+		"intro_title": String(data.get("title", "对手介绍")),
+		"intro_body": String(data.get("body", "")),
+		"typewriter": true,
+		"button": "继续",
+	}
 
 
 func _build_opponent_reward_steps() -> void:
@@ -945,8 +1002,12 @@ func _finish() -> void:
 			if Game.has_method("finish_formal_intro"):
 				Game.call("finish_formal_intro")
 		"opponent":
-			if Game.has_method("finish_opponent_tutorial"):
+			if _opponent_intro_id != "" and Game.has_method("mark_opponent_intro_seen"):
+				Game.call("mark_opponent_intro_seen", _opponent_intro_id)
+			if _opponent_includes_generic and Game.has_method("finish_opponent_tutorial"):
 				Game.call("finish_opponent_tutorial")
+			elif Game.has_method("finish_context_tutorial"):
+				Game.call("finish_context_tutorial")
 		"opponent_reward":
 			if Game.has_method("finish_opponent_reward_tutorial"):
 				Game.call("finish_opponent_reward_tutorial")

@@ -5,6 +5,8 @@ const Card = preload("res://scripts/card.gd")
 const Event = preload("res://scripts/event.gd")
 const CardChoiceDialog = preload("res://scripts/views/card_choice_dialog.gd")
 const TutorialOverlayScene = preload("res://scenes/ui/tutorial_overlay.tscn")
+const SaveOverlay = preload("res://scripts/views/save_overlay.gd")
+const PauseOverlay = preload("res://scripts/views/pause_overlay.gd")
 
 @onready var log_text: RichTextLabel = $LogText
 @onready var bg: ColorRect = $BG
@@ -37,6 +39,9 @@ var _opponent_popup_size: Vector2 = Vector2.ZERO
 var _opponent_popup_y_ratio: float = 0.34
 var _subtitle_banner: Label = null
 var _tutorial_overlay: Control = null
+var _save_overlay: Control = null
+var _pause_overlay: Control = null
+var _game_started: bool = false
 
 const MIN_WINDOW_SIZE: Vector2 = Vector2(960.0, 540.0)
 const OUTER_PAD: float = 8.0
@@ -75,23 +80,27 @@ func _ready() -> void:
 	_build_subtitle_banner()
 	_apply_bg_texture()
 	_setup_tutorial_overlay()
+	_setup_pause_overlay()
 	Game.opponent_entered.connect(_on_opponent_entered_popup)
 	Game.opponent_defeated.connect(_on_opponent_defeated_popup)
 	Game.opponent_defeated.connect(_on_opponent_defeated_for_tutorial)
 	Game.shop_entered.connect(_on_shop_entered_for_tutorial)
 	Game.day_started.connect(_on_day_started_for_tutorial)
 	Game.level_started.connect(_on_level_started_for_tutorial)
+	# 自动保存钩子: 通关 / 教学进度变化 都尝试落盘
+	Game.level_finished.connect(_on_level_finished_for_save)
+	Game.state_changed.connect(_on_state_changed_for_save)
+	Saves.active_slot_changed.connect(_on_active_slot_changed)
 	$PlayerPanel.pile_clicked.connect(_on_pile_clicked)
 	$TurnPanel.pile_clicked.connect(_on_pile_clicked)
-	var skip_tutorial: bool = _has_cmdline_flag("--skip-tutorial")
-	if skip_tutorial:
-		Game.finish_tutorial()
-	var tutorial_should_start: bool = (not skip_tutorial) and Game.should_start_tutorial()
-	Game.set_tutorial_active(tutorial_should_start)
-	Game.new_level()
-	if tutorial_should_start and _tutorial_overlay != null:
-		_tutorial_overlay.call_deferred("start")
-	_start_bgm()
+	_apply_active_persona_portrait()
+	# 隐藏游戏 UI 直到玩家选档完成, 避免空状态闪烁
+	_set_gameplay_visible(false)
+	if _has_cmdline_flag("--skip-save"):
+		# 直跑模式 (cmdline 测试): 不弹存档页, 走旧的默认教学流程
+		_start_gameplay(true)
+	else:
+		_show_save_overlay()
 
 
 func _has_cmdline_flag(flag: String) -> bool:
@@ -102,6 +111,115 @@ func _has_cmdline_flag(flag: String) -> bool:
 		if String(arg) == flag:
 			return true
 	return false
+
+
+# ===========================================================
+# 存档启动流程
+# ===========================================================
+# 玩家可见 UI 仅 BG + 标题横幅 + SaveOverlay; 游戏主面板隐藏, 避免空状态闪烁
+const _GAMEPLAY_PANEL_NODE_NAMES: Array = [
+	"TopBar", "EnemyHpBar", "ChartPanel", "DataPanel", "PlayerTargetBar",
+	"ActionBar", "EnemyPanel", "HandPanel", "TurnPanel", "PlayerPanel", "LogText",
+]
+
+
+func _set_gameplay_visible(visible_state: bool) -> void:
+	for node_name in _GAMEPLAY_PANEL_NODE_NAMES:
+		var n: Node = get_node_or_null(node_name)
+		if n is CanvasItem:
+			(n as CanvasItem).visible = visible_state
+	if _subtitle_banner != null:
+		_subtitle_banner.visible = visible_state
+
+
+func _show_save_overlay() -> void:
+	if _save_overlay != null and is_instance_valid(_save_overlay):
+		_save_overlay.visible = true
+		return
+	_save_overlay = SaveOverlay.new()
+	_save_overlay.name = "SaveOverlay"
+	add_child(_save_overlay)
+	_set_full_rect(_save_overlay)
+	_save_overlay.confirmed.connect(_on_save_overlay_confirmed)
+
+
+func _on_save_overlay_confirmed(_slot_index: int, _persona_id: String, _is_new: bool, start_level_override: int) -> void:
+	# SaveOverlay 内部已经把 active_slot 写好并落盘; 这里只负责拿进度起游戏
+	# start_level_override: >=0 = 全通关存档重玩选关时携带, 覆盖 max_cleared+1 的默认起始关
+	Saves.apply_to_game(start_level_override)
+	if _save_overlay != null and is_instance_valid(_save_overlay):
+		_save_overlay.queue_free()
+		_save_overlay = null
+	_apply_active_persona_portrait()
+	_start_gameplay(false)
+
+
+func _start_gameplay(allow_default_persona: bool) -> void:
+	if _game_started:
+		return
+	_game_started = true
+	_set_gameplay_visible(true)
+	var skip_tutorial: bool = _has_cmdline_flag("--skip-tutorial")
+	if skip_tutorial:
+		Game.finish_tutorial()
+	# allow_default_persona: cmdline --skip-save 时, Saves 里没有 active; 给个默认头像以免空白
+	if allow_default_persona and Saves.active_persona_id == "":
+		Saves.active_persona_id = Saves.DEFAULT_PERSONA_ID
+		_apply_active_persona_portrait()
+	var tutorial_should_start: bool = (not skip_tutorial) and Game.should_start_tutorial()
+	Game.set_tutorial_active(tutorial_should_start)
+	_capture_save_snapshot()
+	Game.new_level()
+	if tutorial_should_start and _tutorial_overlay != null:
+		_tutorial_overlay.call_deferred("start")
+	_start_bgm()
+
+
+# ===========================================================
+# 自动保存钩子
+# ===========================================================
+# 上次写入 Saves 的快照 hash, 用来对比是否需要落盘 (避免每次 state_changed 都写文件)
+# hash 由 Saves.compute_capture_hash() 计算, 涵盖 tutorial flag + Dict 字段 (opponent_intro_seen 等)
+var _last_save_hash: int = 0
+
+
+func _capture_save_snapshot() -> void:
+	_last_save_hash = Saves.compute_capture_hash()
+
+
+func _on_state_changed_for_save() -> void:
+	if not _game_started:
+		return
+	if Saves.active_slot_index < 0:
+		return
+	var cur: int = Saves.compute_capture_hash()
+	if cur == _last_save_hash:
+		return
+	_last_save_hash = cur
+	Saves.capture_from_game()
+
+
+func _on_level_finished_for_save(victory: bool, _final_assets: float) -> void:
+	if not _game_started:
+		return
+	if Saves.active_slot_index < 0:
+		return
+	if victory:
+		Saves.record_level_cleared(Game.current_level_index)
+	# 不论胜负都同步 tutorial flag (失败时 finish_tutorial 也可能被触发)
+	Saves.capture_from_game()
+	_capture_save_snapshot()
+
+
+func _on_active_slot_changed(_slot_index: int, _persona_id: String) -> void:
+	_apply_active_persona_portrait()
+
+
+func _apply_active_persona_portrait() -> void:
+	var avatar: Node = get_node_or_null("PlayerPanel/VBox/AvatarSlot/Avatar")
+	if avatar == null or not avatar.has_method("set_portrait"):
+		return
+	avatar.call("set_portrait", Saves.get_active_portrait())
 
 
 # 选择类卡 UI: 接 game_state 4 个 request_* 信号 → 弹 dialog → 回调 game_state apply_*
@@ -286,8 +404,12 @@ func _on_opponent_entered_popup(_opponent_id: String) -> void:
 		OPPONENT_POPUP_DURATION,
 		0.34
 	)
-	if Game.current_level_index > 0 and not Game.opponent_tutorial_completed and _tutorial_overlay != null:
-		if _tutorial_overlay.has_method("start_opponent_intro"):
+	if Game.current_level_index > 0 and _tutorial_overlay != null:
+		var opp_id: String = ""
+		if opp != null:
+			opp_id = opp.opponent_id
+		var need_intro: bool = not Game.opponent_tutorial_completed or not Game.opponent_intro_seen(opp_id)
+		if need_intro and _tutorial_overlay.has_method("start_opponent_intro"):
 			_tutorial_overlay.call_deferred("start_opponent_intro")
 
 
@@ -408,6 +530,55 @@ func _setup_tutorial_overlay() -> void:
 		_tutorial_overlay.setup(self)
 
 
+# ESC 暂停菜单: 含"继续游戏 / 返回标题切换存档 / 退出游戏"
+# 仅在 _game_started 之后才响应 ESC; SaveOverlay/EndDialog/ShopOverlay/Tutorial 显示时不弹
+func _setup_pause_overlay() -> void:
+	if _pause_overlay != null and is_instance_valid(_pause_overlay):
+		return
+	_pause_overlay = PauseOverlay.new()
+	_pause_overlay.name = "PauseOverlay"
+	add_child(_pause_overlay)
+	_set_full_rect(_pause_overlay)
+	_pause_overlay.resume_requested.connect(_on_pause_resume)
+	_pause_overlay.switch_slot_requested.connect(_on_pause_switch_slot)
+	_pause_overlay.quit_requested.connect(_on_pause_quit)
+
+
+func _can_open_pause_menu() -> bool:
+	if not _game_started:
+		return false
+	if _save_overlay != null and is_instance_valid(_save_overlay) and _save_overlay.visible:
+		return false
+	if _pause_overlay != null and is_instance_valid(_pause_overlay) and _pause_overlay.visible:
+		return false
+	if $EndDialog != null and $EndDialog.visible:
+		return false
+	if $ShopOverlay != null and $ShopOverlay.visible:
+		return false
+	if Game.tutorial_active:
+		return false
+	return true
+
+
+func _on_pause_resume() -> void:
+	pass  # close_menu 已经在 PauseOverlay 内部处理
+
+
+func _on_pause_switch_slot() -> void:
+	# 切换存档: 当前局进度 (cash/shares/手牌/事件) 不持久化, 直接重载场景
+	# autoload Game/Saves 会保留, 但 Game 需要被重置为干净状态以便走选档流程
+	# 简单做法: 重载主场景; Saves 已经把进度落盘 (tutorial flag / max_cleared / opponent_intro_seen)
+	# Saves 的 active_slot 也清掉, 让重载后的 main.gd 弹出 SaveOverlay
+	Saves.active_slot_index = -1
+	Saves.active_persona_id = ""
+	Saves.emit_signal("active_slot_changed", -1, "")
+	get_tree().reload_current_scene()
+
+
+func _on_pause_quit() -> void:
+	get_tree().quit()
+
+
 func _on_shop_entered_for_tutorial(_day: int) -> void:
 	if _tutorial_overlay == null:
 		return
@@ -470,8 +641,34 @@ func _on_pile_clicked(pile_name: String) -> void:
 		popup.show_deck("弃牌堆", Game.discard_pile.duplicate())
 
 
-func _unhandled_input(_event: InputEvent) -> void:
-	pass
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		var key: int = (event as InputEventKey).keycode
+		if key == KEY_ESCAPE:
+			# ESC: 暂停菜单显隐切换 (打开时仅在合法状态下生效, 关闭时无条件允许)
+			if _pause_overlay != null and is_instance_valid(_pause_overlay) and _pause_overlay.visible:
+				_pause_overlay.close_menu()
+				get_viewport().set_input_as_handled()
+				return
+			if _can_open_pause_menu():
+				_pause_overlay.open_menu()
+				get_viewport().set_input_as_handled()
+				return
+		if key == KEY_SPACE:
+			if $ShopOverlay != null and $ShopOverlay.visible:
+				return
+			if $EndDialog != null and $EndDialog.visible:
+				return
+			if _pause_overlay != null and is_instance_valid(_pause_overlay) and _pause_overlay.visible:
+				return
+			if Game.tutorial_active:
+				return
+			if Game.is_level_over:
+				return
+			if Game.phase != Game.Phase.PLAY:
+				return
+			Game.end_turn()
+			get_viewport().set_input_as_handled()
 
 
 func _append_log(msg: String) -> void:
@@ -507,6 +704,7 @@ func _relayout() -> void:
 	_set_full_rect(shop_overlay)
 	_set_full_rect(deck_preview_popup)
 	_set_full_rect(_tutorial_overlay)
+	_set_full_rect(_pause_overlay)
 
 	var content_w: float = view_size.x - OUTER_PAD * 2.0
 	var top_y: float = OUTER_PAD

@@ -129,6 +129,7 @@ var action_points: int = 0
 var hand: Array = []
 var draw_pile: Array = []
 var discard_pile: Array = []                    # 等待区 (类似杀戮尖塔), 抽牌堆空时洗回
+var disabled_pile: Array = []                   # 失效牌堆: 当日已达 daily_limit 的牌在此暂存, 跨天 (离开商店进下一天) 归还到弃牌堆参与重洗
 var is_level_over: bool = false
 var tutorial_active: bool = false
 var tutorial_completed: bool = false
@@ -137,6 +138,7 @@ var shop_tutorial_completed: bool = false
 var tutorial_goal_intro_completed: bool = false
 var formal_intro_completed: bool = false
 var opponent_tutorial_completed: bool = false
+var _opponent_intro_seen: Dictionary = {}  # opponent_id → true, 每只对手仅首次出现弹介绍
 var opponent_reward_tutorial_completed: bool = false
 
 var _tutorial_start_cash: float = 100000.0
@@ -233,6 +235,20 @@ func finish_opponent_tutorial() -> void:
 	finish_context_tutorial()
 
 
+func opponent_intro_seen(opponent_id: String) -> bool:
+	return bool(_opponent_intro_seen.get(opponent_id, false))
+
+
+func mark_opponent_intro_seen(opponent_id: String) -> void:
+	if opponent_id == "":
+		return
+	if bool(_opponent_intro_seen.get(opponent_id, false)):
+		return
+	_opponent_intro_seen[opponent_id] = true
+	# emit state_changed 让 Saves 节流哈希能感知此次变化, 触发自动落盘
+	emit_signal("state_changed")
+
+
 func finish_opponent_reward_tutorial() -> void:
 	opponent_reward_tutorial_completed = true
 	finish_context_tutorial()
@@ -321,6 +337,11 @@ func start_formal_level_from_tutorial() -> void:
 	shop_tutorial_active = false
 	shop_tutorial_completed = true
 	tutorial_completed = true
+	# 防御性: 若有人通过此入口跳过教学关 → 正式关, 也写入 max_cleared_level_index=0
+	# (正常路径走 _settle_level → level_finished → main 的钩子, 不依赖此处)
+	var saves := get_node_or_null("/root/Saves")
+	if saves != null and saves.has_method("record_level_cleared"):
+		saves.call("record_level_cleared", 0)
 	current_level_index = 1
 	new_level(carry)
 
@@ -488,6 +509,7 @@ func new_level(carried_effect_ids: Array = []) -> void:
 	action_points = ACTION_POINTS_INITIAL
 	hand.clear()
 	discard_pile.clear()
+	disabled_pile.clear()
 	draw_pile = CardDatabase.build_starter_deck()
 	for i in range(carried_effect_ids.size()):
 		var carried_id: String = String(carried_effect_ids[i])
@@ -574,10 +596,19 @@ func play_card(index: int) -> bool:
 			if combo_sell_count >= 3 and not _in_cascade:
 				_try_cascade_dispatch(c)
 				combo_sell_count = 0
-	discard_pile.append(c)
-	if c.daily_exile:
-		c.daily_exiled = true
-		_log("  [封存] 「%s」当日不再洗回牌堆" % c.name)
+	# daily_limit > 0 且本次打出后达到上限 → 进失效牌堆 (当日不再参与循环), 跨天前归还
+	# 注意: daily_play_count 在前面已 +1; daily_exile 是另一套机制 (永久封存当日, 走 discard_pile + daily_exiled 标记)
+	var go_disabled: bool = c.daily_limit > 0 \
+		and int(daily_play_count.get(c.effect_id, 0)) >= c.daily_limit \
+		and not c.daily_exile
+	if go_disabled:
+		disabled_pile.append(c)
+		_log("  [失效] 「%s」今日已达上限, 进失效牌堆, 明日归还" % c.name)
+	else:
+		discard_pile.append(c)
+		if c.daily_exile:
+			c.daily_exiled = true
+			_log("  [封存] 「%s」当日不再洗回牌堆" % c.name)
 	_log("打出「%s」: %s" % [c.name, c.description])
 	_emit_card_danmaku(c)
 	_turn_has_played_cards = true
@@ -855,20 +886,21 @@ func discard_one_then_draw(idx: int) -> void:
 # 快速换手: 弃光当前手牌 (此时不含本卡, 本卡已在 play_card 中 remove_at), 再抽相同数量
 func discard_hand_redraw() -> void:
 	var n: int = hand.size()
+	var draw_n: int = max(1, n)                                  # 手牌为空时仍至少抽 1 (保底, 避免本卡 AP 被白嫖)
 	if n == 0:
-		_log("  [快速换手] 手牌为空, 无效果")
-		return
-	emit_signal("hand_redraw_started", _redraw_discard_visual_indices(n))
-	if _is_resolving_play_card:
-		_skip_play_card_final_hand_changed = true
-	var names: Array = []
-	for c in hand:
-		names.append(c.name)
-		discard_pile.append(c)
-	hand.clear()
-	_log("  [快速换手] 弃掉 %d 张 (%s)" % [n, ", ".join(names)])
-	emit_signal("hand_changed")
-	draw_cards(n)
+		_log("  [快速换手] 手牌为空, 直接抽 %d" % draw_n)
+	else:
+		emit_signal("hand_redraw_started", _redraw_discard_visual_indices(n))
+		if _is_resolving_play_card:
+			_skip_play_card_final_hand_changed = true
+		var names: Array = []
+		for c in hand:
+			names.append(c.name)
+			discard_pile.append(c)
+		hand.clear()
+		_log("  [快速换手] 弃掉 %d 张 (%s)" % [n, ", ".join(names)])
+		emit_signal("hand_changed")
+	draw_cards(draw_n)
 	emit_signal("state_changed")
 
 
@@ -1000,7 +1032,7 @@ func shatter_cards(picked_cards: Array) -> void:
 # transient 卡清理: 从手/抽/弃牌堆里全部移除, 不入任何堆 (相当于销毁)
 func _strip_transient_cards() -> void:
 	var removed: int = 0
-	for arr in [hand, draw_pile, discard_pile]:
+	for arr in [hand, draw_pile, discard_pile, disabled_pile]:
 		var i: int = arr.size() - 1
 		while i >= 0:
 			if arr[i].transient:
@@ -1383,6 +1415,13 @@ func _end_day() -> void:
 		"forced_discount": DAY_CLOSE_DISCOUNT,
 	}
 	emit_signal("day_ended", day)
+	# 失效牌堆 (daily_limit 用满的牌) 收盘归还到弃牌堆, 让玩家在商店里也能升级/删除它们
+	# 真正洗回 draw_pile 仍发生在 leave_shop_to_next_day (与等待区一起重洗)
+	if not disabled_pile.is_empty():
+		_log("  失效牌堆 %d 张回到牌组 (商店可操作)" % disabled_pile.size())
+		for c in disabled_pile:
+			discard_pile.append(c)
+		disabled_pile.clear()
 	if day >= DAYS_PER_LEVEL:
 		# 第 5 天直接进入最终结算 (策划文档未指定第 5 天后是否还有商店, 暂走结算)
 		_settle_level()
@@ -1638,6 +1677,7 @@ func _capture_turn_undo_snapshot() -> void:
 		"hand": _clone_card_array(hand),
 		"draw_pile": _clone_card_array(draw_pile),
 		"discard_pile": _clone_card_array(discard_pile),
+		"disabled_pile": _clone_card_array(disabled_pile),
 		"skills_played_this_turn": skills_played_this_turn,
 		"turn_emotion_mul": turn_emotion_mul,
 		"turn_emotion_mul_duration": turn_emotion_mul_duration,
@@ -1675,6 +1715,7 @@ func _restore_turn_undo_snapshot() -> void:
 	hand = _clone_card_array(s["hand"])
 	draw_pile = _clone_card_array(s["draw_pile"])
 	discard_pile = _clone_card_array(s["discard_pile"])
+	disabled_pile = _clone_card_array(s.get("disabled_pile", []))
 	skills_played_this_turn = int(s["skills_played_this_turn"])
 	turn_emotion_mul = float(s["turn_emotion_mul"])
 	turn_emotion_mul_duration = int(s.get("turn_emotion_mul_duration", 0))
@@ -1780,17 +1821,18 @@ func _log(msg: String) -> void:
 # ===========================================================
 # 商店 API (阶段4)
 # ===========================================================
-# 牌组聚合 (玩家拥有的全部卡牌, 包含手牌+抽牌堆+等待区)
+# 牌组聚合 (玩家拥有的全部卡牌, 包含手牌+抽牌堆+等待区+失效牌堆)
 func get_full_deck() -> Array:
 	var all: Array = []
 	for c in hand: all.append(c)
 	for c in draw_pile: all.append(c)
 	for c in discard_pile: all.append(c)
+	for c in disabled_pile: all.append(c)
 	return all
 
 
 func get_deck_size() -> int:
-	return hand.size() + draw_pile.size() + discard_pile.size()
+	return hand.size() + draw_pile.size() + discard_pile.size() + disabled_pile.size()
 
 
 # 当前删卡价 (基础 1000 + 已删次数 × 1000)
@@ -1867,7 +1909,7 @@ func shop_delete_card(deck_index: int) -> bool:
 
 
 # 把"全牌组索引"映射回具体的 (pile, in-pile index)
-# 顺序: hand → draw_pile → discard_pile
+# 顺序: hand → draw_pile → discard_pile → disabled_pile
 func _locate_in_deck(deck_index: int) -> Dictionary:
 	if deck_index < 0:
 		return {}
@@ -1879,6 +1921,9 @@ func _locate_in_deck(deck_index: int) -> Dictionary:
 	off -= draw_pile.size()
 	if off < discard_pile.size():
 		return {"pile": discard_pile, "index": off, "card": discard_pile[off]}
+	off -= discard_pile.size()
+	if off < disabled_pile.size():
+		return {"pile": disabled_pile, "index": off, "card": disabled_pile[off]}
 	return {}
 
 

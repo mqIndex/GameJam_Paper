@@ -68,6 +68,7 @@ static func build_shop_offers(owned_effect_ids: Array = []) -> Array:
 		return offers
 	# 1) 过滤 shop_unique 已拥有的; 同时按 kind 分桶
 	var skills: Array = []
+	var trades: Array = []  # BUY / SELL: 商店里希望至少出 1 张
 	var others: Array = []
 	for eid in raw_pool:
 		var t: Variant = cfg.get_card_template(eid)
@@ -76,24 +77,33 @@ static func build_shop_offers(owned_effect_ids: Array = []) -> Array:
 		if bool(t.get("shop_unique", false)) and owned_effect_ids.has(eid):
 			continue
 		var kind_str: String = String(t.get("kind", "")).strip_edges().to_upper()
-		if kind_str == "SKILL":
-			skills.append(eid)
-		else:
-			others.append(eid)
-	if skills.is_empty() and others.is_empty():
+		match kind_str:
+			"SKILL":
+				skills.append(eid)
+			"BUY", "SELL":
+				trades.append(eid)
+			_:
+				others.append(eid)
+	if skills.is_empty() and trades.is_empty() and others.is_empty():
 		return offers
 	# 2) 各自洗牌
 	skills.shuffle()
+	trades.shuffle()
 	others.shuffle()
-	# 3) 至少 3 张 SKILL: 先从 skills 取 min(3, skills.size())
+	# 3) 配额: 先 1 张 BUY/SELL 保底, 再至少 3 张 SKILL
 	var picked: Array = []
+	var trade_quota: int = min(1, trades.size())
+	for i in range(trade_quota):
+		picked.append(trades[i])
 	var skill_quota: int = min(3, skills.size())
 	for i in range(skill_quota):
 		picked.append(skills[i])
-	# 4) 剩余名额从 (剩余 skills + others) 随机里抽
+	# 4) 剩余名额从 (剩余 skills + 剩余 trades + others) 随机抽
 	var rest: Array = []
 	for i in range(skill_quota, skills.size()):
 		rest.append(skills[i])
+	for i in range(trade_quota, trades.size()):
+		rest.append(trades[i])
 	for eid in others:
 		rest.append(eid)
 	rest.shuffle()
