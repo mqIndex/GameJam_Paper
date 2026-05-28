@@ -7,6 +7,7 @@ extends Control
 const UF = preload("res://scripts/views/ui_factory.gd")
 const Event = preload("res://scripts/event.gd")
 const EmotionMarker = preload("res://scripts/views/emotion_marker.gd")
+const CardHoverTooltip = preload("res://scripts/views/card_hover_tooltip.gd")
 
 # 天赋 ID → logo 图片路径
 const TALENT_ICON_MAP: Dictionary = {
@@ -69,6 +70,9 @@ var _emotion_tick_labels: Array[Label] = []
 
 # 天赋图标缓存 (slot_id → Panel)
 var _talent_icon_nodes: Dictionary = {}
+var _talent_tooltip: PanelContainer = null
+var _talent_tooltip_text: String = ""
+var _talent_tooltip_tween: Tween = null
 
 const EMOTION_BAR_HEIGHT: float = 14.0
 const EMOTION_TICK_COUNT: int = 11  # 0/10/.../100
@@ -89,6 +93,7 @@ const EMOTION_SEGMENT_COLORS: Array[Color] = [
 
 
 func _ready() -> void:
+	set_process(false)
 	left_bar.add_theme_stylebox_override("panel", UF.panel_stylebox())
 	mid_bar.add_theme_stylebox_override("panel", UF.panel_stylebox())
 	right_bar.add_theme_stylebox_override("panel", UF.panel_stylebox())
@@ -266,6 +271,7 @@ func _refresh_talent_icons() -> void:
 	for tid in to_remove:
 		var n: Node = _talent_icon_nodes[tid]
 		if n != null and is_instance_valid(n):
+			_hide_talent_tooltip()
 			n.queue_free()
 		_talent_icon_nodes.erase(tid)
 	# 新增图标
@@ -282,9 +288,14 @@ func _make_talent_icon(t) -> TextureRect:
 	var icon_path: String = TALENT_ICON_MAP.get(t.id, "")
 	var p := TextureRect.new()
 	p.custom_minimum_size = Vector2(24, 24)
-	p.tooltip_text = "%s\n%s" % [t.name, t.description]
+	p.mouse_filter = Control.MOUSE_FILTER_STOP
+	p.tooltip_text = ""
+	p.set_meta("talent_id", t.id)
+	p.set_meta("talent_tooltip", "天赋：%s\n%s" % [t.name, t.description])
 	p.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	p.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	p.mouse_entered.connect(_on_talent_icon_mouse_entered.bind(p))
+	p.mouse_exited.connect(_on_talent_icon_mouse_exited)
 	if icon_path != "":
 		var tex = load(icon_path)
 		if tex is Texture2D:
@@ -295,6 +306,7 @@ func _make_talent_icon(t) -> TextureRect:
 		# 无 logo 的天赋: 仍然用文字首字 fallback
 		var placeholder := Panel.new()
 		placeholder.custom_minimum_size = Vector2(24, 24)
+		placeholder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = Color(UF.COL_NEON_PURPLE.r * 0.4, UF.COL_NEON_PURPLE.g * 0.4, UF.COL_NEON_PURPLE.b * 0.55, 1.0)
 		sb.border_color = UF.COL_NEON_PURPLE
@@ -319,6 +331,59 @@ func _make_talent_icon(t) -> TextureRect:
 		placeholder.add_child(l)
 		p.add_child(placeholder)
 	return p
+
+
+func _on_talent_icon_mouse_entered(anchor: Control) -> void:
+	if anchor == null:
+		return
+	_talent_tooltip_text = String(anchor.get_meta("talent_tooltip", ""))
+	if _talent_tooltip_text == "":
+		return
+	_show_talent_tooltip()
+
+
+func _on_talent_icon_mouse_exited() -> void:
+	_hide_talent_tooltip()
+
+
+func _show_talent_tooltip() -> void:
+	if _talent_tooltip_text == "":
+		return
+	if _talent_tooltip == null:
+		_talent_tooltip = CardHoverTooltip.create(_talent_tooltip_text)
+		get_tree().root.add_child(_talent_tooltip)
+	else:
+		CardHoverTooltip.set_text(_talent_tooltip, _talent_tooltip_text)
+	CardHoverTooltip.position_near_mouse(_talent_tooltip, get_viewport())
+	_talent_tooltip.visible = true
+	_talent_tooltip.modulate = Color(1, 1, 1, 0)
+	if _talent_tooltip_tween != null and _talent_tooltip_tween.is_valid():
+		_talent_tooltip_tween.kill()
+	_talent_tooltip_tween = create_tween()
+	_talent_tooltip_tween.tween_property(_talent_tooltip, "modulate:a", 1.0, 0.05)
+	set_process(true)
+
+
+func _hide_talent_tooltip() -> void:
+	_talent_tooltip_text = ""
+	set_process(false)
+	if _talent_tooltip_tween != null and _talent_tooltip_tween.is_valid():
+		_talent_tooltip_tween.kill()
+	if _talent_tooltip != null:
+		_talent_tooltip.visible = false
+
+
+func _process(_delta: float) -> void:
+	if _talent_tooltip != null and _talent_tooltip.visible:
+		CardHoverTooltip.position_near_mouse(_talent_tooltip, get_viewport())
+	else:
+		set_process(false)
+
+
+func _exit_tree() -> void:
+	if _talent_tooltip != null:
+		_talent_tooltip.queue_free()
+		_talent_tooltip = null
 
 
 # ============== 突发事件 tip / dialog (由 DataPanel 调用) ==============

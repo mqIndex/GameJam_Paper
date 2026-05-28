@@ -30,8 +30,7 @@ text = "交易回合"
 [node name="BtnEndTurn" type="Button" parent="VBox"]
 custom_minimum_size = Vector2(116, 80)
 theme_override_font_sizes/font_size = 16
-text = "结束回合
-(空格)"
+text = "结束回合"
 
 [node name="DiscardPileSlot" type="CenterContainer" parent="VBox"]
 layout_mode = 2

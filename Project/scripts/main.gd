@@ -470,21 +470,8 @@ func _on_pile_clicked(pile_name: String) -> void:
 		popup.show_deck("弃牌堆", Game.discard_pile.duplicate())
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo:
-		if (event as InputEventKey).keycode == KEY_SPACE:
-			if $ShopOverlay != null and $ShopOverlay.visible:
-				return
-			if $EndDialog != null and $EndDialog.visible:
-				return
-			if Game.tutorial_active:
-				return
-			if Game.is_level_over:
-				return
-			if Game.phase != Game.Phase.PLAY:
-				return
-			Game.end_turn()
-			get_viewport().set_input_as_handled()
+func _unhandled_input(_event: InputEvent) -> void:
+	pass
 
 
 func _append_log(msg: String) -> void:

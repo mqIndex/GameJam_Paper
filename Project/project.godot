@@ -14,7 +14,8 @@ config/name="传奇交易员--新乡2000"
 config/description="《不要怕，是技术性调整！》Demo - stage 2 rules"
 run/main_scene="res://scenes/Main.tscn"
 config/features=PackedStringArray("4.6", "GL Compatibility")
-config/icon="res://icon.svg"
+boot_splash/image="uid://7kj4dhufocrj"
+config/icon="uid://5i5yrywg2f30"
 
 [autoload]
 
@@ -40,6 +41,10 @@ folder_colors={
 "res://scripts/": "green",
 "res://tests/": "gray"
 }
+
+[gui]
+
+theme/custom_font="uid://cpapwnbnnk0ep"
 
 [rendering]
 

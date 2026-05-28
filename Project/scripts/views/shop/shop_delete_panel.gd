@@ -7,10 +7,12 @@ const ShopCardScene = preload("res://scenes/ui/shop/shop_card.tscn")
 @onready var grid: GridContainer = $Margin/VBox/Grid
 @onready var lbl_price: Label = $Margin/VBox/LblPrice
 
-const CARD_SLOT_W: float = 100.0
+const MAX_COLUMNS: int = 8
+const CARD_SLOT_W: float = 118.0
 
 
 func _ready() -> void:
+	_raise_scrollbars()
 	resized.connect(_update_columns)
 	Game.shop_changed.connect(refresh)
 	refresh()
@@ -37,4 +39,14 @@ func refresh() -> void:
 func _update_columns() -> void:
 	if grid == null:
 		return
-	grid.columns = max(1, int(floor(size.x / CARD_SLOT_W)))
+	var available_w: float = max(CARD_SLOT_W, size.x - 48.0)
+	grid.columns = min(MAX_COLUMNS, max(1, int(floor(available_w / CARD_SLOT_W))))
+
+
+func _raise_scrollbars() -> void:
+	var vbar := get_v_scroll_bar()
+	vbar.z_index = 200
+	vbar.mouse_filter = Control.MOUSE_FILTER_STOP
+	var hbar := get_h_scroll_bar()
+	hbar.z_index = 200
+	hbar.mouse_filter = Control.MOUSE_FILTER_STOP

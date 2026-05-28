@@ -9,9 +9,9 @@ const TALENT_ICON_MAP: Dictionary = {
 	"influence":     "res://data/talent/影响力.png",
 }
 
-@onready var owned_grid: HBoxContainer = $Margin/VBox/OwnedGrid
+@onready var owned_grid: GridContainer = $Margin/VBox/OwnedGrid
 @onready var lbl_owned_empty: Label = $Margin/VBox/LblOwnedEmpty
-@onready var grid: HBoxContainer = $Margin/VBox/Grid
+@onready var grid: GridContainer = $Margin/VBox/Grid
 @onready var lbl_offer_empty: Label = $Margin/VBox/LblOfferEmpty
 
 # 悬浮 tip 容器 (运行时构建)
@@ -23,13 +23,18 @@ var _tip_anchor: Control = null
 const TALENT_CARD_SIZE: Vector2 = Vector2(116.0, 158.0)
 const TALENT_ICON_SIZE: Vector2 = Vector2(82.0, 82.0)
 const TALENT_BUTTON_SIZE: Vector2 = Vector2(86.0, 30.0)
+const MAX_COLUMNS: int = 8
+const TALENT_SLOT_W: float = 130.0
 
 
 func _ready() -> void:
+	_raise_scrollbars()
+	resized.connect(_update_columns)
 	Game.talents_changed.connect(refresh)
 	Game.state_changed.connect(refresh)
 	_build_tip()
 	refresh()
+	call_deferred("_update_columns")
 
 
 func _build_tip() -> void:
@@ -79,6 +84,7 @@ func refresh() -> void:
 	# 可购
 	if Game.talent_offers.is_empty():
 		lbl_offer_empty.visible = true
+		_update_columns()
 		return
 	lbl_offer_empty.visible = false
 	for i in range(Game.talent_offers.size()):
@@ -89,6 +95,25 @@ func refresh() -> void:
 		var idx_capture: int = i
 		var btn: Button = logo.get_node("BtnBuy")
 		btn.pressed.connect(_make_buy_handler(idx_capture))
+	_update_columns()
+
+
+func _update_columns() -> void:
+	var available_w: float = max(TALENT_SLOT_W, size.x - 48.0)
+	var columns: int = min(MAX_COLUMNS, max(1, int(floor(available_w / TALENT_SLOT_W))))
+	if owned_grid != null:
+		owned_grid.columns = columns
+	if grid != null:
+		grid.columns = columns
+
+
+func _raise_scrollbars() -> void:
+	var vbar := get_v_scroll_bar()
+	vbar.z_index = 200
+	vbar.mouse_filter = Control.MOUSE_FILTER_STOP
+	var hbar := get_h_scroll_bar()
+	hbar.z_index = 200
+	hbar.mouse_filter = Control.MOUSE_FILTER_STOP
 
 
 # 构建天赋 logo 组件: TextureRect + 价格/标签 + 购买按钮

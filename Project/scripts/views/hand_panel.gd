@@ -13,6 +13,9 @@ const CARD_ANIM_Z: int = 260
 
 var _last_hand_keys: Array = []
 var _pending_enter_keys: Dictionary = {}
+var _last_discard_anim_time_msec: int = -100000
+var _suppress_next_discard_diff: bool = false
+var _force_next_enter_all: bool = false
 var _block_hint: PanelContainer = null
 var _block_hint_label: Label = null
 var _block_hint_tween: Tween = null
@@ -23,6 +26,7 @@ func _ready() -> void:
 	add_theme_stylebox_override("panel", UF.panel_stylebox())
 	_build_block_hint()
 	Game.hand_changed.connect(_refresh_hand)
+	Game.hand_redraw_started.connect(_on_hand_redraw_started)
 	Game.state_changed.connect(_refresh_state)
 	Game.phase_changed.connect(_on_phase_changed)
 	Game.card_play_blocked.connect(_on_global_card_play_blocked)
@@ -31,11 +35,23 @@ func _ready() -> void:
 func _refresh_hand() -> void:
 	var next_keys: Array = _make_hand_keys()
 	var removed_indices: Array = _find_removed_card_indices(next_keys)
-	var enter_indices: Array = _find_enter_card_indices(next_keys)
+	var enter_indices: Array = []
+	if _force_next_enter_all:
+		if next_keys.is_empty():
+			enter_indices = _find_enter_card_indices(next_keys)
+		else:
+			for i in range(next_keys.size()):
+				enter_indices.append(i)
+			_force_next_enter_all = false
+	else:
+		enter_indices = _find_enter_card_indices(next_keys)
 	var enter_specs: Array = _make_enter_specs(enter_indices, next_keys)
 	for spec in enter_specs:
 		_pending_enter_keys[String(spec["key"])] = true
-	_play_discard_animations(removed_indices)
+	if _suppress_next_discard_diff:
+		_suppress_next_discard_diff = false
+	else:
+		_play_discard_animations(removed_indices)
 	for c in fan_container.get_children():
 		fan_container.remove_child(c)
 		c.queue_free()
@@ -54,7 +70,13 @@ func _refresh_hand() -> void:
 		fan_container.relayout_cards()
 	_last_hand_keys = next_keys
 	if not enter_specs.is_empty():
-		call_deferred("_play_enter_animations", enter_specs)
+		call_deferred("_play_enter_animations", enter_specs, _enter_delay_after_recent_discard())
+
+
+func _on_hand_redraw_started(discard_visual_indices: Array) -> void:
+	_play_discard_animations(discard_visual_indices)
+	_suppress_next_discard_diff = true
+	_force_next_enter_all = true
 
 
 func _refresh_state() -> void:
@@ -245,7 +267,7 @@ func _make_enter_specs(indices: Array, next_keys: Array) -> Array:
 	return specs
 
 
-func _play_enter_animations(specs: Array) -> void:
+func _play_enter_animations(specs: Array, base_delay: float = 0.0) -> void:
 	if fan_container == null:
 		return
 	var children: Array = fan_container.get_children()
@@ -267,7 +289,8 @@ func _play_enter_animations(specs: Array) -> void:
 		if card == null:
 			_pending_enter_keys.erase(key)
 			continue
-		_play_single_enter(card, key, source_global, float(int(spec["order"])) * ENTER_STAGGER, -1.0 if i % 2 == 0 else 1.0)
+		var delay: float = base_delay + float(int(spec["order"])) * ENTER_STAGGER
+		_play_single_enter(card, key, source_global, delay, -1.0 if i % 2 == 0 else 1.0)
 
 
 func _play_single_enter(card: Control, key: String, source_global: Vector2, delay: float, direction: float) -> void:
@@ -326,6 +349,7 @@ func _finish_enter_animation(card_ref: WeakRef, ghost_ref: WeakRef, key: String)
 func _play_discard_animations(indices: Array) -> void:
 	if indices.is_empty() or fan_container == null:
 		return
+	_last_discard_anim_time_msec = Time.get_ticks_msec()
 	var children: Array = fan_container.get_children()
 	var target: Vector2 = _discard_target_global_position()
 	for idx in indices:
@@ -336,6 +360,13 @@ func _play_discard_animations(indices: Array) -> void:
 		if card == null:
 			continue
 		_spawn_discard_ghost(card, target, -1.0 if i % 2 == 0 else 1.0)
+
+
+func _enter_delay_after_recent_discard() -> float:
+	if _last_discard_anim_time_msec < 0:
+		return 0.0
+	var elapsed: float = float(Time.get_ticks_msec() - _last_discard_anim_time_msec) / 1000.0
+	return max(0.0, DISCARD_DURATION * 0.8 - elapsed)
 
 
 func _spawn_discard_ghost(card: Control, target_global: Vector2, direction: float) -> void:

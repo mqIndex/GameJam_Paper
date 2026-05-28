@@ -1,5 +1,6 @@
 # 配置加载器 (autoload: /root/Cfg)
 # 启动时读取 data/cards.csv 和 data/balance.json,失败时 push_error 并使用代码内回退默认值。
+# Web 导出中 .csv 容易被 Godot 当翻译表导入, 因此运行时数据额外支持同名 .txt 镜像。
 # 用法:
 #   Cfg.get_card_template("buy_basic")  -> Dictionary 或 null
 #   Cfg.balance.get("START_CASH", 100000.0)
@@ -8,9 +9,12 @@
 extends Node
 
 const CARDS_CSV_PATH := "res://data/cards.csv"
+const CARDS_TXT_PATH := "res://data/cards.txt"
 const BALANCE_JSON_PATH := "res://data/balance.json"
 const TALENTS_CSV_PATH := "res://data/talents.csv"
+const TALENTS_TXT_PATH := "res://data/talents.txt"
 const OPPONENTS_CSV_PATH := "res://data/opponents.csv"
+const OPPONENTS_TXT_PATH := "res://data/opponents.txt"
 
 var cards: Dictionary = {}     # effect_id -> {name, kind, cost, description, image_path, upgrade_to, in_starter, starter_count, in_shop}
 var opponents: Dictionary = {} # opponent_id -> {display_name, personality, level, n0, m0, ...}
@@ -29,13 +33,13 @@ func _ready() -> void:
 	_load_talents()
 	_load_opponents()
 	if not _csv_load_ok:
-		push_error("[Cfg] cards.csv 加载失败,卡牌系统将依赖代码回退")
+		push_error("[Cfg] cards.csv/cards.txt 加载失败,卡牌系统将依赖代码回退")
 	if not _balance_load_ok:
 		push_error("[Cfg] balance.json 加载失败,数值将依赖 game_state.gd 内置默认")
 	if not _talents_load_ok:
-		push_warning("[Cfg] talents.csv 未加载, 天赋系统将无可用项")
+		push_warning("[Cfg] talents.csv/talents.txt 未加载, 天赋系统将无可用项")
 	if not _opponents_load_ok:
-		push_error("[Cfg] opponents.csv 加载失败,对手系统不可用")
+		push_error("[Cfg] opponents.csv/opponents.txt 加载失败,对手系统不可用")
 
 
 # ----- 卡牌 -----
@@ -108,9 +112,7 @@ func _load_balance() -> void:
 
 
 func _load_cards() -> void:
-	if not FileAccess.file_exists(CARDS_CSV_PATH):
-		return
-	var f := FileAccess.open(CARDS_CSV_PATH, FileAccess.READ)
+	var f := _open_text_table(CARDS_CSV_PATH, CARDS_TXT_PATH)
 	if f == null:
 		return
 	# 第一行:列头
@@ -189,9 +191,7 @@ func _load_cards() -> void:
 
 
 func _load_talents() -> void:
-	if not FileAccess.file_exists(TALENTS_CSV_PATH):
-		return
-	var f := FileAccess.open(TALENTS_CSV_PATH, FileAccess.READ)
+	var f := _open_text_table(TALENTS_CSV_PATH, TALENTS_TXT_PATH)
 	if f == null:
 		return
 	var headers: PackedStringArray = f.get_csv_line()
@@ -259,9 +259,7 @@ func _float(s: String) -> float:
 
 
 func _load_opponents() -> void:
-	if not FileAccess.file_exists(OPPONENTS_CSV_PATH):
-		return
-	var f := FileAccess.open(OPPONENTS_CSV_PATH, FileAccess.READ)
+	var f := _open_text_table(OPPONENTS_CSV_PATH, OPPONENTS_TXT_PATH)
 	if f == null:
 		return
 	var headers: PackedStringArray = f.get_csv_line()
@@ -318,3 +316,15 @@ func _load_opponents() -> void:
 		opponents[oid] = entry
 	f.close()
 	_opponents_load_ok = true
+
+
+func _open_text_table(primary_path: String, fallback_path: String) -> FileAccess:
+	for path in [primary_path, fallback_path]:
+		if path == "":
+			continue
+		if not FileAccess.file_exists(path):
+			continue
+		var f := FileAccess.open(path, FileAccess.READ)
+		if f != null:
+			return f
+	return null

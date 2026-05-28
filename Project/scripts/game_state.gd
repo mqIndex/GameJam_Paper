@@ -84,6 +84,7 @@ var day_close_summary: Dictionary = {}          # {day, open_price, close_price,
 # ===== 信号 =====
 signal state_changed
 signal hand_changed
+signal hand_redraw_started(discard_visual_indices: Array)
 signal turn_started(day: int, turn_in_day: int)
 signal turn_ended(day: int, turn_in_day: int)
 signal day_started(day: int)
@@ -170,6 +171,9 @@ var cur_low: float = 0.0
 var _turn_undo_snapshot: Dictionary = {}
 var _turn_undo_used: bool = false
 var _turn_has_played_cards: bool = false
+var _is_resolving_play_card: bool = false
+var _resolving_play_card_index: int = -1
+var _skip_play_card_final_hand_changed: bool = false
 
 
 # ===========================================================
@@ -531,6 +535,7 @@ func play_card(index: int) -> bool:
 		_log(block_reason)
 		emit_signal("card_play_blocked", block_reason)
 		return false
+	_skip_play_card_final_hand_changed = false
 	var c: Card = hand[index]
 	action_points -= c.cost
 	hand.remove_at(index)
@@ -541,7 +546,11 @@ func play_card(index: int) -> bool:
 	var hi_before: float = cur_high
 	var lo_before: float = cur_low
 	var bull_before: int = bull
+	_resolving_play_card_index = index
+	_is_resolving_play_card = true
 	_dispatch_effect(c.effect_id)
+	_is_resolving_play_card = false
+	_resolving_play_card_index = -1
 	if c.is_skill():
 		skills_played_this_turn += 1
 	# 主出牌的 K 线 (第 1 根)
@@ -573,7 +582,10 @@ func play_card(index: int) -> bool:
 	_emit_card_danmaku(c)
 	_turn_has_played_cards = true
 	emit_signal("intraday_updated")
-	emit_signal("hand_changed")
+	if _skip_play_card_final_hand_changed:
+		_skip_play_card_final_hand_changed = false
+	else:
+		emit_signal("hand_changed")
 	emit_signal("state_changed")
 	return true
 
@@ -846,6 +858,9 @@ func discard_hand_redraw() -> void:
 	if n == 0:
 		_log("  [快速换手] 手牌为空, 无效果")
 		return
+	emit_signal("hand_redraw_started", _redraw_discard_visual_indices(n))
+	if _is_resolving_play_card:
+		_skip_play_card_final_hand_changed = true
 	var names: Array = []
 	for c in hand:
 		names.append(c.name)
@@ -855,6 +870,17 @@ func discard_hand_redraw() -> void:
 	emit_signal("hand_changed")
 	draw_cards(n)
 	emit_signal("state_changed")
+
+
+func _redraw_discard_visual_indices(discard_count: int) -> Array:
+	var indices: Array = []
+	if _is_resolving_play_card and _resolving_play_card_index >= 0:
+		for visual_index in range(discard_count + 1):
+			indices.append(visual_index)
+	else:
+		for i in range(discard_count):
+			indices.append(i)
+	return indices
 
 
 # 孤注一掷: 股价 ±(X × mul)% (50/50), X = 卡组里 BUY+SELL 牌总数 (含手牌/抽牌堆/弃牌堆/此卡之外; 化整为零产出的 transient 小买/小卖也计入)
@@ -1416,6 +1442,7 @@ func shop_buy_talent(offer_index: int) -> bool:
 	owned_talents.append(t)
 	talent_offers.remove_at(offer_index)
 	_log("[商店] 购入天赋「%s」, 花费 ¥%d" % [t.name, t.price])
+	emit_signal("shop_changed")
 	emit_signal("talents_changed")
 	emit_signal("state_changed")
 	return true

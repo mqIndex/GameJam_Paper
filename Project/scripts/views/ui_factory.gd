@@ -72,6 +72,7 @@ const FUND_PATCH_SIDE: int = 64
 # 卡牌图标
 const PATH_CARDS_DIR: String = "res://data/Cards/"
 const CARDS_VISUAL_CSV: String = "res://data/Cards/Cards_Visual.csv"
+const CARDS_VISUAL_TXT: String = "res://data/Cards/Cards_Visual.txt"
 
 # CSV 缓存: 卡牌名 → 图片文件名 (去后缀的 basename); 懒加载, 仅尝试一次
 static var _card_visual_cache: Dictionary = {}
@@ -111,6 +112,7 @@ static func fund_bar_border_stylebox(texture_path: String, patch: int = 32) -> S
 # 优先级:
 #   1) explicit_path (例如 card.image_path, 若 cards.csv 后续填写)
 #   2) Cards_Visual.csv 中 "卡牌" 列 == card_name 行的 "资源1" (逗号分隔取第一个)
+#      若升级牌名未配置 (如 大V吹票+), 自动回退到去掉末尾 "+" 的基础牌名
 #   3) fallback 同名: res://data/Cards/{card_name}.png
 # 最终找不到返回空字符串 "" (调用方应隐藏 Icon)
 static func card_icon_path_for(card_name: String, explicit_path: String = "") -> String:
@@ -118,7 +120,7 @@ static func card_icon_path_for(card_name: String, explicit_path: String = "") ->
 		return explicit_path
 	if not _card_visual_loaded:
 		_load_card_visual_csv()
-	var entry: Dictionary = _card_visual_cache.get(card_name, {})
+	var entry: Dictionary = _visual_entry_for_card(card_name)
 	var filename: String = String(entry.get("image", ""))
 	if filename != "":
 		var path: String = PATH_CARDS_DIR + filename
@@ -129,6 +131,11 @@ static func card_icon_path_for(card_name: String, explicit_path: String = "") ->
 		var same: String = PATH_CARDS_DIR + card_name + ".png"
 		if ResourceLoader.exists(same):
 			return same
+		var base_name := _base_card_name(card_name)
+		if base_name != card_name:
+			var base_same: String = PATH_CARDS_DIR + base_name + ".png"
+			if ResourceLoader.exists(base_same):
+				return base_same
 	return ""
 
 
@@ -137,7 +144,7 @@ static func card_icon_path_for(card_name: String, explicit_path: String = "") ->
 static func card_color_for(card_name: String) -> Color:
 	if not _card_visual_loaded:
 		_load_card_visual_csv()
-	var entry: Dictionary = _card_visual_cache.get(card_name, {})
+	var entry: Dictionary = _visual_entry_for_card(card_name)
 	var raw: String = String(entry.get("color", "")).strip_edges()
 	if raw == "":
 		return Color(0, 0, 0, 0)
@@ -162,6 +169,23 @@ static func card_color_for(card_name: String) -> Color:
 	return Color(0, 0, 0, 0)
 
 
+static func _visual_entry_for_card(card_name: String) -> Dictionary:
+	var entry: Dictionary = _card_visual_cache.get(card_name, {})
+	if not entry.is_empty():
+		return entry
+	var base_name := _base_card_name(card_name)
+	if base_name != card_name:
+		return _card_visual_cache.get(base_name, {})
+	return {}
+
+
+static func _base_card_name(card_name: String) -> String:
+	var name := card_name.strip_edges()
+	if name.ends_with("+"):
+		return name.substr(0, name.length() - 1).strip_edges()
+	return name
+
+
 static func _is_hex6(s: String) -> bool:
 	if s.length() != 6:
 		return false
@@ -174,9 +198,7 @@ static func _is_hex6(s: String) -> bool:
 
 static func _load_card_visual_csv() -> void:
 	_card_visual_loaded = true
-	if not FileAccess.file_exists(CARDS_VISUAL_CSV):
-		return
-	var f := FileAccess.open(CARDS_VISUAL_CSV, FileAccess.READ)
+	var f := _open_text_data_file(CARDS_VISUAL_CSV, CARDS_VISUAL_TXT)
 	if f == null:
 		return
 	var text: String = f.get_as_text()
@@ -205,6 +227,18 @@ static func _load_card_visual_csv() -> void:
 				"image": first_file,
 				"color": color_field,
 			}
+
+
+static func _open_text_data_file(primary_path: String, fallback_path: String) -> FileAccess:
+	for path in [primary_path, fallback_path]:
+		if path == "":
+			continue
+		if not FileAccess.file_exists(path):
+			continue
+		var f := FileAccess.open(path, FileAccess.READ)
+		if f != null:
+			return f
+	return null
 
 
 # 解析单行 CSV: 支持双引号包裹字段 (含字段内逗号) 与转义 ""

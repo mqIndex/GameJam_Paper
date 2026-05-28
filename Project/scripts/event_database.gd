@@ -11,6 +11,7 @@ const Event = preload("res://scripts/event.gd")
 # 外部美术表 (UTF-8 + BOM + 逗号分隔)
 # 列: 突发事件(name), 解释, 效果, 主题色, 示例(image_path, 可含逗号需引号), 备注, 提示词参考
 const VISUAL_CSV_PATH: String = "res://data/event/Events_Visual.csv"
+const VISUAL_TXT_PATH: String = "res://data/event/Events_Visual.txt"
 
 # CSV 事件名 → _EVENT_DEFS.id 重映射 (CSV 的中文名与 _EVENT_DEFS.name 不完全一致, 此表显式对齐)
 const _CSV_NAME_TO_ID: Dictionary = {
@@ -118,9 +119,7 @@ static func _get_visual_for(event_id: String) -> Dictionary:
 # "示例" 列可能是单文件名或 "a.png,b.png,c.png" (用引号包裹), 取第一个非空作为 image_path
 static func _load_visual_table() -> void:
 	_visual_table_loaded = true
-	if not FileAccess.file_exists(VISUAL_CSV_PATH):
-		return
-	var f := FileAccess.open(VISUAL_CSV_PATH, FileAccess.READ)
+	var f := _open_text_data_file(VISUAL_CSV_PATH, VISUAL_TXT_PATH)
 	if f == null:
 		return
 	# 读取全文并剥 UTF-8 BOM
@@ -154,6 +153,18 @@ static func _load_visual_table() -> void:
 			"theme_color": theme_color,
 			"image_path": image_path,
 		}
+
+
+static func _open_text_data_file(primary_path: String, fallback_path: String) -> FileAccess:
+	for path in [primary_path, fallback_path]:
+		if path == "":
+			continue
+		if not FileAccess.file_exists(path):
+			continue
+		var f := FileAccess.open(path, FileAccess.READ)
+		if f != null:
+			return f
+	return null
 
 
 # 解析单行 CSV: 支持双引号包裹字段 (含字段内逗号) 与转义 ""

@@ -13,6 +13,7 @@ func _ready() -> void:
 	# 面板背景: 用默认 StyleBoxFlat 纯色; 不接入 panel_neon_default.png
 	add_theme_stylebox_override("panel", UF.panel_stylebox())
 	# 结束回合按钮: 用纯色 StyleBoxFlat (霓虹橙), 不接入 btn_end_turn.png
+	btn_end_turn.focus_mode = Control.FOCUS_NONE
 	var sb := UF.neon_button_stylebox(UF.COL_NEON_ORANGE)
 	btn_end_turn.add_theme_stylebox_override("normal", sb)
 	var hover := sb.duplicate() as StyleBoxFlat
