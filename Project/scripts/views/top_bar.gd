@@ -471,7 +471,7 @@ func show_current_event_dialog() -> void:
 		return
 	_event_dialog.title = "突发事件 · %s" % _category_name(ev)
 	var col := _category_color(ev)
-	_event_msg.text = "[color=#%s][b]%s[/b][/color]\n\n%s\n\n[color=#ffd166]%s[/color]" % [
+	_event_msg.text = "[color=#%s]%s[/color]\n\n%s\n\n[color=#ffd166]%s[/color]" % [
 		col.to_html(false), ev.name, ev.desc, ev.effect_desc
 	]
 	_event_dialog.popup_centered()
