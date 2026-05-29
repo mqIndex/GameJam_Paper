@@ -81,12 +81,23 @@ func play_card_deal() -> void:
 
 
 func _play_oneshot(stream: AudioStream, volume_db: float) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
 	if stream == null:
 		return
 	var p := AudioStreamPlayer.new()
 	p.stream = stream
 	p.volume_db = volume_db
 	p.autoplay = false
-	get_tree().root.add_child(p)
-	p.finished.connect(p.queue_free)
-	p.play()
+	call_deferred("_attach_and_play", p)
+
+
+func _attach_and_play(player: AudioStreamPlayer) -> void:
+	if player == null or not is_instance_valid(player):
+		return
+	if not is_inside_tree():
+		player.queue_free()
+		return
+	get_tree().root.add_child(player)
+	player.finished.connect(player.queue_free)
+	player.play()

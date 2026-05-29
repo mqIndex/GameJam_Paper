@@ -3,6 +3,8 @@
 # 把日志写到 res://logs/rule_smoke.log
 extends Node
 
+const CardDatabase = preload("res://scripts/card_database.gd")
+
 var _log_file: FileAccess = null
 
 func _ready() -> void:
@@ -22,7 +24,8 @@ func _ready() -> void:
 	_assert(g.shares == 0, "初始持仓=0")
 	_assert(g.price == g.INITIAL_PRICE, "初始股价=100")
 	_assert(g.bull + g.bear == g.EMOTION_TOTAL, "情绪总和保持 %d" % g.EMOTION_TOTAL)
-	_assert(g.draw_pile.size() + g.hand.size() + g.discard_pile.size() == 12, "牌组=12")
+	var expected_deck_size: int = CardDatabase.build_starter_deck().size()
+	_assert(g.draw_pile.size() + g.hand.size() + g.discard_pile.size() == expected_deck_size, "牌组=%d" % expected_deck_size)
 	_assert(g.day == 1, "第1天")
 	_assert(g.turn_in_day == 1, "第1回合")
 	_assert(g.hand.size() >= g.FIRST_TURN_DRAW, "第一回合至少抽 6 张")

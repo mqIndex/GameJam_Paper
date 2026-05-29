@@ -12,13 +12,22 @@ extends Control
 const UF = preload("res://scripts/views/ui_factory.gd")
 const Card = preload("res://scripts/card.gd")
 const Event = preload("res://scripts/event.gd")
+const CardButtonScene = preload("res://scenes/ui/card_button.tscn")
 
 enum Mode { SINGLE_CARD, MULTI_CARD, SINGLE_EVENT }
+
+const GRID_OFFSET: Vector2 = Vector2(28.0, 18.0)
+const EVENT_BUTTON_SIZE: Vector2 = Vector2(220.0, 196.0)
+const EVENT_IMAGE_HEIGHT: float = 118.0
+const HOVER_SCALE: float = 1.12
+const HOVER_LIFT: float = 8.0
+const HOVER_DURATION: float = 0.16
 
 var _mode: int = Mode.SINGLE_CARD
 var _on_confirm: Callable = Callable()
 var _items: Array = []                    # Card 或 Event 数组
 var _selected: Array = []                 # multi 模式: bool 数组, 与 _items 同长
+var _hover_tweens: Dictionary = {}
 
 var _dim: ColorRect
 var _panel: PanelContainer
@@ -87,12 +96,21 @@ func _build() -> void:
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(scroll)
 
+	var grid_margin := MarginContainer.new()
+	grid_margin.add_theme_constant_override("margin_left", int(GRID_OFFSET.x))
+	grid_margin.add_theme_constant_override("margin_top", int(GRID_OFFSET.y))
+	grid_margin.add_theme_constant_override("margin_right", 8)
+	grid_margin.add_theme_constant_override("margin_bottom", 8)
+	grid_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.add_child(grid_margin)
+
 	_grid = GridContainer.new()
 	_grid.columns = 3
 	_grid.add_theme_constant_override("h_separation", 12)
 	_grid.add_theme_constant_override("v_separation", 12)
 	_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(_grid)
+	grid_margin.add_child(_grid)
 
 	var bottom := HBoxContainer.new()
 	bottom.add_theme_constant_override("separation", 12)
@@ -148,36 +166,112 @@ func _open(mode: int, title: String, prompt: String, items: Array, on_confirm: C
 
 
 func _render_grid() -> void:
+	_clear_hover_tweens()
 	for c in _grid.get_children():
+		_grid.remove_child(c)
 		c.queue_free()
+	_grid.columns = 3 if _mode == Mode.SINGLE_EVENT else 5
 	for i in range(_items.size()):
 		_grid.add_child(_make_item_button(i))
 	_update_hint()
 
 
-func _make_item_button(idx: int) -> Button:
+func _make_item_button(idx: int) -> Control:
 	var item: Variant = _items[idx]
-	var btn := Button.new()
-	btn.custom_minimum_size = Vector2(220, 110)
-	btn.clip_text = false
-	btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	btn.add_theme_font_size_override("font_size", 13)
-	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	var col: Color = UF.COL_TEXT
-	var text: String = ""
-	if _mode == Mode.SINGLE_EVENT:
-		var ev: Event = item as Event
-		col = _event_color(ev)
-		text = "%s\n\n%s\n\n[%s]" % [ev.name, ev.desc, ev.effect_desc]
-	else:
+	if _mode != Mode.SINGLE_EVENT:
 		var card: Card = item as Card
-		col = UF.kind_color(card.kind)
-		text = "[%d AP]  %s\n\n%s" % [card.cost, card.name, card.description]
-	btn.text = text
+		var card_btn = CardButtonScene.instantiate()
+		card_btn.custom_minimum_size = Vector2(116, 176)
+		card_btn.setup(card, idx, true)
+		card_btn.set_choice_selected(_selected[idx])
+		card_btn.selection_pressed.connect(func(_source): _on_item_pressed(idx))
+		return card_btn
+	return _make_event_button(item as Event, idx)
+
+
+func _make_event_button(ev: Event, idx: int) -> Button:
+	var btn := Button.new()
+	btn.custom_minimum_size = EVENT_BUTTON_SIZE
+	btn.pivot_offset = EVENT_BUTTON_SIZE * 0.5
+	btn.clip_text = false
+	btn.text = ""
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	btn.tooltip_text = "%s\n%s\n%s" % [ev.name, ev.desc, ev.effect_desc]
+
+	var col: Color = ev.theme_color
+	if col.a <= 0.0:
+		col = _event_color(ev)
 	btn.add_theme_color_override("font_color", col)
-	_apply_button_style(btn, col, _selected[idx])
+	_apply_button_style(btn, col, false)
+
+	var margin := MarginContainer.new()
+	margin.name = "EventMargin"
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	btn.add_child(margin)
+
+	var root := VBoxContainer.new()
+	root.name = "EventRoot"
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_theme_constant_override("separation", 6)
+	margin.add_child(root)
+
+	var image := TextureRect.new()
+	image.name = "EventImage"
+	image.custom_minimum_size = Vector2(0.0, EVENT_IMAGE_HEIGHT)
+	image.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_load_event_texture(image, ev)
+	root.add_child(image)
+
+	var name_label := Label.new()
+	name_label.name = "LblEventName"
+	name_label.text = ev.name
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.add_theme_font_size_override("font_size", 16)
+	name_label.add_theme_color_override("font_color", col)
+	name_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	name_label.add_theme_constant_override("outline_size", 2)
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(name_label)
+
+	var effect_label := Label.new()
+	effect_label.name = "LblEventEffect"
+	effect_label.text = ev.effect_desc
+	effect_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	effect_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	effect_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	effect_label.add_theme_font_size_override("font_size", 12)
+	effect_label.add_theme_color_override("font_color", UF.COL_TEXT)
+	effect_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	effect_label.add_theme_constant_override("outline_size", 2)
+	effect_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	effect_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(effect_label)
+
 	btn.pressed.connect(_on_item_pressed.bind(idx))
+	btn.mouse_entered.connect(_on_choice_hover_enter.bind(btn))
+	btn.mouse_exited.connect(_on_choice_hover_exit.bind(btn))
 	return btn
+
+
+func _load_event_texture(image: TextureRect, ev: Event) -> void:
+	if ev == null or ev.image_path == "" or not ResourceLoader.exists(ev.image_path):
+		image.visible = false
+		return
+	var tex = load(ev.image_path)
+	if tex is Texture2D:
+		image.texture = tex as Texture2D
+		image.visible = true
+	else:
+		image.visible = false
 
 
 func _apply_button_style(btn: Button, col: Color, picked: bool) -> void:
@@ -203,6 +297,63 @@ func _apply_button_style(btn: Button, col: Color, picked: bool) -> void:
 	btn.add_theme_stylebox_override("pressed", hov)
 
 
+func _on_choice_hover_enter(btn: Button) -> void:
+	if btn == null or not is_instance_valid(btn):
+		return
+	_kill_hover_tween(btn)
+	if not btn.has_meta("_choice_base_y"):
+		btn.set_meta("_choice_base_y", btn.position.y)
+	btn.z_index = 40
+	SfxBus.play_card_hover()
+	var target_y: float = float(btn.get_meta("_choice_base_y")) - HOVER_LIFT
+	var t := create_tween()
+	t.set_parallel(true)
+	t.set_trans(Tween.TRANS_QUAD)
+	t.set_ease(Tween.EASE_OUT)
+	t.tween_property(btn, "scale", Vector2(HOVER_SCALE, HOVER_SCALE), HOVER_DURATION)
+	t.tween_property(btn, "position:y", target_y, HOVER_DURATION)
+	_hover_tweens[btn] = t
+
+
+func _on_choice_hover_exit(btn: Button) -> void:
+	if btn == null or not is_instance_valid(btn):
+		return
+	_kill_hover_tween(btn)
+	var base_y: float = float(btn.get_meta("_choice_base_y", btn.position.y))
+	var t := create_tween()
+	t.set_parallel(true)
+	t.set_trans(Tween.TRANS_QUAD)
+	t.set_ease(Tween.EASE_OUT)
+	t.tween_property(btn, "scale", Vector2.ONE, HOVER_DURATION)
+	t.tween_property(btn, "position:y", base_y, HOVER_DURATION)
+	var btn_ref: WeakRef = weakref(btn)
+	t.chain().tween_callback(func():
+		var node := btn_ref.get_ref() as Button
+		if node == null:
+			return
+		node.z_index = 0
+		node.remove_meta("_choice_base_y")
+	)
+	_hover_tweens[btn] = t
+
+
+func _kill_hover_tween(btn: Button) -> void:
+	if not _hover_tweens.has(btn):
+		return
+	var prev = _hover_tweens[btn]
+	if prev != null and prev.is_valid():
+		prev.kill()
+	_hover_tweens.erase(btn)
+
+
+func _clear_hover_tweens() -> void:
+	for btn in _hover_tweens.keys():
+		var tween = _hover_tweens[btn]
+		if tween != null and tween.is_valid():
+			tween.kill()
+	_hover_tweens.clear()
+
+
 func _on_item_pressed(idx: int) -> void:
 	match _mode:
 		Mode.SINGLE_CARD, Mode.SINGLE_EVENT:
@@ -213,9 +364,9 @@ func _on_item_pressed(idx: int) -> void:
 		Mode.MULTI_CARD:
 			_selected[idx] = not _selected[idx]
 			# 局部刷新: 仅这一张按钮的样式
-			var btn: Button = _grid.get_child(idx) as Button
-			var col: Color = UF.kind_color((_items[idx] as Card).kind)
-			_apply_button_style(btn, col, _selected[idx])
+			var card_view: Control = _grid.get_child(idx) as Control
+			if card_view != null and card_view.has_method("set_choice_selected"):
+				card_view.call("set_choice_selected", _selected[idx])
 			_update_hint()
 
 

@@ -20,14 +20,17 @@ const TOOLTIP_DELAY_MSEC: int = 20
 
 signal play_blocked(reason: String, source: Control)
 signal play_block_hint_cleared(source: Control)
+signal selection_pressed(source: Control)
 
 var _card_index: int = -1
+var _selection_mode: bool = false
 var _play_block_reason: String = ""
 var _current_tween: Tween = null
 var _is_hovering: bool = false
 var _is_dragging: bool = false
 var _tutorial_highlight: Panel = null
 var _tutorial_highlight_tween: Tween = null
+var _choice_selected_overlay: Panel = null
 var _blocked_overlay: Panel = null
 var _card_tooltip_full_text: String = ""
 var _card_tooltip_text: String = ""
@@ -38,6 +41,7 @@ var _tooltip_tween: Tween = null
 
 
 func _ready() -> void:
+	_bind_child_nodes()
 	set_process(false)
 	pivot_offset = custom_minimum_size * 0.5
 	_ensure_blocked_overlay()
@@ -47,8 +51,13 @@ func _ready() -> void:
 	button_up.connect(_on_button_up)
 
 
-func setup(card: Card, index: int) -> void:
+func setup(card: Card, index: int, selection_mode: bool = false) -> void:
+	_bind_child_nodes()
+	if lbl_name == null or lbl_cost == null or lbl_desc == null:
+		push_warning("CardButton.setup: scene children are missing")
+		return
 	_card_index = index
+	_selection_mode = selection_mode
 	set_meta("effect_id", card.effect_id)
 	set_meta("card_name", card.name)
 	lbl_name.text = card.name
@@ -119,9 +128,23 @@ func setup(card: Card, index: int) -> void:
 	_apply_icon(card)
 
 
+func _bind_child_nodes() -> void:
+	if lbl_name == null:
+		lbl_name = get_node_or_null("VBox/LblName") as Label
+	if lbl_cost == null:
+		lbl_cost = get_node_or_null("VBox/LblCost") as Label
+	if lbl_desc == null:
+		lbl_desc = get_node_or_null("VBox/LblDesc") as Label
+	if icon_slot == null:
+		icon_slot = get_node_or_null("VBox/IconSlot") as CenterContainer
+	if icon_tex == null:
+		icon_tex = get_node_or_null("VBox/IconSlot/Icon") as TextureRect
+
+
 # 给卡牌 Icon 加载对应图标 (路径由 UF.card_icon_path_for 数据驱动解析);
 # 找不到时隐藏 Icon TextureRect, 不报错也不显示占位
 func _apply_icon(card: Card) -> void:
+	_bind_child_nodes()
 	if icon_tex == null:
 		return
 	var path: String = UF.card_icon_path_for(card.name, card.image_path)
@@ -220,6 +243,9 @@ func _text_units(text: String) -> float:
 
 
 func refresh_play_block_reason() -> String:
+	if _selection_mode:
+		set_play_block_reason("")
+		return ""
 	var reason := Game.get_card_play_block_reason(_card_index)
 	set_play_block_reason(reason)
 	return reason
@@ -292,6 +318,11 @@ func set_tutorial_highlight(enabled: bool) -> void:
 			_tutorial_highlight.modulate = Color(1, 1, 1, 1)
 
 
+func set_choice_selected(enabled: bool) -> void:
+	_ensure_choice_selected_overlay()
+	_choice_selected_overlay.visible = enabled
+
+
 func _ensure_tutorial_highlight() -> void:
 	if _tutorial_highlight != null:
 		return
@@ -319,8 +350,39 @@ func _ensure_tutorial_highlight() -> void:
 	add_child(_tutorial_highlight)
 
 
+func _ensure_choice_selected_overlay() -> void:
+	if _choice_selected_overlay != null:
+		return
+	_choice_selected_overlay = Panel.new()
+	_choice_selected_overlay.name = "ChoiceSelectedOverlay"
+	_choice_selected_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_choice_selected_overlay.z_index = 70
+	_choice_selected_overlay.visible = false
+	_choice_selected_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_choice_selected_overlay.offset_left = -4.0
+	_choice_selected_overlay.offset_top = -4.0
+	_choice_selected_overlay.offset_right = 4.0
+	_choice_selected_overlay.offset_bottom = 4.0
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(1.0, 0.82, 0.40, 0.10)
+	sb.border_color = UF.COL_GOLD
+	sb.border_width_left = 4
+	sb.border_width_top = 4
+	sb.border_width_right = 4
+	sb.border_width_bottom = 4
+	sb.corner_radius_top_left = 7
+	sb.corner_radius_top_right = 7
+	sb.corner_radius_bottom_left = 7
+	sb.corner_radius_bottom_right = 7
+	_choice_selected_overlay.add_theme_stylebox_override("panel", sb)
+	add_child(_choice_selected_overlay)
+
+
 func _on_pressed() -> void:
 	if _is_dragging:
+		return
+	if _selection_mode:
+		selection_pressed.emit(self)
 		return
 	if refresh_play_block_reason() != "":
 		_emit_play_blocked()
@@ -438,6 +500,8 @@ func _exit_tree() -> void:
 
 
 func _get_drag_data(_at_position: Vector2) -> Variant:
+	if _selection_mode:
+		return null
 	if refresh_play_block_reason() != "":
 		_emit_play_blocked()
 		return null

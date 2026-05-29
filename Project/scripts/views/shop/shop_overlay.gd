@@ -4,7 +4,6 @@ const UF = preload("res://scripts/views/ui_factory.gd")
 
 @onready var lbl_shop_day: Label = $ShopPanel/Margin/RootVBox/TopBar/LblShopDay
 @onready var lbl_shop_cash: Label = $ShopPanel/Margin/RootVBox/TopBar/LblShopCash
-@onready var lbl_summary: Label = $ShopPanel/Margin/RootVBox/SummaryPanel/SumMargin/SumVBox/LblSummary
 @onready var btn_leave_shop: Button = $ShopPanel/Margin/RootVBox/BottomBar/BtnLeaveShop
 @onready var summary_panel: PanelContainer = $ShopPanel/Margin/RootVBox/SummaryPanel
 @onready var tabs: TabContainer = $ShopPanel/Margin/RootVBox/Tabs
@@ -22,6 +21,7 @@ func _ready() -> void:
 	hover.bg_color = Color(UF.COL_HIGHLIGHT.r, UF.COL_HIGHLIGHT.g, UF.COL_HIGHLIGHT.b, 0.18)
 	btn_leave_shop.add_theme_stylebox_override("hover", hover)
 	summary_panel.add_theme_stylebox_override("panel", UF.panel_stylebox())
+	summary_panel.visible = false
 	btn_leave_shop.pressed.connect(_on_leave_shop_pressed)
 	Game.shop_entered.connect(_on_shop_entered)
 	Game.shop_changed.connect(_refresh_header)
@@ -79,32 +79,6 @@ func _refresh_header() -> void:
 		return
 	lbl_shop_day.text = "第 %d / %d 天 结束" % [Game.day, Game.DAYS_PER_LEVEL]
 	lbl_shop_cash.text = "¥%s" % UF.fmt_money(Game.cash)
-
-	var s: Dictionary = Game.day_close_summary
-	if s.is_empty():
-		lbl_summary.text = "(无)"
-	else:
-		var pnl: float = s["day_pnl"]
-		var pnl_str: String = "%s¥%s" % ["+" if pnl >= 0 else "-", UF.fmt_money(abs(pnl))]
-		var price_pct: float = s["price_change_pct"]
-		var forced_shares: int = int(s.get("forced_liquidation_shares", 0))
-		var summary: String = (
-			"开盘 ¥%.2f → 收盘 ¥%.2f (%+.2f%%)  ·  持仓 %d 股, 市值 ¥%s\n" +
-			"现金 ¥%s  ·  总资产 ¥%s  ·  今日盈亏 %s"
-		) % [
-			s["open_price"], s["close_price"], price_pct,
-			int(s["shares"]), UF.fmt_money(s["holding_value"]),
-			UF.fmt_money(s["cash"]), UF.fmt_money(s["total_assets"]),
-			pnl_str
-		]
-		if forced_shares > 0:
-			var discount: float = float(s.get("forced_discount", 0.8))
-			var proceeds: float = float(s.get("forced_liquidation_proceeds", 0.0))
-			summary += "\n尾盘强制清仓: %d 股 × ¥%.2f × %.0f%% = ¥%s" % [
-				forced_shares, float(s["close_price"]), discount * 100.0,
-				UF.fmt_money(proceeds)
-			]
-		lbl_summary.text = summary
 
 	if _tutorial_button_override != "":
 		btn_leave_shop.text = _tutorial_button_override

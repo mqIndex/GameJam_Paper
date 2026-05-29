@@ -107,6 +107,7 @@ var _in_cascade: bool = false                   # 重入保护: 连携 / 影响�
 var day_open_price: float = 100.0
 var day_open_assets: float = 100000.0
 var day_close_summary: Dictionary = {}          # {day, open_price, close_price, day_pnl, total_assets, shares, holding_value}
+var awaiting_day_settlement: bool = false
 
 # ===== 信号 =====
 signal state_changed
@@ -140,6 +141,7 @@ signal opponent_action_played(action_name: String, params: Dictionary)
 signal opponent_state_changed
 signal opponent_defeated(opponent_id: String, reward_card_id: String)
 signal opponent_bubble(text: String)
+signal baoshu_tip_requested(text: String)
 
 # ===== 局内状态 =====
 var cash: float = 100000.0
@@ -167,6 +169,7 @@ var formal_intro_completed: bool = false
 var opponent_tutorial_completed: bool = false
 var _opponent_intro_seen: Dictionary = {}  # opponent_id → true, 每只对手仅首次出现弹介绍
 var opponent_reward_tutorial_completed: bool = false
+var forced_liquidation_tip_shown: bool = false
 
 var _tutorial_start_cash: float = 100000.0
 var _tutorial_victory_target: float = 120000.0
@@ -304,6 +307,7 @@ func tutorial_enter_shop() -> void:
 		"open_price": day_open_price,
 		"close_price": price,
 		"price_change_pct": (price / day_open_price - 1.0) * 100.0 if day_open_price > 0.0 else 0.0,
+		"open_assets": day_open_assets,
 		"day_pnl": get_total_assets() - day_open_assets,
 		"total_assets": get_total_assets(),
 		"shares": shares,
@@ -584,6 +588,8 @@ func new_level(carried_effect_ids: Array = []) -> void:
 	day_open_price = INITIAL_PRICE
 	day_open_assets = START_CASH
 	day_close_summary = {}
+	awaiting_day_settlement = false
+	forced_liquidation_tip_shown = false
 	# 突发事件状态: 一关不重复
 	triggered_event_ids_this_level.clear()
 	_clear_event_state()
@@ -1171,7 +1177,7 @@ func _sell_shares(n: int, trade_price_pct: float = 0.0) -> void:
 # ===========================================================
 # 抽牌 / 弃牌
 # ===========================================================
-func draw_cards(n: int) -> int:
+func draw_cards(n: int, emit_change: bool = true) -> int:
 	var got: int = 0
 	for i in range(n):
 		if hand.size() >= HAND_LIMIT: break
@@ -1196,7 +1202,8 @@ func draw_cards(n: int) -> int:
 		got += 1
 	if got > 0:
 		SfxBus.play_card_deal()
-		emit_signal("hand_changed")
+		if emit_change:
+			emit_signal("hand_changed")
 	return got
 
 
@@ -1315,10 +1322,9 @@ func _start_turn() -> void:
 		_seed_first_turn()
 		var to_draw: int = max(0, FIRST_TURN_DRAW - hand.size())
 		if to_draw > 0:
-			draw_cards(to_draw)
-		emit_signal("hand_changed")
+			draw_cards(to_draw, false)
 	else:
-		draw_cards(FIRST_TURN_DRAW)
+		draw_cards(FIRST_TURN_DRAW, false)
 	# 突发事件: 账户审查 - 抽完牌后随机弃 N 张
 	if event_modifiers.has("freeze_per_turn"):
 		var n: int = int(event_modifiers["freeze_per_turn"])
@@ -1456,6 +1462,12 @@ func _end_day() -> void:
 		_log("  尾盘强制清仓: %d 股 × ¥%.2f × %.0f%% = ¥%s" % [
 			forced_shares, price, DAY_CLOSE_DISCOUNT * 100.0,
 			_fmt_money(forced_proceeds)])
+		if not forced_liquidation_tip_shown:
+			forced_liquidation_tip_shown = true
+			emit_signal("baoshu_tip_requested", "尾盘还留着 %d 股，只能按 %.0f 折贱卖。\n浮盈不落袋，就不是你的钱。" % [
+				forced_shares,
+				DAY_CLOSE_DISCOUNT * 10.0
+			])
 		shares = 0
 		avg_cost_price = 0.0
 	# 当日结算摘要
@@ -1464,6 +1476,7 @@ func _end_day() -> void:
 		"open_price": day_open_price,
 		"close_price": price,
 		"price_change_pct": (price / day_open_price - 1.0) * 100.0,
+		"open_assets": day_open_assets,
 		"day_pnl": get_total_assets() - day_open_assets,
 		"total_assets": get_total_assets(),
 		"shares": shares,
@@ -1473,6 +1486,10 @@ func _end_day() -> void:
 		"forced_liquidation_proceeds": forced_proceeds,
 		"forced_discount": DAY_CLOSE_DISCOUNT,
 	}
+	awaiting_day_settlement = _should_pause_for_day_settlement()
+	if awaiting_day_settlement:
+		phase = Phase.SETTLE
+		emit_signal("phase_changed", phase)
 	emit_signal("day_ended", day)
 	# 失效牌堆 (daily_limit 用满的牌) 收盘归还到弃牌堆, 让玩家在商店里也能升级/删除它们
 	# 真正洗回 draw_pile 仍发生在 leave_shop_to_next_day (与等待区一起重洗)
@@ -1481,6 +1498,20 @@ func _end_day() -> void:
 		for c in disabled_pile:
 			discard_pile.append(c)
 		disabled_pile.clear()
+	if awaiting_day_settlement:
+		emit_signal("state_changed")
+		return
+	continue_after_day_settlement()
+
+
+func _should_pause_for_day_settlement() -> bool:
+	return DisplayServer.get_name() != "headless"
+
+
+func continue_after_day_settlement() -> void:
+	if is_level_over:
+		return
+	awaiting_day_settlement = false
 	if day >= DAYS_PER_LEVEL:
 		# 第 5 天直接进入最终结算 (策划文档未指定第 5 天后是否还有商店, 暂走结算)
 		_settle_level()
@@ -2130,11 +2161,12 @@ func _clear_event_state() -> void:
 
 func _apply_ap_chaos() -> void:
 	if randf() < 0.5:
-		action_points = min(action_points + 1, ACTION_POINTS_MAX)
+		action_points += 1
 		_log("  [混乱之日] 行动力 +1 → %d" % action_points)
 	else:
 		action_points = max(action_points - 1, 0)
 		_log("  [混乱之日] 行动力 -1 → %d" % action_points)
+	emit_signal("state_changed")
 
 
 # ===========================================================

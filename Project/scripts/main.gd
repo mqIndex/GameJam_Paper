@@ -5,6 +5,7 @@ const Card = preload("res://scripts/card.gd")
 const Event = preload("res://scripts/event.gd")
 const CardChoiceDialog = preload("res://scripts/views/card_choice_dialog.gd")
 const TutorialOverlayScene = preload("res://scenes/ui/tutorial_overlay.tscn")
+const DaySettlementOverlay = preload("res://scripts/views/day_settlement_overlay.gd")
 const SaveOverlay = preload("res://scripts/views/save_overlay.gd")
 const PauseOverlay = preload("res://scripts/views/pause_overlay.gd")
 const TitleOverlay = preload("res://scripts/views/title_overlay.gd")
@@ -30,6 +31,9 @@ const COL_HIGHLIGHT: Color = Color("#ffae42")
 const COL_GOLD: Color = Color("#ffd166")
 const COL_UP: Color = Color("#06d6a0")
 const COL_DOWN: Color = Color("#ef476f")
+const BAOSHU_AVATAR_PATH: String = "res://assets/baoshu_avatar_UpperHalf.png"
+const BAOSHU_TIP_SIZE: Vector2 = Vector2(560.0, 172.0)
+const BAOSHU_TIP_TEXT_WIDTH: float = 382.0
 
 var _choice_dialog: CardChoiceDialog = null
 var _opponent_popup: PanelContainer = null
@@ -40,6 +44,12 @@ var _opponent_popup_size: Vector2 = Vector2.ZERO
 var _opponent_popup_y_ratio: float = 0.34
 var _subtitle_banner: Label = null
 var _tutorial_overlay: Control = null
+var _day_settlement_overlay: Control = null
+var _baoshu_tip_panel: PanelContainer = null
+var _baoshu_tip_text: Label = null
+var _baoshu_tip_button: Button = null
+var _pending_baoshu_tip_text: String = ""
+var _pending_day_settlement: bool = false
 var _save_overlay: Control = null
 var _pause_overlay: Control = null
 var _title_overlay: Control = null
@@ -82,10 +92,14 @@ func _ready() -> void:
 	_build_subtitle_banner()
 	_apply_bg_texture()
 	_setup_tutorial_overlay()
+	_setup_day_settlement_overlay()
+	_build_baoshu_tip_dialog()
 	_setup_pause_overlay()
 	Game.opponent_entered.connect(_on_opponent_entered_popup)
 	Game.opponent_defeated.connect(_on_opponent_defeated_popup)
+	Game.baoshu_tip_requested.connect(_on_baoshu_tip_requested)
 	Game.opponent_defeated.connect(_on_opponent_defeated_for_tutorial)
+	Game.day_ended.connect(_on_day_ended_show_settlement)
 	Game.shop_entered.connect(_on_shop_entered_for_tutorial)
 	Game.day_started.connect(_on_day_started_for_tutorial)
 	Game.level_started.connect(_on_level_started_for_tutorial)
@@ -134,6 +148,10 @@ func _set_gameplay_visible(visible_state: bool) -> void:
 			(n as CanvasItem).visible = visible_state
 	if _subtitle_banner != null:
 		_subtitle_banner.visible = visible_state
+	if _day_settlement_overlay != null and not visible_state:
+		_day_settlement_overlay.visible = false
+	if _baoshu_tip_panel != null and not visible_state:
+		_baoshu_tip_panel.visible = false
 
 
 func _show_title_overlay() -> void:
@@ -269,9 +287,10 @@ func _on_event_preview_requested(events: Array) -> void:
 
 
 func _on_discard_choice_requested(hand_cards: Array) -> void:
+	var draw_n: int = max(1, Game.pending_discard_draw_count)
 	_choice_dialog.show_card_single(
 		"顺势而为",
-		"选择 1 张要弃掉的手牌, 之后会抽 1 张。",
+		"选择 1 张要弃掉的手牌, 之后会抽 %d 张。" % draw_n,
 		hand_cards,
 		func(picked):
 			var idx: int = Game.hand.find(picked)
@@ -463,6 +482,12 @@ func _on_opponent_defeated_popup(_opponent_id: String, reward_card_id: String) -
 	)
 
 
+func _on_baoshu_tip_requested(text: String) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	_pending_baoshu_tip_text = text
+
+
 func _show_opponent_popup(
 	title: String,
 	body: String,
@@ -556,6 +581,148 @@ func _setup_tutorial_overlay() -> void:
 		_tutorial_overlay.setup(self)
 
 
+func _setup_day_settlement_overlay() -> void:
+	if _day_settlement_overlay != null and is_instance_valid(_day_settlement_overlay):
+		return
+	_day_settlement_overlay = DaySettlementOverlay.new()
+	_day_settlement_overlay.name = "DaySettlementOverlay"
+	add_child(_day_settlement_overlay)
+	_set_full_rect(_day_settlement_overlay)
+	_day_settlement_overlay.continue_requested.connect(_on_day_settlement_continue)
+
+
+func _build_baoshu_tip_dialog() -> void:
+	if _baoshu_tip_panel != null and is_instance_valid(_baoshu_tip_panel):
+		return
+	_baoshu_tip_panel = PanelContainer.new()
+	_baoshu_tip_panel.name = "BaoshuTipDialog"
+	_baoshu_tip_panel.visible = false
+	_baoshu_tip_panel.z_index = 230
+	_baoshu_tip_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_baoshu_tip_panel.custom_minimum_size = BAOSHU_TIP_SIZE
+	_baoshu_tip_panel.add_theme_stylebox_override("panel", UF.neon_panel_stylebox(UF.COL_GOLD))
+	add_child(_baoshu_tip_panel)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 16)
+	margin.add_theme_constant_override("margin_right", 16)
+	margin.add_theme_constant_override("margin_top", 14)
+	margin.add_theme_constant_override("margin_bottom", 14)
+	_baoshu_tip_panel.add_child(margin)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	margin.add_child(row)
+
+	var avatar := TextureRect.new()
+	avatar.custom_minimum_size = Vector2(108.0, 126.0)
+	avatar.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	if ResourceLoader.exists(BAOSHU_AVATAR_PATH):
+		avatar.texture = load(BAOSHU_AVATAR_PATH) as Texture2D
+	row.add_child(avatar)
+
+	var text_box := VBoxContainer.new()
+	text_box.custom_minimum_size = Vector2(BAOSHU_TIP_TEXT_WIDTH, 0.0)
+	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text_box.add_theme_constant_override("separation", 8)
+	row.add_child(text_box)
+
+	var name_label := Label.new()
+	name_label.text = "宝叔"
+	name_label.add_theme_font_size_override("font_size", 18)
+	name_label.add_theme_color_override("font_color", UF.COL_GOLD)
+	name_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	name_label.add_theme_constant_override("outline_size", 2)
+	text_box.add_child(name_label)
+
+	_baoshu_tip_text = Label.new()
+	_baoshu_tip_text.text = ""
+	_baoshu_tip_text.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY
+	_baoshu_tip_text.custom_minimum_size = Vector2(BAOSHU_TIP_TEXT_WIDTH, 58.0)
+	_baoshu_tip_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_baoshu_tip_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_baoshu_tip_text.add_theme_font_size_override("font_size", 17)
+	_baoshu_tip_text.add_theme_color_override("font_color", UF.COL_TEXT)
+	_baoshu_tip_text.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	_baoshu_tip_text.add_theme_constant_override("outline_size", 2)
+	text_box.add_child(_baoshu_tip_text)
+
+	_baoshu_tip_button = UF.button("知道了", UF.COL_GOLD, 15)
+	_baoshu_tip_button.custom_minimum_size = Vector2(112.0, 34.0)
+	_baoshu_tip_button.size_flags_horizontal = Control.SIZE_SHRINK_END
+	_baoshu_tip_button.pressed.connect(_on_baoshu_tip_continue)
+	text_box.add_child(_baoshu_tip_button)
+	_position_baoshu_tip_dialog()
+
+
+func _position_baoshu_tip_dialog() -> void:
+	if _baoshu_tip_panel == null:
+		return
+	var view_size: Vector2 = size
+	if view_size.x <= 0.0 or view_size.y <= 0.0:
+		view_size = get_viewport_rect().size
+	view_size.x = max(view_size.x, MIN_WINDOW_SIZE.x)
+	view_size.y = max(view_size.y, MIN_WINDOW_SIZE.y)
+	_baoshu_tip_panel.custom_minimum_size = BAOSHU_TIP_SIZE
+	_baoshu_tip_panel.size = BAOSHU_TIP_SIZE
+	_baoshu_tip_panel.position = Vector2(
+		(view_size.x - BAOSHU_TIP_SIZE.x) * 0.5,
+		max(64.0, (view_size.y - BAOSHU_TIP_SIZE.y) * 0.42)
+	)
+
+
+func _show_baoshu_tip_dialog() -> void:
+	if _baoshu_tip_panel == null or _pending_baoshu_tip_text == "":
+		return
+	_baoshu_tip_text.text = _pending_baoshu_tip_text
+	_baoshu_tip_text.custom_minimum_size = Vector2(BAOSHU_TIP_TEXT_WIDTH, 58.0)
+	_baoshu_tip_panel.visible = false
+	_baoshu_tip_panel.modulate = Color(1, 1, 1, 0)
+	_position_baoshu_tip_dialog()
+	call_deferred("_show_baoshu_tip_dialog_after_layout")
+
+
+func _show_baoshu_tip_dialog_after_layout() -> void:
+	if _baoshu_tip_panel == null or _pending_baoshu_tip_text == "":
+		return
+	_position_baoshu_tip_dialog()
+	_baoshu_tip_panel.visible = true
+	_baoshu_tip_panel.modulate = Color(1, 1, 1, 0)
+	var tween := create_tween()
+	tween.tween_property(_baoshu_tip_panel, "modulate", Color(1, 1, 1, 1), 0.12)
+
+
+func _on_baoshu_tip_continue() -> void:
+	if _baoshu_tip_panel != null:
+		_baoshu_tip_panel.visible = false
+	_pending_baoshu_tip_text = ""
+	_show_day_settlement_now()
+
+
+func _on_day_ended_show_settlement(_day: int) -> void:
+	if _day_settlement_overlay == null:
+		return
+	if DisplayServer.get_name() == "headless":
+		return
+	_pending_day_settlement = true
+	if _pending_baoshu_tip_text != "":
+		_show_baoshu_tip_dialog()
+		return
+	_show_day_settlement_now()
+
+
+func _show_day_settlement_now() -> void:
+	if not _pending_day_settlement or _day_settlement_overlay == null:
+		return
+	_day_settlement_overlay.show_summary(Game.day_close_summary, Game.day >= Game.DAYS_PER_LEVEL)
+
+
+func _on_day_settlement_continue() -> void:
+	_pending_day_settlement = false
+	Game.continue_after_day_settlement()
+
+
 # ESC 暂停菜单: 含"继续游戏 / 返回标题切换存档 / 退出游戏"
 # 仅在 _game_started 之后才响应 ESC; SaveOverlay/EndDialog/ShopOverlay/Tutorial 显示时不弹
 func _setup_pause_overlay() -> void:
@@ -580,6 +747,10 @@ func _can_open_pause_menu() -> bool:
 	if $EndDialog != null and $EndDialog.visible:
 		return false
 	if $ShopOverlay != null and $ShopOverlay.visible:
+		return false
+	if _day_settlement_overlay != null and _day_settlement_overlay.visible:
+		return false
+	if _baoshu_tip_panel != null and _baoshu_tip_panel.visible:
 		return false
 	if Game.tutorial_active:
 		return false
@@ -732,7 +903,9 @@ func _relayout() -> void:
 	_set_full_rect(shop_overlay)
 	_set_full_rect(deck_preview_popup)
 	_set_full_rect(_tutorial_overlay)
+	_set_full_rect(_day_settlement_overlay)
 	_set_full_rect(_pause_overlay)
+	_position_baoshu_tip_dialog()
 
 	var content_w: float = view_size.x - OUTER_PAD * 2.0
 	var top_y: float = OUTER_PAD

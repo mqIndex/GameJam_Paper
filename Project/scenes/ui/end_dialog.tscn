@@ -1,6 +1,6 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://dmxakaeuyrkap"]
 
-[ext_resource type="Script" path="res://scripts/views/end_dialog.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://bfay6n56kwqdj" path="res://scripts/views/end_dialog.gd" id="1_script"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
 bg_color = Color(0.106, 0.165, 0.255, 1)
@@ -11,43 +11,43 @@ border_width_bottom = 2
 border_color = Color(1, 0.682, 0.259, 1)
 corner_radius_top_left = 4
 corner_radius_top_right = 4
-corner_radius_bottom_left = 4
 corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
 
-[node name="EndDialog" type="PanelContainer"]
+[node name="EndDialog" type="PanelContainer" unique_id=1929500340]
 visible = false
 offset_right = 512.0
 offset_bottom = 280.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
 script = ExtResource("1_script")
 
-[node name="Margin" type="MarginContainer" parent="."]
+[node name="Margin" type="MarginContainer" parent="." unique_id=971307166]
 layout_mode = 2
 theme_override_constants/margin_left = 32
 theme_override_constants/margin_top = 24
 theme_override_constants/margin_right = 32
 theme_override_constants/margin_bottom = 24
 
-[node name="VBox" type="VBoxContainer" parent="Margin"]
+[node name="VBox" type="VBoxContainer" parent="Margin" unique_id=1610060879]
 layout_mode = 2
 theme_override_constants/separation = 16
 alignment = 1
 
-[node name="LblTitle" type="Label" parent="Margin/VBox"]
+[node name="LblTitle" type="Label" parent="Margin/VBox" unique_id=569173284]
 layout_mode = 2
 theme_override_font_sizes/font_size = 32
-horizontal_alignment = 1
 text = "关卡结算"
+horizontal_alignment = 1
 
-[node name="LblDetail" type="Label" parent="Margin/VBox"]
+[node name="LblDetail" type="Label" parent="Margin/VBox" unique_id=1263049930]
 layout_mode = 2
-theme_override_font_sizes/font_size = 16
 theme_override_colors/font_color = Color(0.604, 0.655, 0.753, 1)
+theme_override_font_sizes/font_size = 16
 horizontal_alignment = 1
 autowrap_mode = 3
 
-[node name="BtnRestart" type="Button" parent="Margin/VBox"]
-layout_mode = 2
+[node name="BtnRestart" type="Button" parent="Margin/VBox" unique_id=1697108089]
 custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
 theme_override_font_sizes/font_size = 18
 text = "再来一关"

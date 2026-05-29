@@ -895,6 +895,8 @@ func _enter_step() -> void:
 	_start_dialog_typewriter(baoshu_text, player_text)
 	_prompt_text.text = String(step.get("prompt", ""))
 	var button_text: String = String(step.get("button", "下一步"))
+	if _is_step_shop_guide(step) and String(step.get("wait", "")) != "" and _is_wait_condition_done(step) and button_text == "":
+		button_text = "下一步"
 	if _is_step_shop_guide(step):
 		_next_button.text = button_text
 		_next_button.visible = _should_show_shop_dialog_button(step)
@@ -945,9 +947,9 @@ func _should_show_next_button(step: Dictionary) -> bool:
 
 
 func _should_show_shop_dialog_button(step: Dictionary) -> bool:
-	if not bool(step.get("dialog_next", false)):
-		return false
 	if String(step.get("wait", "")) != "":
+		return _is_wait_condition_done(step)
+	if not bool(step.get("dialog_next", false)):
 		return false
 	if bool(step.get("force_click", false)):
 		return false
@@ -1120,24 +1122,27 @@ func _check_step_completion() -> bool:
 	if _step_index < 0 or _step_index >= _steps.size():
 		return false
 	var step: Dictionary = _steps[_step_index]
-	var wait_for: String = String(step.get("wait", ""))
-	var done: bool = false
-	match wait_for:
-		"buy":
-			done = Game.shares > _wait_shares
-		"hype":
-			done = Game.bull > _wait_bull
-		"price_up":
-			done = Game.price > _wait_price + 0.001
-		"sell":
-			done = Game.shares < _wait_shares and Game.cash > _wait_cash
-		"talent":
-			done = Game.has_talent("cascade_combo")
-		_:
-			done = false
+	var done: bool = _is_wait_condition_done(step)
 	if done:
 		_go_next()
 	return done
+
+
+func _is_wait_condition_done(step: Dictionary) -> bool:
+	var wait_for: String = String(step.get("wait", ""))
+	match wait_for:
+		"buy":
+			return Game.shares > _wait_shares
+		"hype":
+			return Game.bull > _wait_bull
+		"price_up":
+			return Game.price > _wait_price + 0.001
+		"sell":
+			return Game.shares < _wait_shares and Game.cash > _wait_cash
+		"talent":
+			return Game.has_talent("cascade_combo")
+		_:
+			return false
 
 
 func _update_layout() -> void:

@@ -41,9 +41,11 @@ func _ready() -> void:
 	# 买 1 张
 	var deck_before: int = g.get_deck_size()
 	var cash_before: float = g.cash
+	var buy_offer: Card = g.shop_offers[0] as Card
+	var buy_price: int = buy_offer.shop_price if buy_offer.shop_price > 0 else g.SHOP_BUY_PRICE
 	_assert(g.shop_buy_card(0), "买卡 0 应成功")
 	_assert(g.get_deck_size() == deck_before + 1, "买卡后牌组 +1")
-	_assert(g.cash == cash_before - g.SHOP_BUY_PRICE, "买卡扣 1000")
+	_assert(g.cash == cash_before - buy_price, "买卡扣 %d" % buy_price)
 
 	# 升级 1 张 (找 deck 里第一张能升的)
 	var up_target_index: int = -1
