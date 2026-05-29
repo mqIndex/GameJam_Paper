@@ -786,7 +786,6 @@ func _set_bgm_volume(volume: float) -> void:
 	var p := get_node_or_null("Bgm") as AudioStreamPlayer
 	if p != null:
 		p.volume_db = _bgm_volume_to_db(_bgm_volume)
-		p.stream_paused = _bgm_volume <= 0.0001
 	if top_bar != null and top_bar.has_method("set_bgm_volume"):
 		top_bar.call("set_bgm_volume", _bgm_volume)
 
@@ -892,7 +891,6 @@ func _start_bgm() -> void:
 	p.autoplay = false
 	add_child(p)
 	p.play()
-	p.stream_paused = _bgm_volume <= 0.0001
 
 
 func _on_pile_clicked(pile_name: String) -> void:

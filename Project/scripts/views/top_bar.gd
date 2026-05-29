@@ -43,7 +43,7 @@ var _last_emotion_icon_idx: int = -1
 @onready var lbl_talent_title: Label = $RightBar/HBox/LblTalentTitle
 @onready var talent_icons_slot: HBoxContainer = $RightBar/HBox/TalentIconsSlot
 @onready var btn_help: Button = $RightBar/HBox/BtnHelp
-@onready var btn_music: Button = $RightBar/HBox/BtnMusic
+@onready var btn_music: TextureButton = $RightBar/HBox/BtnMusic
 
 # 兼容旧 @onready (节点已隐藏到 $HBox 下, 保留赋值不报错)
 @onready var lbl_price: Label = $HBox/LblPrice
@@ -86,8 +86,9 @@ var _bgm_slider: HSlider = null
 var _bgm_value_label: Label = null
 
 const DEFAULT_BGM_VOLUME: float = 0.5
-const BGM_ICON_ON: String = "🎵"
-const BGM_ICON_OFF: String = "🔇"
+const BGM_ICON_PATH: String = "res://assets/yinfu.png"
+
+var _bgm_icon_tex: Texture2D = null
 
 const EMOTION_BAR_HEIGHT: float = 14.0
 const EMOTION_TICK_COUNT: int = 11  # 0/10/.../100
@@ -132,13 +133,27 @@ func _ready() -> void:
 
 func _setup_top_buttons() -> void:
 	_style_top_button(btn_help, UF.COL_GOLD)
-	_style_top_button(btn_music, UF.COL_HIGHLIGHT)
+	_bgm_icon_tex = load(BGM_ICON_PATH) as Texture2D
+	_setup_music_button()
 	if btn_help != null and not btn_help.pressed.is_connected(_on_help_pressed):
 		btn_help.pressed.connect(_on_help_pressed)
 	if btn_music != null and not btn_music.pressed.is_connected(_on_music_pressed):
 		btn_music.pressed.connect(_on_music_pressed)
 	_build_bgm_popup()
 	_refresh_music_button()
+
+
+func _setup_music_button() -> void:
+	if btn_music == null:
+		return
+	btn_music.texture_normal = _bgm_icon_tex
+	btn_music.texture_hover = _bgm_icon_tex
+	btn_music.texture_pressed = _bgm_icon_tex
+	btn_music.texture_disabled = _bgm_icon_tex
+	btn_music.ignore_texture_size = true
+	btn_music.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	btn_music.custom_minimum_size = Vector2(24, 24)
+	btn_music.add_to_group("no_click_sfx")
 
 
 func _style_top_button(button: Button, color: Color) -> void:
@@ -186,7 +201,10 @@ func set_bgm_volume(volume: float) -> void:
 func _refresh_music_button() -> void:
 	if btn_music == null:
 		return
-	btn_music.text = BGM_ICON_OFF if _bgm_volume <= 0.0001 else BGM_ICON_ON
+	if _bgm_volume <= 0.0001:
+		btn_music.modulate = Color(0.35, 0.35, 0.35, 1.0)
+	else:
+		btn_music.modulate = Color(1.0, 1.0, 1.0, 1.0)
 
 
 func _build_bgm_popup() -> void:

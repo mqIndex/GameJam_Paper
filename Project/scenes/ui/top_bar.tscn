@@ -124,11 +124,9 @@ layout_mode = 2
 theme_override_font_sizes/font_size = 11
 text = "玩法介绍帮助"
 
-[node name="BtnMusic" type="Button" parent="RightBar/HBox" unique_id=1924361546]
-custom_minimum_size = Vector2(36, 24)
+[node name="BtnMusic" type="TextureButton" parent="RightBar/HBox" unique_id=1924361546]
+custom_minimum_size = Vector2(24, 24)
 layout_mode = 2
-theme_override_font_sizes/font_size = 14
-text = "🎵"
 
 [node name="HBox" type="Control" parent="." unique_id=615060251]
 visible = false
