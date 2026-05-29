@@ -9,6 +9,7 @@ const DaySettlementOverlay = preload("res://scripts/views/day_settlement_overlay
 const SaveOverlay = preload("res://scripts/views/save_overlay.gd")
 const PauseOverlay = preload("res://scripts/views/pause_overlay.gd")
 const TitleOverlay = preload("res://scripts/views/title_overlay.gd")
+const GameHelpOverlay = preload("res://scripts/views/game_help_overlay.gd")
 
 @onready var log_text: RichTextLabel = $LogText
 @onready var bg: ColorRect = $BG
@@ -53,7 +54,9 @@ var _pending_day_settlement: bool = false
 var _save_overlay: Control = null
 var _pause_overlay: Control = null
 var _title_overlay: Control = null
+var _help_overlay: Control = null
 var _game_started: bool = false
+var _bgm_muted: bool = false
 
 const MIN_WINDOW_SIZE: Vector2 = Vector2(960.0, 540.0)
 const OUTER_PAD: float = 8.0
@@ -95,6 +98,8 @@ func _ready() -> void:
 	_setup_day_settlement_overlay()
 	_build_baoshu_tip_dialog()
 	_setup_pause_overlay()
+	_setup_help_overlay()
+	_setup_top_bar_actions()
 	Game.opponent_entered.connect(_on_opponent_entered_popup)
 	Game.opponent_defeated.connect(_on_opponent_defeated_popup)
 	Game.baoshu_tip_requested.connect(_on_baoshu_tip_requested)
@@ -152,6 +157,8 @@ func _set_gameplay_visible(visible_state: bool) -> void:
 		_day_settlement_overlay.visible = false
 	if _baoshu_tip_panel != null and not visible_state:
 		_baoshu_tip_panel.visible = false
+	if _help_overlay != null and not visible_state:
+		_help_overlay.visible = false
 
 
 func _show_title_overlay() -> void:
@@ -737,6 +744,52 @@ func _setup_pause_overlay() -> void:
 	_pause_overlay.quit_requested.connect(_on_pause_quit)
 
 
+func _setup_help_overlay() -> void:
+	if _help_overlay != null and is_instance_valid(_help_overlay):
+		return
+	_help_overlay = GameHelpOverlay.new()
+	_help_overlay.name = "GameHelpOverlay"
+	_help_overlay.z_index = 245
+	add_child(_help_overlay)
+	_set_full_rect(_help_overlay)
+	_help_overlay.setup(self)
+
+
+func _setup_top_bar_actions() -> void:
+	if top_bar == null:
+		return
+	var help_cb := Callable(self, "_on_help_requested")
+	if top_bar.has_signal("help_requested") and not top_bar.is_connected("help_requested", help_cb):
+		top_bar.connect("help_requested", help_cb)
+	var music_cb := Callable(self, "_on_music_toggled")
+	if top_bar.has_signal("music_toggled") and not top_bar.is_connected("music_toggled", music_cb):
+		top_bar.connect("music_toggled", music_cb)
+	if top_bar.has_method("set_music_muted"):
+		top_bar.call("set_music_muted", _bgm_muted)
+
+
+func _on_help_requested() -> void:
+	if _help_overlay == null:
+		return
+	if _help_overlay.visible:
+		_help_overlay.call("close")
+	else:
+		_help_overlay.call("open")
+
+
+func _on_music_toggled(muted: bool) -> void:
+	_set_bgm_muted(muted)
+
+
+func _set_bgm_muted(muted: bool) -> void:
+	_bgm_muted = muted
+	var p := get_node_or_null("Bgm") as AudioStreamPlayer
+	if p != null:
+		p.stream_paused = muted
+	if top_bar != null and top_bar.has_method("set_music_muted"):
+		top_bar.call("set_music_muted", muted)
+
+
 func _can_open_pause_menu() -> bool:
 	if not _game_started:
 		return false
@@ -751,6 +804,8 @@ func _can_open_pause_menu() -> bool:
 	if _day_settlement_overlay != null and _day_settlement_overlay.visible:
 		return false
 	if _baoshu_tip_panel != null and _baoshu_tip_panel.visible:
+		return false
+	if _help_overlay != null and _help_overlay.visible:
 		return false
 	if Game.tutorial_active:
 		return false
@@ -830,6 +885,7 @@ func _start_bgm() -> void:
 	p.autoplay = false
 	add_child(p)
 	p.play()
+	p.stream_paused = _bgm_muted
 
 
 func _on_pile_clicked(pile_name: String) -> void:
@@ -844,6 +900,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		var key: int = (event as InputEventKey).keycode
 		if key == KEY_ESCAPE:
+			if _help_overlay != null and _help_overlay.visible:
+				_help_overlay.call("close")
+				get_viewport().set_input_as_handled()
+				return
 			# ESC: 暂停菜单显隐切换 (打开时仅在合法状态下生效, 关闭时无条件允许)
 			if _pause_overlay != null and is_instance_valid(_pause_overlay) and _pause_overlay.visible:
 				_pause_overlay.close_menu()
@@ -905,6 +965,7 @@ func _relayout() -> void:
 	_set_full_rect(_tutorial_overlay)
 	_set_full_rect(_day_settlement_overlay)
 	_set_full_rect(_pause_overlay)
+	_set_full_rect(_help_overlay)
 	_position_baoshu_tip_dialog()
 
 	var content_w: float = view_size.x - OUTER_PAD * 2.0

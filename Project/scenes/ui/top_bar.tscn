@@ -118,23 +118,17 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 4
 
-[node name="BtnPause" type="Button" parent="RightBar/HBox" unique_id=1500580332]
-custom_minimum_size = Vector2(28, 24)
+[node name="BtnHelp" type="Button" parent="RightBar/HBox" unique_id=1500580332]
+custom_minimum_size = Vector2(112, 24)
 layout_mode = 2
 theme_override_font_sizes/font_size = 11
-text = "II"
+text = "玩法介绍帮助"
 
-[node name="BtnPlay" type="Button" parent="RightBar/HBox" unique_id=1924361546]
-custom_minimum_size = Vector2(28, 24)
+[node name="BtnMusic" type="Button" parent="RightBar/HBox" unique_id=1924361546]
+custom_minimum_size = Vector2(64, 24)
 layout_mode = 2
 theme_override_font_sizes/font_size = 11
-text = ">"
-
-[node name="BtnFF" type="Button" parent="RightBar/HBox" unique_id=425774068]
-custom_minimum_size = Vector2(28, 24)
-layout_mode = 2
-theme_override_font_sizes/font_size = 11
-text = ">>"
+text = "音乐开"
 
 [node name="HBox" type="Control" parent="." unique_id=615060251]
 visible = false

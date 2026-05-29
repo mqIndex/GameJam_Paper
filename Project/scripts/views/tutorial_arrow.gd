@@ -5,6 +5,16 @@ extends Control
 		fill_color = value
 		queue_redraw()
 
+@export var border_color: Color = Color(1.0, 0.55, 0.26, 0.98):
+	set(value):
+		border_color = value
+		queue_redraw()
+
+@export var border_width: float = 2.0:
+	set(value):
+		border_width = value
+		queue_redraw()
+
 @export var points_down: bool = true:
 	set(value):
 		points_down = value
@@ -30,3 +40,7 @@ func _draw() -> void:
 			Vector2(size.x, size.y),
 		])
 	draw_colored_polygon(pts, fill_color)
+	for i in range(pts.size()):
+		var a: Vector2 = pts[i]
+		var b: Vector2 = pts[(i + 1) % pts.size()]
+		draw_line(a, b, border_color, border_width, true)

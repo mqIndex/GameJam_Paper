@@ -1,13 +1,16 @@
 # TopBar — 拆分为 3 个独立 Bar
 # LeftBar: 第 N/M 天 + 第 X/Y 回合
 # MidBar: 市场情绪 (图标 + 进度条 + 状态文字)
-# RightBar: 已获取天赋小图标列表 + 暂停/播放/快进按钮
+# RightBar: 已获取天赋小图标列表 + 帮助 / 音乐按钮
 extends Control
 
 const UF = preload("res://scripts/views/ui_factory.gd")
 const Event = preload("res://scripts/event.gd")
 const EmotionMarker = preload("res://scripts/views/emotion_marker.gd")
 const CardHoverTooltip = preload("res://scripts/views/card_hover_tooltip.gd")
+
+signal help_requested
+signal music_toggled(muted: bool)
 
 # 天赋 ID → logo 图片路径
 const TALENT_ICON_MAP: Dictionary = {
@@ -39,6 +42,8 @@ var _last_emotion_icon_idx: int = -1
 
 @onready var lbl_talent_title: Label = $RightBar/HBox/LblTalentTitle
 @onready var talent_icons_slot: HBoxContainer = $RightBar/HBox/TalentIconsSlot
+@onready var btn_help: Button = $RightBar/HBox/BtnHelp
+@onready var btn_music: Button = $RightBar/HBox/BtnMusic
 
 # 兼容旧 @onready (节点已隐藏到 $HBox 下, 保留赋值不报错)
 @onready var lbl_price: Label = $HBox/LblPrice
@@ -73,6 +78,7 @@ var _talent_icon_nodes: Dictionary = {}
 var _talent_tooltip: PanelContainer = null
 var _talent_tooltip_text: String = ""
 var _talent_tooltip_tween: Tween = null
+var _music_muted: bool = false
 
 const EMOTION_BAR_HEIGHT: float = 14.0
 const EMOTION_TICK_COUNT: int = 11  # 0/10/.../100
@@ -97,6 +103,7 @@ func _ready() -> void:
 	left_bar.add_theme_stylebox_override("panel", UF.panel_stylebox())
 	mid_bar.add_theme_stylebox_override("panel", UF.panel_stylebox())
 	right_bar.add_theme_stylebox_override("panel", UF.panel_stylebox())
+	_setup_top_buttons()
 	_load_emotion_icons()
 	_build_emotion_bar()
 	_setup_event_dialog()
@@ -112,6 +119,54 @@ func _ready() -> void:
 	emotion_bar_slot.resized.connect(_layout_emotion_bar)
 	_relayout_bars()
 	_refresh()
+
+
+func _setup_top_buttons() -> void:
+	_style_top_button(btn_help, UF.COL_GOLD)
+	_style_top_button(btn_music, UF.COL_HIGHLIGHT)
+	if btn_help != null and not btn_help.pressed.is_connected(_on_help_pressed):
+		btn_help.pressed.connect(_on_help_pressed)
+	if btn_music != null and not btn_music.pressed.is_connected(_on_music_pressed):
+		btn_music.pressed.connect(_on_music_pressed)
+	_refresh_music_button()
+
+
+func _style_top_button(button: Button, color: Color) -> void:
+	if button == null:
+		return
+	button.add_theme_color_override("font_color", color)
+	var sb := UF.panel_stylebox(color)
+	sb.content_margin_left = 8.0
+	sb.content_margin_right = 8.0
+	sb.content_margin_top = 3.0
+	sb.content_margin_bottom = 3.0
+	button.add_theme_stylebox_override("normal", sb)
+	var hover := sb.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(color.r, color.g, color.b, 0.18)
+	button.add_theme_stylebox_override("hover", hover)
+	var pressed := sb.duplicate() as StyleBoxFlat
+	pressed.bg_color = Color(color.r, color.g, color.b, 0.30)
+	button.add_theme_stylebox_override("pressed", pressed)
+
+
+func _on_help_pressed() -> void:
+	emit_signal("help_requested")
+
+
+func _on_music_pressed() -> void:
+	_music_muted = not _music_muted
+	_refresh_music_button()
+	emit_signal("music_toggled", _music_muted)
+
+
+func set_music_muted(muted: bool) -> void:
+	_music_muted = muted
+	_refresh_music_button()
+
+
+func _refresh_music_button() -> void:
+	if btn_music != null:
+		btn_music.text = "音乐关" if _music_muted else "音乐开"
 
 
 func _load_emotion_icons() -> void:

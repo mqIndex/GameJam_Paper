@@ -201,6 +201,8 @@ func handle_shop_continue() -> bool:
 			_go_next()
 			return true
 		if bool(step.get("force_click", false)):
+			if _is_wait_condition_done(step):
+				_go_next()
 			return true
 		var wait_for: String = String(step.get("wait", ""))
 		if wait_for != "":
@@ -346,7 +348,7 @@ func _build_steps() -> void:
 			"button": "继续",
 		},
 		{
-			"dialog": "目前先做这只股票，盈维达，公司蒸蒸日上，有无限的想象空间。",
+			"dialog": "目前先做这只股票: 盈维达，公司蒸蒸日上，有无限的想象空间。",
 			"button": "开始交易",
 		},
 		{
@@ -894,9 +896,7 @@ func _enter_step() -> void:
 	# 启动打字机: 宝叔(主对话)先, 完成后再放玩家对话框
 	_start_dialog_typewriter(baoshu_text, player_text)
 	_prompt_text.text = String(step.get("prompt", ""))
-	var button_text: String = String(step.get("button", "下一步"))
-	if _is_step_shop_guide(step) and String(step.get("wait", "")) != "" and _is_wait_condition_done(step) and button_text == "":
-		button_text = "下一步"
+	var button_text: String = _step_button_text(step, "下一步")
 	if _is_step_shop_guide(step):
 		_next_button.text = button_text
 		_next_button.visible = _should_show_shop_dialog_button(step)
@@ -954,6 +954,13 @@ func _should_show_shop_dialog_button(step: Dictionary) -> bool:
 	if bool(step.get("force_click", false)):
 		return false
 	return String(step.get("button", "下一步")) != ""
+
+
+func _step_button_text(step: Dictionary, fallback: String = "下一步") -> String:
+	var text: String = String(step.get("button", fallback))
+	if text == "" and _is_step_shop_guide(step) and String(step.get("wait", "")) != "" and _is_wait_condition_done(step):
+		text = fallback
+	return text
 
 
 func _try_complete_intro_typewriter(step: Dictionary) -> bool:
@@ -1089,6 +1096,9 @@ func _update_shop_button_text() -> void:
 	if _step_index >= 0 and _step_index < _steps.size():
 		var step: Dictionary = _steps[_step_index]
 		if bool(step.get("force_click", false)) or String(step.get("wait", "")) != "":
+			if _is_wait_condition_done(step):
+				shop.call("set_tutorial_button_override", _step_button_text(step, "继续"))
+				return
 			shop.call("set_tutorial_button_override", "")
 			return
 		if bool(step.get("dialog_next", false)):
@@ -1238,7 +1248,7 @@ func _layout_embedded_shop_guide() -> void:
 	_player_dialog.visible = false
 	_intro_panel.visible = false
 	_dialog.visible = true
-	var button_text: String = String(step.get("button", "知道了"))
+	var button_text: String = _step_button_text(step, "下一步")
 	_next_button.text = button_text
 	_next_button.visible = _should_show_shop_dialog_button(step)
 
