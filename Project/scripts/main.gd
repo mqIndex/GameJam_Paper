@@ -7,6 +7,7 @@ const CardChoiceDialog = preload("res://scripts/views/card_choice_dialog.gd")
 const TutorialOverlayScene = preload("res://scenes/ui/tutorial_overlay.tscn")
 const SaveOverlay = preload("res://scripts/views/save_overlay.gd")
 const PauseOverlay = preload("res://scripts/views/pause_overlay.gd")
+const TitleOverlay = preload("res://scripts/views/title_overlay.gd")
 
 @onready var log_text: RichTextLabel = $LogText
 @onready var bg: ColorRect = $BG
@@ -41,6 +42,7 @@ var _subtitle_banner: Label = null
 var _tutorial_overlay: Control = null
 var _save_overlay: Control = null
 var _pause_overlay: Control = null
+var _title_overlay: Control = null
 var _game_started: bool = false
 
 const MIN_WINDOW_SIZE: Vector2 = Vector2(960.0, 540.0)
@@ -96,11 +98,13 @@ func _ready() -> void:
 	_apply_active_persona_portrait()
 	# 隐藏游戏 UI 直到玩家选档完成, 避免空状态闪烁
 	_set_gameplay_visible(false)
+	# 封面出现的同时就放 BGM (_start_bgm 内部 has_node 幂等, 后续路径再调不会重叠)
+	_start_bgm()
 	if _has_cmdline_flag("--skip-save"):
 		# 直跑模式 (cmdline 测试): 不弹存档页, 走旧的默认教学流程
 		_start_gameplay(true)
 	else:
-		_show_save_overlay()
+		_show_title_overlay()
 
 
 func _has_cmdline_flag(flag: String) -> bool:
@@ -130,6 +134,28 @@ func _set_gameplay_visible(visible_state: bool) -> void:
 			(n as CanvasItem).visible = visible_state
 	if _subtitle_banner != null:
 		_subtitle_banner.visible = visible_state
+
+
+func _show_title_overlay() -> void:
+	if _title_overlay != null and is_instance_valid(_title_overlay):
+		_title_overlay.visible = true
+		return
+	_title_overlay = TitleOverlay.new()
+	_title_overlay.name = "TitleOverlay"
+	add_child(_title_overlay)
+	_set_full_rect(_title_overlay)
+	_title_overlay.start_pressed.connect(_on_title_start_pressed)
+
+
+func _close_title_overlay() -> void:
+	if _title_overlay != null and is_instance_valid(_title_overlay):
+		_title_overlay.queue_free()
+		_title_overlay = null
+
+
+func _on_title_start_pressed() -> void:
+	_close_title_overlay()
+	_show_save_overlay()
 
 
 func _show_save_overlay() -> void:
@@ -616,8 +642,10 @@ func _on_opponent_defeated_for_tutorial(_opponent_id: String, _reward_card_id: S
 			_tutorial_overlay.call_deferred("start_opponent_reward_intro")
 
 
-# 启动 BGM (循环, -6dB)
+# 启动 BGM (循环, -8dB); 玩家点封面 / --skip-save 路径都会调到, 用 has_node 防重
 func _start_bgm() -> void:
+	if has_node("Bgm"):
+		return
 	var stream: AudioStream = load("res://assets/bgm/Measured Inflection.mp3") as AudioStream
 	if stream == null:
 		push_warning("BGM not loaded: res://assets/bgm/Measured Inflection.mp3")
