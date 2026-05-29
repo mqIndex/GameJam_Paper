@@ -56,7 +56,7 @@ var _pause_overlay: Control = null
 var _title_overlay: Control = null
 var _help_overlay: Control = null
 var _game_started: bool = false
-var _bgm_muted: bool = false
+var _bgm_volume: float = 0.5
 
 const MIN_WINDOW_SIZE: Vector2 = Vector2(960.0, 540.0)
 const OUTER_PAD: float = 8.0
@@ -761,11 +761,11 @@ func _setup_top_bar_actions() -> void:
 	var help_cb := Callable(self, "_on_help_requested")
 	if top_bar.has_signal("help_requested") and not top_bar.is_connected("help_requested", help_cb):
 		top_bar.connect("help_requested", help_cb)
-	var music_cb := Callable(self, "_on_music_toggled")
-	if top_bar.has_signal("music_toggled") and not top_bar.is_connected("music_toggled", music_cb):
-		top_bar.connect("music_toggled", music_cb)
-	if top_bar.has_method("set_music_muted"):
-		top_bar.call("set_music_muted", _bgm_muted)
+	var music_cb := Callable(self, "_on_bgm_volume_changed")
+	if top_bar.has_signal("bgm_volume_changed") and not top_bar.is_connected("bgm_volume_changed", music_cb):
+		top_bar.connect("bgm_volume_changed", music_cb)
+	if top_bar.has_method("set_bgm_volume"):
+		top_bar.call("set_bgm_volume", _bgm_volume)
 
 
 func _on_help_requested() -> void:
@@ -777,17 +777,24 @@ func _on_help_requested() -> void:
 		_help_overlay.call("open")
 
 
-func _on_music_toggled(muted: bool) -> void:
-	_set_bgm_muted(muted)
+func _on_bgm_volume_changed(volume: float) -> void:
+	_set_bgm_volume(volume)
 
 
-func _set_bgm_muted(muted: bool) -> void:
-	_bgm_muted = muted
+func _set_bgm_volume(volume: float) -> void:
+	_bgm_volume = clamp(volume, 0.0, 1.0)
 	var p := get_node_or_null("Bgm") as AudioStreamPlayer
 	if p != null:
-		p.stream_paused = muted
-	if top_bar != null and top_bar.has_method("set_music_muted"):
-		top_bar.call("set_music_muted", muted)
+		p.volume_db = _bgm_volume_to_db(_bgm_volume)
+		p.stream_paused = _bgm_volume <= 0.0001
+	if top_bar != null and top_bar.has_method("set_bgm_volume"):
+		top_bar.call("set_bgm_volume", _bgm_volume)
+
+
+func _bgm_volume_to_db(volume: float) -> float:
+	if volume <= 0.0001:
+		return -80.0
+	return linear_to_db(volume)
 
 
 func _can_open_pause_menu() -> bool:
@@ -881,11 +888,11 @@ func _start_bgm() -> void:
 	var p := AudioStreamPlayer.new()
 	p.name = "Bgm"
 	p.stream = stream
-	p.volume_db = -6.0
+	p.volume_db = _bgm_volume_to_db(_bgm_volume)
 	p.autoplay = false
 	add_child(p)
 	p.play()
-	p.stream_paused = _bgm_muted
+	p.stream_paused = _bgm_volume <= 0.0001
 
 
 func _on_pile_clicked(pile_name: String) -> void:

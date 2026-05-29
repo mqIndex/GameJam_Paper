@@ -10,7 +10,7 @@ const EmotionMarker = preload("res://scripts/views/emotion_marker.gd")
 const CardHoverTooltip = preload("res://scripts/views/card_hover_tooltip.gd")
 
 signal help_requested
-signal music_toggled(muted: bool)
+signal bgm_volume_changed(volume: float)
 
 # 天赋 ID → logo 图片路径
 const TALENT_ICON_MAP: Dictionary = {
@@ -78,7 +78,16 @@ var _talent_icon_nodes: Dictionary = {}
 var _talent_tooltip: PanelContainer = null
 var _talent_tooltip_text: String = ""
 var _talent_tooltip_tween: Tween = null
-var _music_muted: bool = false
+var _bgm_volume: float = DEFAULT_BGM_VOLUME
+
+# BGM 音量弹窗
+var _bgm_popup: PanelContainer = null
+var _bgm_slider: HSlider = null
+var _bgm_value_label: Label = null
+
+const DEFAULT_BGM_VOLUME: float = 0.5
+const BGM_ICON_ON: String = "🎵"
+const BGM_ICON_OFF: String = "🔇"
 
 const EMOTION_BAR_HEIGHT: float = 14.0
 const EMOTION_TICK_COUNT: int = 11  # 0/10/.../100
@@ -128,6 +137,7 @@ func _setup_top_buttons() -> void:
 		btn_help.pressed.connect(_on_help_pressed)
 	if btn_music != null and not btn_music.pressed.is_connected(_on_music_pressed):
 		btn_music.pressed.connect(_on_music_pressed)
+	_build_bgm_popup()
 	_refresh_music_button()
 
 
@@ -154,19 +164,95 @@ func _on_help_pressed() -> void:
 
 
 func _on_music_pressed() -> void:
-	_music_muted = not _music_muted
-	_refresh_music_button()
-	emit_signal("music_toggled", _music_muted)
+	if _bgm_popup == null:
+		return
+	if _bgm_popup.visible:
+		_bgm_popup.visible = false
+		return
+	_position_bgm_popup()
+	_bgm_popup.visible = true
 
 
-func set_music_muted(muted: bool) -> void:
-	_music_muted = muted
+func set_bgm_volume(volume: float) -> void:
+	_bgm_volume = clamp(volume, 0.0, 1.0)
+	if _bgm_slider != null and not is_equal_approx(_bgm_slider.value, _bgm_volume):
+		_bgm_slider.set_block_signals(true)
+		_bgm_slider.value = _bgm_volume
+		_bgm_slider.set_block_signals(false)
 	_refresh_music_button()
+	_refresh_bgm_value_label()
 
 
 func _refresh_music_button() -> void:
-	if btn_music != null:
-		btn_music.text = "音乐关" if _music_muted else "音乐开"
+	if btn_music == null:
+		return
+	btn_music.text = BGM_ICON_OFF if _bgm_volume <= 0.0001 else BGM_ICON_ON
+
+
+func _build_bgm_popup() -> void:
+	if _bgm_popup != null:
+		return
+	_bgm_popup = PanelContainer.new()
+	_bgm_popup.name = "BgmPopup"
+	_bgm_popup.top_level = true
+	_bgm_popup.z_index = 200
+	_bgm_popup.visible = false
+	_bgm_popup.mouse_filter = Control.MOUSE_FILTER_STOP
+	_bgm_popup.custom_minimum_size = Vector2(180, 0)
+	_bgm_popup.add_theme_stylebox_override("panel", UF.panel_stylebox(UF.COL_HIGHLIGHT))
+	add_child(_bgm_popup)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	_bgm_popup.add_child(vbox)
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 8)
+	vbox.add_child(header)
+	var title := Label.new()
+	title.text = "背景音乐"
+	title.add_theme_font_size_override("font_size", 12)
+	title.add_theme_color_override("font_color", UF.COL_HIGHLIGHT)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(title)
+	_bgm_value_label = Label.new()
+	_bgm_value_label.add_theme_font_size_override("font_size", 12)
+	_bgm_value_label.add_theme_color_override("font_color", UF.COL_TEXT)
+	header.add_child(_bgm_value_label)
+	_bgm_slider = HSlider.new()
+	_bgm_slider.min_value = 0.0
+	_bgm_slider.max_value = 1.0
+	_bgm_slider.step = 0.01
+	_bgm_slider.value = _bgm_volume
+	_bgm_slider.custom_minimum_size = Vector2(160, 18)
+	_bgm_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_bgm_slider.add_to_group("no_click_sfx")
+	vbox.add_child(_bgm_slider)
+	_bgm_slider.value_changed.connect(_on_bgm_slider_value_changed)
+	_refresh_bgm_value_label()
+
+
+func _on_bgm_slider_value_changed(value: float) -> void:
+	_bgm_volume = clamp(value, 0.0, 1.0)
+	_refresh_music_button()
+	_refresh_bgm_value_label()
+	emit_signal("bgm_volume_changed", _bgm_volume)
+
+
+func _refresh_bgm_value_label() -> void:
+	if _bgm_value_label == null:
+		return
+	_bgm_value_label.text = "%d%%" % int(round(_bgm_volume * 100.0))
+
+
+func _position_bgm_popup() -> void:
+	if _bgm_popup == null or btn_music == null:
+		return
+	_bgm_popup.reset_size()
+	var top_bar_rect := get_global_rect()
+	var btn_rect := btn_music.get_global_rect()
+	var popup_w: float = max(_bgm_popup.size.x, _bgm_popup.custom_minimum_size.x)
+	var x: float = btn_rect.position.x + btn_rect.size.x - popup_w - top_bar_rect.position.x
+	var y: float = btn_rect.position.y + btn_rect.size.y + 4 - top_bar_rect.position.y
+	_bgm_popup.position = Vector2(max(x, 0.0), y)
 
 
 func _load_emotion_icons() -> void:

@@ -24,7 +24,7 @@ const HELP_ITEMS: Array[Dictionary] = [
 		"path": "TopBar/RightBar",
 		"title": "天赋与设置",
 		"summary": "查看天赋、帮助和音乐",
-		"detail": "这里会显示已获得的天赋图标。右侧按钮可以打开本帮助或开关背景音乐。",
+		"detail": "这里会显示已获得的天赋图标。右侧按钮可以打开本帮助或调节背景音乐音量。",
 	},
 	{
 		"path": "EnemyHpBar",
