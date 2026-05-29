@@ -9,6 +9,8 @@ signal start_pressed
 
 const COVER_PATH := "res://assets/startPage.png"
 const FALLBACK_COVER_PATH := "res://assets/loadingPage.png"
+const CLICK_SFX_PATH := "res://assets/bgm/JDSherbert - Ultimate UI SFX Pack - Swipe - 2.mp3"
+const CLICK_SFX_VOLUME_DB := -30.0
 const HINT_TEXT := "点击屏幕开始游戏"
 const HINT_BOTTOM_PAD := 56.0
 const HINT_FONT_SIZE := 22
@@ -98,4 +100,21 @@ func _gui_input(event: InputEvent) -> void:
 func _emit_start() -> void:
 	if _hint_tween != null and _hint_tween.is_valid():
 		_hint_tween.kill()
+	_play_click_sfx()
 	emit_signal("start_pressed")
+
+
+# 点击封面进入游戏时播放一次 swipe 音效; 节点挂在 SceneTree.root 上, 避免本 overlay 被 queue_free 后音效被截断
+func _play_click_sfx() -> void:
+	if not ResourceLoader.exists(CLICK_SFX_PATH):
+		return
+	var stream: AudioStream = load(CLICK_SFX_PATH) as AudioStream
+	if stream == null:
+		return
+	var p := AudioStreamPlayer.new()
+	p.stream = stream
+	p.volume_db = CLICK_SFX_VOLUME_DB
+	p.autoplay = false
+	get_tree().root.add_child(p)
+	p.finished.connect(p.queue_free)
+	p.play()

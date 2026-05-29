@@ -333,6 +333,7 @@ func _on_mouse_entered() -> void:
 	if not blocked:
 		play_block_hint_cleared.emit(null)
 	_is_hovering = true
+	SfxBus.play_card_hover()
 	_tween_scale(Vector2(HOVER_SCALE, HOVER_SCALE), HOVER_DURATION)
 	z_index = HOVER_Z_INDEX
 	_schedule_card_tooltip()

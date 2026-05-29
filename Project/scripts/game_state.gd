@@ -1195,6 +1195,7 @@ func draw_cards(n: int) -> int:
 		hand.append(draw_pile.pop_back())
 		got += 1
 	if got > 0:
+		SfxBus.play_card_deal()
 		emit_signal("hand_changed")
 	return got
 
