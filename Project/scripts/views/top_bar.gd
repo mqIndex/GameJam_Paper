@@ -458,7 +458,7 @@ func _on_event_triggered(ev) -> void:
 			cat_text = "中性"
 			cat_color = UF.COL_GOLD
 	_event_dialog.title = "突发事件 · %s" % cat_text
-	_event_msg.text = "[color=#%s][b]%s[/b][/color]\n\n%s\n\n[color=#ffd166]%s[/color]" % [
+	_event_msg.text = "[color=#%s]%s[/color]\n\n%s\n\n[color=#ffd166]%s[/color]" % [
 		cat_color.to_html(false), ev_obj.name, ev_obj.desc, ev_obj.effect_desc
 	]
 	_event_dialog.popup_centered()
@@ -501,7 +501,7 @@ func _update_tip_text() -> void:
 		return
 	var col := _category_color(ev)
 	var tag := _category_name(ev)
-	_tip_title.text = "[color=#%s][b][%s] %s[/b][/color]" % [col.to_html(false), tag, ev.name]
+	_tip_title.text = "[color=#%s][%s] %s[/color]" % [col.to_html(false), tag, ev.name]
 	_tip_desc.text = "[color=#ffffff]%s[/color]" % ev.desc
 	_tip_effect.text = "[color=#ffd166]%s[/color]" % ev.effect_desc
 
