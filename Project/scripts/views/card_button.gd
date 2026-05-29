@@ -382,11 +382,13 @@ func _on_pressed() -> void:
 	if _is_dragging:
 		return
 	if _selection_mode:
+		SfxBus.play_card_click()
 		selection_pressed.emit(self)
 		return
 	if refresh_play_block_reason() != "":
 		_emit_play_blocked()
 	else:
+		SfxBus.play_card_click()
 		Game.play_card(_card_index)
 
 

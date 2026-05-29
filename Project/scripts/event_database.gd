@@ -287,10 +287,10 @@ const _EVENT_DEFS: Array = [
 		"delta_bull": -30},
 
 	# --- 股价直接冲击 ---
-	{"id": "double_up",  "name": "盈利双击", "category": "good",
+	{"id": "double_up",  "name": "戴维斯双击", "category": "good",
 		"desc": "业绩超出估值预期同时发生, 股价进入加速上涨阶段",
 		"effect_desc": "当前股价 +20%",
-		"image_path": "",
+		"image_path": "res://data/event/dawis.png",
 		"theme_color": "金",
 		"price_rate": 0.20},
 	{"id": "black_swan", "name": "黑天鹅",   "category": "bad",
