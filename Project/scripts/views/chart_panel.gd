@@ -231,6 +231,10 @@ func _on_intraday_updated() -> void:
 		Effects.shake_node(get_tree().root.get_node_or_null("Main"), 4.0, 0.18)
 		var flash_color: Color = UF.COL_UP if price_pct > 0.0 else UF.COL_DOWN
 		Effects.flash_rect(flash_overlay, flash_color, 0.30)
+		if price_pct > 0.0:
+			SfxBus.play_price_surge()
+		else:
+			SfxBus.play_price_crash()
 
 
 func _queue_redraw() -> void:

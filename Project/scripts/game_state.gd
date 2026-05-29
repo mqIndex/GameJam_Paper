@@ -57,6 +57,8 @@ var SHOP_BUY_PRICE: int = 1000
 var SHOP_UPGRADE_PRICE: int = 1000
 var SHOP_DELETE_BASE_PRICE: int = 1000
 var SHOP_DELETE_PRICE_INCREMENT: int = 1000   # 策划: 后续每次删卡价格+1000
+const MAX_SHOP_DELETES: int = 2              # 每次进入商店最多删 2 张卡
+var shop_deletes_this_visit: int = 0
 
 # ===== 对手参数 =====
 var LEVEL_OPPONENT_ID: Array = ["boss_six", "boss_blade"]
@@ -585,6 +587,7 @@ func new_level(carried_effect_ids: Array = []) -> void:
 	shop_offers.clear()
 	talent_offers.clear()
 	shop_delete_count = 0
+	shop_deletes_this_visit = 0
 	day_open_price = INITIAL_PRICE
 	day_open_assets = START_CASH
 	day_close_summary = {}
@@ -2039,6 +2042,9 @@ func shop_upgrade_card(deck_index: int) -> bool:
 # 商店: 删卡
 func shop_delete_card(deck_index: int) -> bool:
 	if phase != Phase.SHOP: return false
+	if shop_deletes_this_visit >= MAX_SHOP_DELETES:
+		_log("本回合删卡次数已达上限 (%d)" % MAX_SHOP_DELETES)
+		return false
 	var del_price: int = current_delete_price()
 	if cash < del_price:
 		_log("现金不足, 无法删卡 (需要 ¥%d)" % del_price)
@@ -2052,6 +2058,7 @@ func shop_delete_card(deck_index: int) -> bool:
 	cash -= del_price
 	(entry["pile"] as Array).remove_at(entry["index"])
 	shop_delete_count += 1
+	shop_deletes_this_visit += 1
 	_log("[商店] 删除「%s」, 花费 ¥%d, 下次删卡 ¥%d" % [card.name, del_price, current_delete_price()])
 	emit_signal("hand_changed")
 	emit_signal("shop_changed")

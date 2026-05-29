@@ -24,12 +24,16 @@ func refresh() -> void:
 		c.queue_free()
 	var deck: Array = Game.get_full_deck()
 	var del_price: int = Game.current_delete_price()
-	lbl_price.text = "当前删卡价: ¥%d" % del_price
+	var deletes_left: int = Game.MAX_SHOP_DELETES - Game.shop_deletes_this_visit
+	if deletes_left > 0:
+		lbl_price.text = "当前删卡价: ¥%d | 本回合可删 %d/%d 张" % [del_price, deletes_left, Game.MAX_SHOP_DELETES]
+	else:
+		lbl_price.text = "本回合删卡次数已达上限 (%d/%d)" % [Game.MAX_SHOP_DELETES, Game.MAX_SHOP_DELETES]
 	for i in range(deck.size()):
 		var card: Card = deck[i]
 		var sc = ShopCardScene.instantiate()
 		grid.add_child(sc)
-		var can_afford: bool = (Game.cash >= del_price) and (deck.size() > 1)
+		var can_afford: bool = (Game.cash >= del_price) and (deck.size() > 1) and (deletes_left > 0)
 		sc.setup(card, del_price, "删除", UF.COL_DOWN, can_afford)
 		var idx_capture: int = i
 		sc.action_pressed.connect(func(): Game.shop_delete_card(idx_capture))

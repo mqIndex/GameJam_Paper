@@ -7,10 +7,14 @@ const CLICK_SFX_PATH := "res://assets/bgm/JDSherbert - Ultimate UI SFX Pack - Cu
 const CARD_HOVER_SFX_PATH := "res://assets/bgm/SFX_CardGrabSlide06.wav"
 const CARD_DEAL_SFX_PATH := "res://assets/bgm/SFX_CardGenericMovesLong03.wav"
 const CARD_CLICK_SFX_PATH := "res://assets/bgm/SFX_CardGrabSlide09.wav"
+const PRICE_SURGE_SFX_PATH := "res://assets/bgm/JDSherbert - Ultimate UI SFX Pack - Popup Open - 1.mp3"
+const PRICE_CRASH_SFX_PATH := "res://assets/bgm/JDSherbert - Ultimate UI SFX Pack - Popup Open - 1.mp3"
 const CLICK_SFX_VOLUME_DB := -10.0
 const CARD_HOVER_SFX_VOLUME_DB := -10.0
 const CARD_DEAL_SFX_VOLUME_DB := -10.0
 const CARD_CLICK_SFX_VOLUME_DB := -10.0
+const PRICE_SURGE_SFX_VOLUME_DB := -20
+const PRICE_CRASH_SFX_VOLUME_DB := -20
 const CARD_BUTTON_SCRIPT_PATH := "res://scripts/views/card_button.gd"
 const NO_CLICK_SFX_GROUP := "no_click_sfx"
 
@@ -18,6 +22,8 @@ var _click_stream: AudioStream = null
 var _card_hover_stream: AudioStream = null
 var _card_deal_stream: AudioStream = null
 var _card_click_stream: AudioStream = null
+var _price_surge_stream: AudioStream = null
+var _price_crash_stream: AudioStream = null
 var _card_button_script: Script = null
 
 
@@ -31,6 +37,10 @@ func _ready() -> void:
 		_card_deal_stream = load(CARD_DEAL_SFX_PATH) as AudioStream
 	if ResourceLoader.exists(CARD_CLICK_SFX_PATH):
 		_card_click_stream = load(CARD_CLICK_SFX_PATH) as AudioStream
+	if ResourceLoader.exists(PRICE_SURGE_SFX_PATH):
+		_price_surge_stream = load(PRICE_SURGE_SFX_PATH) as AudioStream
+	if ResourceLoader.exists(PRICE_CRASH_SFX_PATH):
+		_price_crash_stream = load(PRICE_CRASH_SFX_PATH) as AudioStream
 	if ResourceLoader.exists(CARD_BUTTON_SCRIPT_PATH):
 		_card_button_script = load(CARD_BUTTON_SCRIPT_PATH) as Script
 	get_tree().node_added.connect(_on_node_added)
@@ -88,6 +98,16 @@ func play_card_deal() -> void:
 # 公共 API: 卡牌被点击 (打出/选中) 时调用一次
 func play_card_click() -> void:
 	_play_oneshot(_card_click_stream, CARD_CLICK_SFX_VOLUME_DB)
+
+
+# 公共 API: 分时图出现大幅上涨 (≥1.5%, 与震屏+红闪同判定) 时调用一次
+func play_price_surge() -> void:
+	_play_oneshot(_price_surge_stream, PRICE_SURGE_SFX_VOLUME_DB)
+
+
+# 公共 API: 分时图出现大幅下跌 (≤-1.5%, 与震屏+绿闪同判定) 时调用一次
+func play_price_crash() -> void:
+	_play_oneshot(_price_crash_stream, PRICE_CRASH_SFX_VOLUME_DB)
 
 
 func _play_oneshot(stream: AudioStream, volume_db: float) -> void:
