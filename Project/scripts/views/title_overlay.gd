@@ -35,7 +35,7 @@ func _build_bg() -> void:
 	_bg = TextureRect.new()
 	_bg.name = "Cover"
 	_bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_bg.mouse_filter = MOUSE_FILTER_IGNORE
 	var tex: Texture2D = null
