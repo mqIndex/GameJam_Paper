@@ -3,6 +3,7 @@
 #   persona_id                          - 选择的人格 (mr_dealer / ms_controller)
 #   played_at                           - 最近一次进入存档的时间字符串
 #   max_cleared_level_index             - 已通关的最高关卡 index (-1 = 尚未通关任何关; 0 = 教学关已过, 后续以此类推)
+#   tutorial_guidance_seen              - 本存档已触发过新手教学引导 (触发即记, 中途退出也不再重复)
 #   tutorial_completed                  - 教学关主体流程已完成
 #   tutorial_goal_intro_completed       - 教学关目标介绍 (第 3 天) 已完成
 #   formal_intro_completed              - 进入第 1 个正式关时的介绍已完成
@@ -20,10 +21,11 @@
 #   - v3: 槽位增加 current_level_index / deck_effect_ids / talent_ids (跨关继承的牌组+天赋)
 #   - v4: 槽位增加 resume_day / resume_phase / resume_cash / resume_shares / resume_avg_cost / resume_price / resume_bull / resume_turn_global
 #         (中途退出后恢复到最近一次 _start_day / _enter_shop 的快照点; 商店内购买不更新)
+#   - v5: 槽位增加 tutorial_guidance_seen, 教学引导按存档只触发一次
 extends Node
 
 const SAVE_PATH := "user://saves.cfg"
-const SAVE_VERSION := 4
+const SAVE_VERSION := 5
 const META_SECTION := "meta"
 const SLOT_COUNT := 3
 # 关卡总数 = 教程关 1 + 正式关数 (LEVEL_OPPONENT_ID.size())
@@ -52,6 +54,7 @@ const LEVEL_NAMES: Array = ["新手关", "正式关", "高压关"]
 
 # tutorial 标志位的 (Game 字段名 → 默认值) 字典, 用于序列化和回放
 const TUTORIAL_FLAG_DEFAULTS: Dictionary = {
+	"tutorial_guidance_seen": false,
 	"tutorial_completed": false,
 	"tutorial_goal_intro_completed": false,
 	"formal_intro_completed": false,
@@ -390,9 +393,14 @@ func _load_from_disk() -> void:
 
 
 # 版本迁移钩子: 升版本时在此为新字段填默认值 / 转换旧字段
-# 当前 v1→v2 不需要额外处理 (新字段已由 _empty_slot 提供空字典默认)
-func _migrate_slot(_slot: Dictionary, _from_version: int) -> void:
-	pass
+# 当前 v5: 旧档如果已经完成教学, 视为已经触发过教学引导。
+func _migrate_slot(slot: Dictionary, from_version: int) -> void:
+	if from_version < 5 and (
+		bool(slot.get("tutorial_completed", false))
+		or int(slot.get("max_cleared_level_index", -1)) >= 0
+		or int(slot.get("current_level_index", -1)) > 0
+	):
+		slot["tutorial_guidance_seen"] = true
 
 
 func _save_to_disk() -> void:

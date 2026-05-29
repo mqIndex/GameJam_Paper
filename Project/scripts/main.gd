@@ -218,6 +218,8 @@ func _start_gameplay(allow_default_persona: bool) -> void:
 		Saves.active_persona_id = Saves.DEFAULT_PERSONA_ID
 		_apply_active_persona_portrait()
 	var tutorial_should_start: bool = (not skip_tutorial) and Game.should_start_tutorial()
+	if tutorial_should_start and Game.has_method("mark_tutorial_guidance_seen"):
+		Game.call("mark_tutorial_guidance_seen")
 	Game.set_tutorial_active(tutorial_should_start)
 	_capture_save_snapshot()
 	Game.new_level()

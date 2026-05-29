@@ -163,6 +163,7 @@ var discard_pile: Array = []                    # 等待区 (类似杀戮尖塔)
 var disabled_pile: Array = []                   # 失效牌堆: 当日已达 daily_limit 的牌在此暂存, 跨天 (离开商店进下一天) 归还到弃牌堆参与重洗
 var is_level_over: bool = false
 var tutorial_active: bool = false
+var tutorial_guidance_seen: bool = false
 var tutorial_completed: bool = false
 var shop_tutorial_active: bool = false
 var shop_tutorial_completed: bool = false
@@ -219,7 +220,14 @@ func _ready() -> void:
 
 
 func should_start_tutorial() -> bool:
-	return current_level_index == 0 and not tutorial_completed
+	return current_level_index == 0 and not tutorial_guidance_seen and not tutorial_completed
+
+
+func mark_tutorial_guidance_seen() -> void:
+	if tutorial_guidance_seen:
+		return
+	tutorial_guidance_seen = true
+	emit_signal("state_changed")
 
 
 func should_start_shop_tutorial() -> bool:
@@ -232,6 +240,7 @@ func set_tutorial_active(active: bool) -> void:
 
 func finish_tutorial() -> void:
 	tutorial_active = false
+	tutorial_guidance_seen = true
 	tutorial_completed = true
 	emit_signal("state_changed")
 
@@ -247,6 +256,7 @@ func finish_context_tutorial() -> void:
 
 
 func tutorial_finish_guidance() -> void:
+	tutorial_guidance_seen = true
 	shop_tutorial_active = false
 	shop_tutorial_completed = true
 	finish_context_tutorial()
@@ -367,6 +377,7 @@ func tutorial_finish_and_start_formal_level() -> void:
 func start_formal_level_from_tutorial() -> void:
 	var carry: Array = _level_carryover_effect_ids()
 	tutorial_active = false
+	tutorial_guidance_seen = true
 	shop_tutorial_active = false
 	shop_tutorial_completed = true
 	tutorial_completed = true
@@ -390,6 +401,7 @@ func start_next_level_from_result() -> void:
 	var carry: Array = _level_carryover_effect_ids()
 	if is_tutorial_level():
 		tutorial_active = false
+		tutorial_guidance_seen = true
 		shop_tutorial_active = false
 		shop_tutorial_completed = true
 		tutorial_completed = true
@@ -402,11 +414,10 @@ func start_next_level_from_result() -> void:
 
 func restart_tutorial_level() -> void:
 	current_level_index = 0
-	tutorial_completed = false
+	var should_show_guidance: bool = should_start_tutorial()
 	shop_tutorial_completed = false
 	shop_tutorial_active = false
-	tutorial_goal_intro_completed = false
-	tutorial_active = true
+	tutorial_active = should_show_guidance
 	new_level()
 
 
@@ -1733,6 +1744,7 @@ func _settle_level() -> void:
 			_log("[宝叔] 山高路远，江湖再见")
 	if is_tutorial_level():
 		tutorial_active = false
+		tutorial_guidance_seen = true
 		shop_tutorial_active = false
 		shop_tutorial_completed = true
 		tutorial_completed = true

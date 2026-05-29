@@ -84,7 +84,12 @@ func _on_restart() -> void:
 	if _continue_to_next_level and Game.has_method("start_next_level_from_result"):
 		Game.call("start_next_level_from_result")
 	elif Game.current_level_index == 0 and Game.has_method("restart_tutorial_level"):
+		var restart_should_start_tutorial: bool = Game.should_start_tutorial()
 		Game.call("restart_tutorial_level")
+		if not restart_should_start_tutorial:
+			return
+		if Game.has_method("mark_tutorial_guidance_seen"):
+			Game.call("mark_tutorial_guidance_seen")
 		var tutorial: Control = null
 		if get_parent() != null:
 			tutorial = get_parent().get_node_or_null("TutorialOverlay") as Control
